@@ -1,4 +1,5 @@
 import ChatPanel from './components/ChatPanel/ChatPanel'
+import Dashboard from './components/Dashboard/Dashboard'
 import { FormProvider } from './state/FormContext'
 
 export default function App() {
@@ -9,7 +10,7 @@ export default function App() {
           <ChatPanel />
         </div>
         <div className="w-[45%]">
-          <div className="p-4 text-muted text-sm">右侧仪表盘（待实现）</div>
+          <Dashboard />
         </div>
       </div>
     </FormProvider>
