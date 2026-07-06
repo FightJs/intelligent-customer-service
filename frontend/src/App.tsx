@@ -18,7 +18,7 @@ export default function App() {
         ) : (
           <div className="flex-1 flex overflow-hidden">
             <div className="w-[55%] border-r border-idle">
-              <ChatPanel onAllDone={() => setShowReport(true)} />
+              <ChatPanel />
             </div>
             <div className="w-[45%]">
               <Dashboard onGenerate={() => setShowReport(true)} />

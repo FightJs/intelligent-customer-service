@@ -14,6 +14,7 @@ export default function ChatPanel({ onAllDone }: { onAllDone?: () => void }) {
   const { state, dispatch } = useFormState()
   const [messages, setMessages] = useState<ChatMessage[]>(() => initialMessages())
   const [draft, setDraft] = useState('')
+  const [finished, setFinished] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -42,6 +43,7 @@ export default function ChatPanel({ onAllDone }: { onAllDone?: () => void }) {
     if (nextStep) dispatch({ type: 'set_active_section', sectionId: nextStep.sectionId })
     else {
       dispatch({ type: 'complete' })
+      setFinished(true)
       onAllDone?.()
     }
   }
@@ -58,7 +60,7 @@ export default function ChatPanel({ onAllDone }: { onAllDone?: () => void }) {
         {messages.map((m) => (
           <MessageBubble key={m.id} role={m.role}>
             <div>{m.text}</div>
-            {m.kind === 'field' && m.fieldRef && fieldDef && m.fieldRef.fieldId === fieldId && currentValue && (
+            {m.kind === 'field' && m.fieldRef && fieldDef && m.fieldRef.fieldId === fieldId && currentValue && !finished && (
               <FieldInput def={fieldDef} value={currentValue} updateValue={updateValue} commitAndAdvance={commitAndAdvance} />
             )}
           </MessageBubble>
