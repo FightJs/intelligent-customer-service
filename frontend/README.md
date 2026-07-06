@@ -1,32 +1,30 @@
-# React + TypeScript + Vite
+# 直播间视觉向量化智能客服 UI 原型
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+面向客户的 AI 对话式客服前端原型，采集直播间搭建需求的 11 节信息。
 
-Currently, two official plugins are available:
+## 启动
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev      # 启动开发服务器
+npm test         # 跑单元测试
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## 功能
+
+- 左侧对话区：AI 按脚本提问，气泡内嵌选项卡/尺寸输入/图片上传
+- 右侧仪表盘：11 节卡片网格，实时回显采集进度，点击就地展开编辑
+- 顶部进度：环形完成度 + 重新开始
+- 完成态：生成方案预览页（11 节摘要 + 占位交付物 + 原始 JSON）
+
+## 技术栈
+
+React 19 · TypeScript · Vite · Tailwind CSS · Vitest
+
+## 范围说明
+
+本原型不接后端 / 不接 LLM。AI 消息由 `src/data/scriptedFlow.ts` 本地脚本生成。后续可替换为真实 OpenAI Agents SDK 后端。
+
+## 设计文档
+
+见 `../docs/superpowers/specs/2026-07-06-livestream-cs-ui-design.md`。
