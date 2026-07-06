@@ -10,7 +10,7 @@ import DimensionInput from './DimensionInput'
 import ImageUpload from './ImageUpload'
 import type { FieldDef, FieldValue, SectionId } from '../../types/schema'
 
-export default function ChatPanel({ onAllDone }: { onAllDone?: () => void }) {
+export default function ChatPanel({ onComplete }: { onComplete?: () => void }) {
   const { state, dispatch } = useFormState()
   const [messages, setMessages] = useState<ChatMessage[]>(() => initialMessages())
   const [draft, setDraft] = useState('')
@@ -44,7 +44,7 @@ export default function ChatPanel({ onAllDone }: { onAllDone?: () => void }) {
     else {
       dispatch({ type: 'complete' })
       setFinished(true)
-      onAllDone?.()
+      onComplete?.()
     }
   }
 
