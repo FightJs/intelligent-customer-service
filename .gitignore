@@ -1,0 +1,92 @@
+# ===================================================================
+# Monorepo 根 .gitignore（Intelligent Customer Service）
+# 结构：frontend/ (React UI) + backend/ (待开发) + docs/ + 配置
+# 子包可有各自 .gitignore 补充（如 frontend/.gitignore 已存在）
+# ===================================================================
+
+# ---------- 依赖 ----------
+node_modules/
+.pnp
+.pnp.js
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+vendor/
+
+# ---------- 构建产物 ----------
+dist/
+dist-ssr/
+build/
+.next/
+out/
+*.tsbuildinfo
+.nuxt/
+target/             # Rust/Java
+bin/obj/            # .NET
+coverage/
+*.lcov
+
+# ---------- 包管理锁文件 ----------
+# 锁文件应入库（保证可复现构建），以下仅排除本地工具产生的元数据
+# package-lock.json / yarn.lock / pnpm-lock.yaml / Cargo.lock 等不忽略
+
+# ---------- 环境变量与密钥 ----------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+secrets/
+credentials.json
+service-account*.json
+
+# ---------- 日志与临时 ----------
+*.log
+logs/
+*.tmp
+*.bak
+*.cache
+*.swp
+*~
+
+# ---------- 测试与缓存 ----------
+.nyc_output/
+.eslintcache
+.stylelintcache
+.parcel-cache/
+.turbo/
+.cache/
+
+# ---------- 操作系统 ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+
+# ---------- 编辑器 / IDE ----------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.code-workspace
+.history/
+
+# ---------- AI / 工具运行时缓存 ----------
+.superpowers/
+.opencode/
+.opencode*
+*.chat_history
+
+# ---------- 本地脚手架产物（不入库）----------
+_workspace-backup/
+_ics_tmp_hold/
