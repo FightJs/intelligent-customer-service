@@ -1,7 +1,13 @@
+import MessageBubble from './components/ChatPanel/MessageBubble'
+import { FormProvider } from './state/FormContext'
+
 export default function App() {
   return (
-    <div className="h-full flex items-center justify-center">
-      <h1 className="text-primary text-xl">直播间视觉向量化智能客服</h1>
-    </div>
+    <FormProvider>
+      <div className="h-full p-8">
+        <MessageBubble role="ai">测试气泡</MessageBubble>
+        <MessageBubble role="user">用户消息</MessageBubble>
+      </div>
+    </FormProvider>
   )
 }
