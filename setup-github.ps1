@@ -1,10 +1,12 @@
-# setup-github.ps1 — 一次性 GitHub 环境初始化
+﻿# setup-github.ps1 — 一次性 GitHub 环境初始化（monorepo 版）
 # 前置：代理客户端（Clash 等）运行中，GitHub 规则生效
 # 用法：在 A:\Intelligent Customer Service 下执行  .\setup-github.ps1
+#
+# 适用场景：在新机器上 clone 本仓库后，配置 GitHub CLI + git 凭据 + 上传缓冲。
+# 仓库已存在于 GitHub（HXS482/intelligent-customer-service），本脚本不再创建仓库。
 
 $ErrorActionPreference = 'Stop'
-$git = "C:\Program Files\Git\cmd\git.exe"
-$repoDir = "A:\Intelligent Customer Service\livestream-cs-ui"
+$repoRoot = "A:\Intelligent Customer Service"
 
 Write-Host "== 1. 连通性检查 ==" -ForegroundColor Cyan
 try {
@@ -19,12 +21,14 @@ try {
 Write-Host "`n== 2. 安装 GitHub CLI ==" -ForegroundColor Cyan
 $gh = Get-Command gh -ErrorAction SilentlyContinue
 if ($gh) {
-    Write-Host "gh 已安装：$(& gh --version | Select-Object -First 1)" -ForegroundColor Green
+    $ghVer = (& gh --version | Select-Object -First 1)
+    Write-Host ("gh 已安装：" + $ghVer) -ForegroundColor Green
 } else {
     Write-Host "通过 winget 安装 gh..." -ForegroundColor Yellow
     winget install --id GitHub.cli -e --accept-source-agreements --accept-package-agreements
-    # 刷新当前会话 PATH
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+    $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $env:Path = "$machinePath;$userPath"
     $gh = Get-Command gh -ErrorAction SilentlyContinue
     if (-not $gh) { Write-Host "gh 安装失败，请手动安装后重跑后续步骤" -ForegroundColor Red; exit 1 }
 }
@@ -38,21 +42,27 @@ if ($LASTEXITCODE -eq 0) {
     if ($LASTEXITCODE -ne 0) { Write-Host "登录失败" -ForegroundColor Red; exit 1 }
 }
 
-Write-Host "`n== 4. 创建 GitHub 私有仓库 livestream-cs-ui ==" -ForegroundColor Cyan
-Set-Location $repoDir
-$remote = & $git remote get-url origin 2>$null
-if ($remote) {
-    Write-Host "origin 已存在：$remote" -ForegroundColor Green
-} else {
-    & gh repo create livestream-cs-ui --private --source=. --remote=origin --description "直播间视觉向量化智能客服 UI 原型"
-    Write-Host "仓库已创建并设为 origin" -ForegroundColor Green
-}
+Write-Host "`n== 4. 把 gh token 注册为 git HTTPS 凭据助手 ==" -ForegroundColor Cyan
+& gh auth setup-git
+Write-Host "credential helper 已配置（避免 push 超时）" -ForegroundColor Green
 
-Write-Host "`n== 5. 推送当前代码 ==" -ForegroundColor Cyan
-& $git push -u origin main
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "`n✅ 完成！仓库地址：" -ForegroundColor Green
-    & gh repo view --web
+Write-Host "`n== 5. 调小 git 上传缓冲（避免大 push 在代理上挂起）==" -ForegroundColor Cyan
+& git config --global http.postBuffer 524288
+Write-Host "http.postBuffer = 524288" -ForegroundColor Green
+
+Write-Host "`n== 6. 验证远程仓库连接 ==" -ForegroundColor Cyan
+Set-Location $repoRoot
+$remote = & git remote get-url origin 2>$null
+if ($remote) {
+    Write-Host "origin: $remote" -ForegroundColor Green
+    & git ls-remote origin *>$null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "`n✅ 环境就绪！可用 git pull / push 与 GitHub 同步。" -ForegroundColor Green
+        Write-Host "仓库地址：https://github.com/HXS482/intelligent-customer-service" -ForegroundColor Cyan
+    } else {
+        Write-Host "git ls-remote 失败，请检查凭据与代理" -ForegroundColor Red
+    }
 } else {
-    Write-Host "推送失败，请检查分支/认证" -ForegroundColor Red
+    Write-Host "未检测到 origin 远程。若是新 clone，请确认仓库地址正确。" -ForegroundColor Yellow
+    Write-Host "手动添加：git remote add origin https://github.com/HXS482/intelligent-customer-service.git" -ForegroundColor Yellow
 }

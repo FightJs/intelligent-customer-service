@@ -3,22 +3,29 @@
 本文件是本仓库 AI agent 与人类协作者的统一开发规约。所有提交、分支、PR 必须遵守。
 目标：**可溯源** —— 任何一行代码变更都能追溯到对应的 issue / PR / commit。
 
-## 1. 仓库结构
+## 1. 仓库结构（Monorepo）
+
+整个工作区是**单一 git 仓库**（monorepo），托管于 GitHub `HXS482/intelligent-customer-service`。
+前端、后端、文档、规约统一在一个仓库内，共享一套分支与提交规范。
 
 ```
-A:\Intelligent Customer Service\
-├── livestream-cs-ui/        # 主代码仓库（独立 git repo，托管于 GitHub）
+A:\Intelligent Customer Service\           ← git 根（.git 在此）
+├── frontend/          # 前端（React + Vite + Tailwind，三栏布局 UI）
+├── backend/           # 后端（待开发）
 ├── docs/
-│   ├── superpowers/
-│   │   ├── specs/           # 设计文档（brainstorming 产物）
-│   │   └── plans/           # 实现计划（writing-plans 产物）
-│   └── ...
-├── AGENTS.md                # 本文件
-└── opencode.json            # opencode 项目配置（权限 + 指令）
+│   └── superpowers/
+│       ├── specs/     # 设计文档（brainstorming 产物）
+│       └── plans/     # 实现计划（writing-plans 产物）
+├── AGENTS.md          # 本文件（协作规约）
+├── opencode.json      # opencode 项目配置（权限 + 指令）
+├── setup-github.ps1   # GitHub 环境初始化脚本
+└── .gitignore         # monorepo 根排除规则
 ```
 
-- `livestream-cs-ui/` 是唯一推送到 GitHub 的 git 仓库
+- **唯一 GitHub 仓库**：`intelligent-customer-service`，默认分支 `main`
 - `docs/superpowers/` 是设计与计划的"源头"，每个功能先有 spec → plan → 才有代码
+- `frontend/`、`backend/` 可有各自 `.gitignore` 补充子包特定排除项
+- 严禁在子目录内再 `git init`（避免嵌套仓库反模式）
 
 ## 2. 分支模型（GitHub Flow）
 
@@ -101,8 +108,8 @@ Closes #N
 - ...
 
 ## 验证方式
-- [ ] 测试通过：`npm test`
-- [ ] 构建通过：`npm run build`
+- [ ] 测试通过：`cd frontend && npm test`（后端同理进 backend/）
+- [ ] 构建通过：`cd frontend && npm run build`
 - [ ] 手动验证：...
 
 ## 自检
@@ -117,7 +124,7 @@ AI agent（opencode）在本项目工作时**必须**：
 1. **永远不直接 push 到 main** —— 任何变更先切 feature 分支再开 PR
 2. **永远不 force push** 到他人协作的分支
 3. **commit message 必须符合** 第 3 节规范
-4. **开 PR 前必须自检**：`npm test` + `npm run build` 通过
+4. **开 PR 前必须自检**：改了前端就 `cd frontend && npm test && npm run build`；改了后端同理进对应子包
 5. **只在用户明确要求时**才 commit / push / 开 PR / 合并
 6. **gh 命令用于所有 GitHub 操作**（建仓库、开 PR、查 issue、加 label）
 7. **大型功能必须先有 spec + plan**（走 superpowers brainstorming → writing-plans 流程）
@@ -139,7 +146,7 @@ AI agent（opencode）在本项目工作时**必须**：
 ### ① 同步最新 main（起点，每次开工必做）
 
 ```bash
-cd "A:/Intelligent Customer Service/livestream-cs-ui"
+cd "A:/Intelligent Customer Service"   # monorepo 根
 git checkout main
 git pull --ff-only origin main
 ```
@@ -185,9 +192,10 @@ git commit -m "feat(scope): 动词开头的描述"
 ### ⑤ 本地自检（push 前必做）
 
 ```bash
-npm test          # 测试通过
-npm run build     # 构建通过
+# monorepo：进入对应子包再跑（前端改动 → frontend/，后端改动 → backend/）
+cd frontend && npm test && npm run build && cd ..
 ```
+- 只改了文档（AGENTS.md / docs/）可跳过此步。
 - 任一失败 → 回 ④ 修复，**不得带病 push**（第 5 节第 4 条）。
 - 自检通过后再 push。
 
@@ -257,7 +265,7 @@ git branch -d feature/<简短描述>-#N   # 保险：删除本地分支（如未
 
 - [ ] 从最新 main 切的分支
 - [ ] commit message 全部 Conventional Commits 格式
-- [ ] `npm test` + `npm run build` 通过
+- [ ] 改动子包的自检通过（前端 `cd frontend && npm test && npm run build`）
 - [ ] PR 描述含 `Closes #N`
 - [ ] 无调试代码残留
 - [ ] squash merge 到 main，分支已删
