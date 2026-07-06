@@ -4,15 +4,15 @@ export default {
   theme: {
     extend: {
       colors: {
-        base: '#0f172a',
-        surface: '#1e293b',
-        'active-surface': '#172554',
-        primary: '#e2e8f0',
-        secondary: '#94a3b8',
-        muted: '#64748b',
-        accent: '#2563eb',
-        done: '#34d399',
-        idle: '#475569',
+        base: 'rgb(var(--color-base) / <alpha-value>)',
+        surface: 'rgb(var(--color-surface) / <alpha-value>)',
+        'active-surface': 'rgb(var(--color-active-surface) / <alpha-value>)',
+        primary: 'rgb(var(--color-primary) / <alpha-value>)',
+        secondary: 'rgb(var(--color-secondary) / <alpha-value>)',
+        muted: 'rgb(var(--color-muted) / <alpha-value>)',
+        accent: 'rgb(var(--color-accent) / <alpha-value>)',
+        done: 'rgb(var(--color-done) / <alpha-value>)',
+        idle: 'rgb(var(--color-idle) / <alpha-value>)',
       },
       borderRadius: {
         card: '8px',
