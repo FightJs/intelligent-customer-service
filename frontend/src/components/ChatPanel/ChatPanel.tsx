@@ -29,7 +29,12 @@ export default function ChatPanel() {
   const currentValue: FieldValue | undefined =
     sectionId && fieldId ? state.sections[sectionId].fields[fieldId] : undefined
 
-  function commit(v: FieldValue) {
+  function updateValue(v: FieldValue) {
+    if (!step) return
+    dispatch({ type: 'update_field', sectionId: step.sectionId, fieldId: step.fieldId, value: v })
+  }
+
+  function commitAndAdvance(v: FieldValue) {
     if (!step) return
     dispatch({ type: 'update_field', sectionId: step.sectionId, fieldId: step.fieldId, value: v })
     const { userMsg, aiMessages, nextStep } = replyToCurrentStep(step, v)
@@ -40,7 +45,7 @@ export default function ChatPanel() {
 
   function submitDraft() {
     if (!fieldDef || fieldDef.type !== 'text' || draft.trim() === '') return
-    commit({ type: 'text', value: draft.trim() })
+    commitAndAdvance({ type: 'text', value: draft.trim() })
     setDraft('')
   }
 
@@ -51,7 +56,7 @@ export default function ChatPanel() {
           <MessageBubble key={m.id} role={m.role}>
             <div>{m.text}</div>
             {m.kind === 'field' && m.fieldRef && fieldDef && m.fieldRef.fieldId === fieldId && currentValue && (
-              <FieldInput def={fieldDef} value={currentValue} onCommit={commit} />
+              <FieldInput def={fieldDef} value={currentValue} updateValue={updateValue} commitAndAdvance={commitAndAdvance} />
             )}
           </MessageBubble>
         ))}
@@ -77,15 +82,55 @@ export default function ChatPanel() {
   )
 }
 
-function FieldInput({ def, value, onCommit }: { def: FieldDef; value: FieldValue; onCommit: (v: FieldValue) => void }) {
+function FieldInput({
+  def,
+  value,
+  updateValue,
+  commitAndAdvance,
+}: {
+  def: FieldDef
+  value: FieldValue
+  updateValue: (v: FieldValue) => void
+  commitAndAdvance: (v: FieldValue) => void
+}) {
+  const confirmClass = 'mt-2 px-3 py-1 text-xs rounded-pill bg-accent text-white disabled:opacity-40'
+
   switch (def.type) {
     case 'choice-single':
-    case 'choice-multi':
-      return <ChoiceCard def={def} value={value} onCommit={onCommit} />
-    case 'dimension':
-      return <DimensionInput def={def} value={value} onChange={onCommit} />
-    case 'image':
-      return <ImageUpload value={value} onChange={onCommit} />
+      return <ChoiceCard def={def} value={value} onCommit={commitAndAdvance} />
+    case 'choice-multi': {
+      const empty = value.type !== 'choice-multi' || value.value.length === 0
+      return (
+        <div>
+          <ChoiceCard def={def} value={value} onCommit={updateValue} />
+          <button type="button" className={confirmClass} disabled={empty} onClick={() => commitAndAdvance(value)}>
+            确认
+          </button>
+        </div>
+      )
+    }
+    case 'dimension': {
+      const empty = value.type !== 'dimension' || Object.values(value.value).every((v) => v.trim() === '')
+      return (
+        <div>
+          <DimensionInput def={def} value={value} onChange={updateValue} />
+          <button type="button" className={confirmClass} disabled={empty} onClick={() => commitAndAdvance(value)}>
+            确认
+          </button>
+        </div>
+      )
+    }
+    case 'image': {
+      const empty = value.type !== 'image' || value.value.length === 0
+      return (
+        <div>
+          <ImageUpload value={value} onChange={updateValue} />
+          <button type="button" className={confirmClass} disabled={empty} onClick={() => commitAndAdvance(value)}>
+            确认
+          </button>
+        </div>
+      )
+    }
     default:
       return null
   }
