@@ -86,10 +86,14 @@ class SectionState(BaseModel):
 
 
 class StudioFormState(BaseModel):
-    """完整表单状态，跨会话持久化的对象。"""
-    model_config = ConfigDict(extra='forbid')
+    """完整表单状态，跨会话持久化的对象。
+
+    序列化统一用 camelCase（与前端 TS 一致）：
+    current_section_id → currentSectionId
+    """
+    model_config = ConfigDict(extra='forbid', populate_by_name=True)
     sections: dict[str, SectionState] = Field(default_factory=dict)
-    current_section_id: str = ''
+    current_section_id: str = Field(default='', alias='currentSectionId')
     completed: bool = False
 
 

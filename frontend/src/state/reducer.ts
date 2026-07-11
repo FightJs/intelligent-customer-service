@@ -4,6 +4,7 @@ import { filledCount } from '../utils/summary'
 
 export type Action =
   | { type: 'update_field'; sectionId: SectionId; fieldId: string; value: FieldValue }
+  | { type: 'replace_state'; state: StudioFormState }
   | { type: 'set_active_section'; sectionId: SectionId }
   | { type: 'advance' }
   | { type: 'complete' }
@@ -35,6 +36,8 @@ export function reducer(state: StudioFormState, action: Action): StudioFormState
       next = recomputeStatus(next, action.sectionId)
       return next
     }
+    case 'replace_state':
+      return action.state
     case 'set_active_section':
       return { ...state, currentSectionId: action.sectionId }
     case 'advance': {

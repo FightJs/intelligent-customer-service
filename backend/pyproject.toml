@@ -1,0 +1,37 @@
+[project]
+name = "ics-backend"
+version = "0.1.0"
+description = "Intelligent Customer Service backend — AI 对话采集 + 交付物生成"
+requires-python = ">=3.12"
+dependencies = [
+    # Web 框架
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    # Schema（已在用）
+    "pydantic>=2.10",
+    # AI Agent（阶段 2）
+    "pydantic-ai-slim[openai]>=2.5",
+    # 交付物生成（阶段 3）
+    "jinja2>=3.1",         # Markdown 模板
+    "openpyxl>=3.1",       # Excel
+    "python-docx>=1.1",    # Word
+    # HTTP（agent 调 LLM 用）
+    "httpx>=0.28",
+    # SSE 流式
+    "sse-starlette>=2.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
+
+# 不打包（无 [build-system]），用 `pip install -r` + PYTHONPATH 方式开发。
+# 运行：cd backend && uvicorn api.app:app --reload
+# 测试：cd backend && pytest
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+pythonpath = ["."]

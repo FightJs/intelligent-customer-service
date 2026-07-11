@@ -28,6 +28,13 @@ bin/obj/            # .NET
 coverage/
 *.lcov
 
+# ---------- 运行时数据（SQLite 等）----------
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+backend/data/
+
 # ---------- 包管理锁文件 ----------
 # 锁文件应入库（保证可复现构建），以下仅排除本地工具产生的元数据
 # package-lock.json / yarn.lock / pnpm-lock.yaml / Cargo.lock 等不忽略
