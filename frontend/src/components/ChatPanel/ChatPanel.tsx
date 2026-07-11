@@ -8,6 +8,7 @@ import MessageBubble from './MessageBubble'
 import ChoiceCard from './ChoiceCard'
 import DimensionInput from './DimensionInput'
 import ImageUpload from './ImageUpload'
+import TableInput from './TableInput'
 import type { FieldDef, FieldValue, SectionId } from '../../types/schema'
 
 interface ChatPanelProps {
@@ -18,7 +19,7 @@ export default function ChatPanel({
   onComplete,
 }: ChatPanelProps) {
   const { state, dispatch } = useFormState()
-  const [messages, setMessages] = useState<ChatMessage[]>(() => initialMessages())
+  const [messages, setMessages] = useState<ChatMessage[]>(() => initialMessages(state))
   const [draft, setDraft] = useState('')
   const [finished, setFinished] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -27,7 +28,7 @@ export default function ChatPanel({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])
 
-  const step = currentStep(messages)
+  const step = currentStep(messages, state)
   const fieldDef: FieldDef | undefined = step
     ? SECTIONS.find((s) => s.id === step.sectionId)?.fields.find((f) => f.id === step.fieldId)
     : undefined
@@ -44,9 +45,9 @@ export default function ChatPanel({
   function commitAndAdvance(v: FieldValue) {
     if (!step) return
     dispatch({ type: 'update_field', sectionId: step.sectionId, fieldId: step.fieldId, value: v })
-    const { userMsg, aiMessages, nextStep } = replyToCurrentStep(step, v)
+    const { userMsg, aiMessages, nextField } = replyToCurrentStep(step, v, state)
     setMessages((prev) => [...prev, userMsg, ...aiMessages])
-    if (nextStep) dispatch({ type: 'set_active_section', sectionId: nextStep.sectionId })
+    if (nextField) dispatch({ type: 'set_active_section', sectionId: nextField.sectionId })
     else {
       dispatch({ type: 'complete' })
       setFinished(true)
@@ -139,6 +140,16 @@ function FieldInput({
         <div>
           <ImageUpload value={value} onChange={updateValue} />
           <button type="button" className={confirmClass} disabled={empty} onClick={() => commitAndAdvance(value)}>
+            确认
+          </button>
+        </div>
+      )
+    }
+    case 'table': {
+      return (
+        <div>
+          <TableInput def={def} value={value} onChange={updateValue} />
+          <button type="button" className={confirmClass} onClick={() => commitAndAdvance(value)}>
             确认
           </button>
         </div>

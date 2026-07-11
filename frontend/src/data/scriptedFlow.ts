@@ -1,4 +1,16 @@
-import type { SectionId } from '../types/schema'
+/**
+ * 对话流程定义（数据驱动版）。
+ *
+ * 流程步骤由 SECTIONS 自动生成，prompt 由 FieldDef.label 派生。
+ * 条件分支字段（visibleIf）在条件不满足时自动跳过。
+ *
+ * 注意：本模块是前端"脚本化"流程，用于阶段 0（无后端 AI 时）。
+ * 阶段 2 接入后端 AI agent 后，chatController 会改为调 /api/chat，
+ * 本模块仍保留作为 fallback 和测试用。
+ */
+import type { SectionId, StudioFormState, SectionState } from '../types/schema'
+import { SECTIONS, SECTION_ORDER, SECTION_BY_ID } from './sections'
+import { isFieldVisible } from '../utils/summary'
 
 export interface ScriptedStep {
   sectionId: SectionId
@@ -6,41 +18,81 @@ export interface ScriptedStep {
   prompt: string
 }
 
-export const SCRIPTED_FLOW: ScriptedStep[] = [
-  { sectionId: 'customer', fieldId: 'brand', prompt: '您好！我是直播间搭建顾问，先问下您的品牌名是？' },
-  { sectionId: 'customer', fieldId: 'phone', prompt: '留个联系电话方便后续沟通？' },
-  { sectionId: 'industry', fieldId: 'category', prompt: '您主要做哪个品类？（选择最接近的）' },
-  { sectionId: 'industry', fieldId: 'position', prompt: '品牌定位大概是？' },
-  { sectionId: 'status', fieldId: 'hasRoom', prompt: '您现在已经有直播间了吗？' },
-  { sectionId: 'status', fieldId: 'views', prompt: '场均观看大概多少人？' },
-  { sectionId: 'venue', fieldId: 'area', prompt: '聊聊场地，直播间大概多少平米？' },
-  { sectionId: 'venue', fieldId: 'size', prompt: '具体尺寸呢？宽×深×高，估个大概也行。' },
-  { sectionId: 'budget', fieldId: 'total', prompt: '预算范围大概多少？' },
-  { sectionId: 'budget', fieldId: 'equipment', prompt: '其中设备预算大概占多少？' },
-  { sectionId: 'product', fieldId: 'main', prompt: '主营商品是什么？比如连衣裙、口红。' },
-  { sectionId: 'product', fieldId: 'keywords', prompt: '风格关键词？3-5 个词，比如：国风、高端、雅致。' },
-  { sectionId: 'benchmark', fieldId: 'hasBenchmark', prompt: '有没有对标参考的直播间？' },
-  { sectionId: 'benchmark', fieldId: 'platform', prompt: '主要想对标哪个平台？' },
-  { sectionId: 'host', fieldId: 'count', prompt: '主播几个人？' },
-  { sectionId: 'host', fieldId: 'height', prompt: '主播身高多少？影响机位高度计算。' },
-  { sectionId: 'equipment', fieldId: 'hasEquipment', prompt: '现有设备情况？是全部新买还是已有部分？' },
-  { sectionId: 'goal', fieldId: 'core', prompt: '核心需求是什么？全新搭建 / 优化 / 只调设备…' },
-  { sectionId: 'goal', fieldId: 'deadline', prompt: '期望什么时候交付？' },
-  { sectionId: 'notes', fieldId: 'note', prompt: '还有什么特殊要求吗？没有可以直接说"无"。' },
-]
+/** 从 FieldDef.label 生成提问话术。 */
+function fieldPrompt(sectionId: SectionId, fieldId: string): string {
+  const def = SECTION_BY_ID[sectionId].fields.find((f) => f.id === fieldId)
+  if (!def) return ''
+  // 不同类型微调话术
+  if (def.type === 'choice-single') return `${def.label}？`
+  if (def.type === 'choice-multi') return `${def.label}？（可多选）`
+  if (def.type === 'dimension') return `${def.label}？`
+  if (def.type === 'image') return `${def.label}？（可直接跳过）`
+  if (def.type === 'table') return `${def.label}？（可添加多行，也可跳过）`
+  return `${def.label}？`
+}
+
+/** 所有可见字段按章节顺序展开为流程步骤。 */
+export function visibleSteps(state: StudioFormState): ScriptedStep[] {
+  const steps: ScriptedStep[] = []
+  for (const secId of SECTION_ORDER) {
+    const secState = state.sections[secId]
+    const secDef = SECTION_BY_ID[secId]
+    if (secState.status === 'skipped') continue
+    for (const f of secDef.fields) {
+      if (!isFieldVisible(f, secState)) continue
+      steps.push({
+        sectionId: secId,
+        fieldId: f.id,
+        prompt: fieldPrompt(secId, f.id),
+      })
+    }
+  }
+  return steps
+}
 
 export function stepAfter(fieldId: string): ScriptedStep | null {
-  const idx = SCRIPTED_FLOW.findIndex((s) => s.fieldId === fieldId)
-  if (idx === -1 || idx + 1 >= SCRIPTED_FLOW.length) return null
-  return SCRIPTED_FLOW[idx + 1]
+  // 兼容旧 API：无 state 时按线性顺序找下一个（不处理条件分支）
+  const all = visibleSteps(createEmptyFlowState())
+  const idx = all.findIndex((s) => s.fieldId === fieldId)
+  if (idx === -1 || idx + 1 >= all.length) return null
+  return all[idx + 1]
+}
+
+export function nextStep(
+  currentFieldId: string,
+  state: StudioFormState,
+): ScriptedStep | null {
+  const steps = visibleSteps(state)
+  const idx = steps.findIndex((s) => s.fieldId === currentFieldId)
+  if (idx === -1 || idx + 1 >= steps.length) return null
+  return steps[idx + 1]
 }
 
 export function transitionPrompt(from: SectionId, to: SectionId): string {
-  const titleMap: Record<SectionId, string> = {
-    customer: '客户信息', industry: '行业品类', status: '直播间现状',
-    venue: '场地条件', budget: '预算范围', product: '商品品牌',
-    benchmark: '对标参考', host: '主播信息', equipment: '现有设备',
-    goal: '需求目标', notes: '备注',
+  const fromTitle = SECTION_BY_ID[from].title
+  const toTitle = SECTION_BY_ID[to].title
+  return `${fromTitle}信息够了，聊聊${toTitle}吧 👇`
+}
+
+/** 起始第一步。 */
+export function firstStep(state: StudioFormState): ScriptedStep | null {
+  return visibleSteps(state)[0] ?? null
+}
+
+// ── 用于 stepAfter 兼容函数的空状态 ──
+function createEmptyFlowState(): StudioFormState {
+  const sections = {} as StudioFormState['sections']
+  for (const def of SECTIONS) {
+    const fields: Record<string, { type: 'choice-single'; value: string | null }> = {}
+    for (const f of def.fields) {
+      // 给依赖字段一个非 null 默认值，让 visibleIf 字段默认可见
+      fields[f.id] = { type: 'choice-single', value: '' }
+    }
+    sections[def.id] = { id: def.id, status: 'pending', fields } as SectionState
   }
-  return `${titleMap[from]}信息够了，聊聊${titleMap[to]}吧 👇`
+  return {
+    sections,
+    currentSectionId: SECTION_ORDER[0],
+    completed: false,
+  }
 }

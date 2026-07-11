@@ -9,6 +9,7 @@ function emptyFieldValue(def: FieldDef): FieldValue {
     case 'dimension':
       return { type: 'dimension', value: Object.fromEntries((def.dims ?? []).map((d) => [d, ''])) }
     case 'image': return { type: 'image', value: [] }
+    case 'table': return { type: 'table', value: [] }
   }
 }
 

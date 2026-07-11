@@ -1,12 +1,28 @@
-export type SectionId =
-  | 'customer' | 'industry' | 'status' | 'venue' | 'budget'
-  | 'product' | 'benchmark' | 'host' | 'equipment' | 'goal' | 'notes'
+/**
+ * @generated 由 frontend/scripts/gen-schema.mjs 从 schema.json 生成，勿手改。
+ * 改后端 schema 后：python -m backend.survey.export && npm run gen:schema
+ */
 
-export type FieldType = 'text' | 'choice-single' | 'choice-multi' | 'dimension' | 'image'
+export type SectionId = 'budget' | 'customer' | 'equipment' | 'goal' | 'host' | 'industry' | 'notes' | 'product' | 'status' | 'venue'
+
+export type FieldType =
+  | 'text' | 'choice-single' | 'choice-multi' | 'dimension' | 'image' | 'table'
 
 export interface OptionDef {
   value: string
   label: string
+}
+
+export interface VisibleIf {
+  fieldId: string
+  op: 'eq' | 'ne'
+  value: string
+}
+
+export interface TableColumn {
+  id: string
+  label: string
+  placeholder: string
 }
 
 export interface FieldDef {
@@ -15,14 +31,17 @@ export interface FieldDef {
   type: FieldType
   required: boolean
   options?: OptionDef[]
-  dims?: string[]              // for 'dimension'：如 ['宽','深','高']
-  unit?: string                // for 'dimension'：如 'm' / 'cm'
-  placeholder?: string         // for 'text'
+  dims?: string[]              // dimension：['宽','深','高']
+  unit?: string                // dimension：'m' / 'cm'
+  placeholder?: string         // text
+  columns?: TableColumn[]      // table：列定义
+  visibleIf?: VisibleIf        // 条件分支
 }
 
 export interface SectionDef {
   id: SectionId
-  title: string                // '一、客户信息'
+  title: string
+  hint: string
   order: number
   fields: FieldDef[]
 }
@@ -31,12 +50,15 @@ export type FieldValue =
   | { type: 'text'; value: string }
   | { type: 'choice-single'; value: string | null }
   | { type: 'choice-multi'; value: string[] }
-  | { type: 'dimension'; value: Record<string, string> }  // { 宽:'4.5', 深:'5', 高:'3' }
-  | { type: 'image'; value: string[] }                    // 占位文件名列表
+  | { type: 'dimension'; value: Record<string, string> }
+  | { type: 'image'; value: string[] }
+  | { type: 'table'; value: Record<string, string>[] }
+
+export type SectionStatus = 'pending' | 'active' | 'complete' | 'skipped'
 
 export interface SectionState {
   id: SectionId
-  status: 'pending' | 'active' | 'complete'
+  status: SectionStatus
   fields: Record<string, FieldValue>
 }
 

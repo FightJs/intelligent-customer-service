@@ -6,6 +6,7 @@ const STATUS_DOT: Record<string, string> = {
   pending: 'bg-idle',
   active: 'bg-accent',
   complete: 'bg-done',
+  skipped: 'bg-idle opacity-40',
 }
 
 export default function ProgressPanel() {

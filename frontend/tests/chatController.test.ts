@@ -1,10 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import { initialMessages, currentStep, replyToCurrentStep, fieldToUserText } from '../src/components/ChatPanel/chatController'
-import { SCRIPTED_FLOW } from '../src/data/scriptedFlow'
+import { visibleSteps } from '../src/data/scriptedFlow'
+import { createInitialState } from '../src/state/initialState'
+import type { StudioFormState } from '../src/types/schema'
+
+function freshState(): StudioFormState {
+  return createInitialState()
+}
 
 describe('initialMessages', () => {
   it('首条是文字开场白，第二条是第一个 field', () => {
-    const msgs = initialMessages()
+    const state = freshState()
+    const msgs = initialMessages(state)
     expect(msgs).toHaveLength(2)
     expect(msgs[0].role).toBe('ai')
     expect(msgs[0].kind).toBe('text')
@@ -15,38 +22,45 @@ describe('initialMessages', () => {
 
 describe('currentStep', () => {
   it('返回最后一条 field 消息对应的 step', () => {
-    const msgs = initialMessages()
-    const step = currentStep(msgs)
+    const state = freshState()
+    const msgs = initialMessages(state)
+    const step = currentStep(msgs, state)
     expect(step?.fieldId).toBe('brand')
   })
 })
 
 describe('replyToCurrentStep', () => {
   it('回答后生成 user 消息 + AI 确认 + 下一个 field', () => {
-    const step = SCRIPTED_FLOW[0]  // brand
+    const state = freshState()
+    const steps = visibleSteps(state)
+    const step = steps[0]  // brand
     const value = { type: 'text' as const, value: '云裳' }
-    const { userMsg, aiMessages, nextStep } = replyToCurrentStep(step, value)
+    const { userMsg, aiMessages, nextField } = replyToCurrentStep(step, value, state)
     expect(userMsg.role).toBe('user')
     expect(userMsg.text).toBe('云裳')
     expect(aiMessages.length).toBeGreaterThanOrEqual(2)
     expect(aiMessages[0].text).toBe('收到 ✓')
-    expect(nextStep?.fieldId).toBe('phone')
+    expect(nextField?.fieldId).toBe('contact')  // brand 后是 contact
   })
 
   it('跨节时 AI 有过渡语', () => {
-    // phone 是 customer 最后一个，下一个是 industry
-    const phoneStep = SCRIPTED_FLOW[1]
-    const value = { type: 'text' as const, value: '138****' }
-    const { aiMessages } = replyToCurrentStep(phoneStep, value)
-    const hasTransition = aiMessages.some((m) => m.text?.includes('行业品类'))
+    const state = freshState()
+    const steps = visibleSteps(state)
+    // customer 最后一个必填字段是 source（第7个字段），下一个进 industry
+    const customerLastStep = steps.filter((s) => s.sectionId === 'customer').slice(-1)[0]
+    const value = { type: 'choice-single' as const, value: 'douyin' }
+    const { aiMessages } = replyToCurrentStep(customerLastStep, value, state)
+    const hasTransition = aiMessages.some((m) => m.text?.includes('行业与品类'))
     expect(hasTransition).toBe(true)
   })
 
-  it('最后一个字段回答后 nextStep 为 null', () => {
-    const last = SCRIPTED_FLOW[SCRIPTED_FLOW.length - 1]
+  it('最后一个字段回答后 nextField 为 null', () => {
+    const state = freshState()
+    const steps = visibleSteps(state)
+    const last = steps[steps.length - 1]
     const value = { type: 'text' as const, value: '无' }
-    const { nextStep } = replyToCurrentStep(last, value)
-    expect(nextStep).toBeNull()
+    const { nextField } = replyToCurrentStep(last, value, state)
+    expect(nextField).toBeNull()
   })
 })
 

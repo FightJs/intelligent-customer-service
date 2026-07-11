@@ -85,6 +85,7 @@ $RECYCLE.BIN/
 .superpowers/
 .opencode/
 .opencode*
+.zcode/
 *.chat_history
 
 # ---------- 本地脚手架产物（不入库）----------

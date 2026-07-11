@@ -1,4 +1,16 @@
-import type { SectionState, FieldValue, SectionDef } from '../types/schema'
+import type { SectionState, FieldValue, SectionDef, FieldDef } from '../types/schema'
+
+/** 字段是否可见（条件分支：visibleIf 条件满足才可见）。 */
+export function isFieldVisible(field: FieldDef, section: SectionState): boolean {
+  if (!field.visibleIf) return true
+  const dep = section.fields[field.visibleIf.fieldId]
+  if (!dep || dep.type !== 'choice-single') return true
+  const depValue = dep.value
+  if (depValue === null) return false
+  return field.visibleIf.op === 'eq'
+    ? depValue === field.visibleIf.value
+    : depValue !== field.visibleIf.value
+}
 
 function valueToText(v: FieldValue, def?: { label?: string; options?: { value: string; label: string }[] }): string {
   switch (v.type) {
@@ -21,12 +33,15 @@ function valueToText(v: FieldValue, def?: { label?: string; options?: { value: s
         .join('×')
     case 'image':
       return v.value.length ? `${v.value.length}张图` : ''
+    case 'table':
+      return v.value.length ? `${v.value.length}行` : ''
   }
 }
 
 export function makeSummary(section: SectionState, def: SectionDef): string {
   const parts: string[] = []
   for (const f of def.fields) {
+    if (!isFieldVisible(f, section)) continue
     const v = section.fields[f.id]
     if (!v) continue
     const t = valueToText(v, f)
@@ -39,12 +54,14 @@ export function makeSummary(section: SectionState, def: SectionDef): string {
 
 export function filledCount(section: SectionState, def: SectionDef): { filled: number; total: number } {
   let filled = 0
+  let total = 0
   for (const f of def.fields) {
     if (!f.required) continue
+    if (!isFieldVisible(f, section)) continue
+    total++
     const v = section.fields[f.id]
     if (!v) continue
     if (valueToText(v, f) !== '') filled++
   }
-  const total = def.fields.filter((f) => f.required).length
   return { filled, total }
 }
