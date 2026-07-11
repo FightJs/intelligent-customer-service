@@ -20,10 +20,14 @@ from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from agent.gather import run_turn_stream, initial_greeting
+from delivery.markdown import generate_markdown
+from delivery.excel import generate_excel
+from delivery.word import generate_word
 from store import db
 from survey.state import create_initial_state, to_dict, from_dict
 
@@ -56,12 +60,6 @@ class ChatRequest(BaseModel):
     session_id: str
     message: str
     history: list[dict] | None = None
-
-
-class GenerateResponse(BaseModel):
-    type: str
-    filename: str
-    content: str
 
 
 # ── 端点 ──────────────────────────────────────────────────────
@@ -133,19 +131,53 @@ def chat(req: ChatRequest) -> EventSourceResponse:
     return EventSourceResponse(event_generator())
 
 
-@app.post('/api/generate/{doc_type}', response_model=GenerateResponse)
+@app.post('/api/generate/{doc_type}')
 def generate(
     doc_type: Literal['markdown', 'excel', 'word'],
     session_id: str,
-) -> GenerateResponse:
-    """生成交付物。阶段 3 接入 DeliveryService。"""
+) -> Response:
+    """生成交付物，返回文件流下载。
+
+    - markdown: text/markdown
+    - excel:   application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+    - word:    application/vnd.openxmlformats-officedocument.wordprocessingml.document
+    """
     data = db.get_session(session_id)
     if data is None:
         raise HTTPException(status_code=404, detail='session not found')
 
-    suffix = {'markdown': 'md', 'excel': 'xlsx', 'word': 'docx'}[doc_type]
-    return GenerateResponse(
-        type=doc_type,
-        filename=f'交付物.{suffix}',
-        content=f'[阶段 3 待实现] {doc_type} 交付物生成',
+    state = from_dict(data)
+
+    # 文件名用品牌名（如有）
+    brand = state.sections.get('customer', None)
+    brand_name = ''
+    if brand:
+        brand_field = brand.fields.get('brand')
+        if brand_field and brand_field.type == 'text' and brand_field.value:
+            brand_name = brand_field.value
+
+    if doc_type == 'markdown':
+        content = generate_markdown(state).encode('utf-8')
+        media_type = 'text/markdown; charset=utf-8'
+        suffix = 'md'
+    elif doc_type == 'excel':
+        content = generate_excel(state)
+        media_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        suffix = 'xlsx'
+    elif doc_type == 'word':
+        content = generate_word(state)
+        media_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        suffix = 'docx'
+    else:
+        raise HTTPException(status_code=400, detail=f'unknown type: {doc_type}')
+
+    filename = f'{brand_name}直播间搭建方案.{suffix}' if brand_name else f'交付物.{suffix}'
+    # 中文文件名 RFC 5987 编码
+    from urllib.parse import quote
+    encoded = quote(filename)
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={'Content-Disposition': f"attachment; filename*=UTF-8''{encoded}"},
     )

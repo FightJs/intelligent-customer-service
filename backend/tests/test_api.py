@@ -99,7 +99,24 @@ def test_chat_missing_session_404():
 @patch('api.app.initial_greeting', return_value='hi')
 def test_generate_all_types(mock_greeting):
     sid = client.post('/api/session').json()['session_id']
-    for doc_type, suffix in [('markdown', 'md'), ('excel', 'xlsx'), ('word', 'docx')]:
-        r = client.post(f'/api/generate/{doc_type}?session_id={sid}')
-        assert r.status_code == 200
-        assert r.json()['filename'].endswith(suffix)
+    # markdown
+    r = client.post(f'/api/generate/markdown?session_id={sid}')
+    assert r.status_code == 200
+    assert 'text/markdown' in r.headers.get('content-type', '')
+    assert 'attachment' in r.headers.get('content-disposition', '')
+    assert len(r.content) > 0
+    # excel
+    r2 = client.post(f'/api/generate/excel?session_id={sid}')
+    assert r2.status_code == 200
+    assert 'spreadsheet' in r2.headers.get('content-type', '')
+    assert len(r2.content) > 0
+    # word
+    r3 = client.post(f'/api/generate/word?session_id={sid}')
+    assert r3.status_code == 200
+    assert 'wordprocessingml' in r3.headers.get('content-type', '')
+    assert len(r3.content) > 0
+
+
+def test_generate_missing_session_404():
+    r = client.post('/api/generate/markdown?session_id=nonexistent')
+    assert r.status_code == 404

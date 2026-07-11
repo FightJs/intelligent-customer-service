@@ -32,6 +32,7 @@ export default function ChatPanel({ onComplete }: ChatPanelProps) {
       .then((data) => {
         if (cancelled) return
         setSessionId(data.session_id)
+        sessionStorage.setItem('ics_session_id', data.session_id)
         setMessages([
           { id: newId(), role: 'ai', kind: 'text', text: data.greeting },
         ])
