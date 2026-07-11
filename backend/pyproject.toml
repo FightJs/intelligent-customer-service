@@ -9,16 +9,14 @@ dependencies = [
     "uvicorn[standard]>=0.32",
     # Schema（已在用）
     "pydantic>=2.10",
-    # AI Agent（阶段 2）
-    "pydantic-ai-slim[openai]>=2.5",
+    # AI Agent — Anthropic SDK（直连 DeepSeek /anthropic 端点）
+    "anthropic>=0.40",
     # 交付物生成（阶段 3）
     "jinja2>=3.1",         # Markdown 模板
     "openpyxl>=3.1",       # Excel
     "python-docx>=1.1",    # Word
     # HTTP（agent 调 LLM 用）
     "httpx>=0.28",
-    # SSE 流式
-    "sse-starlette>=2.1",
 ]
 
 [project.optional-dependencies]

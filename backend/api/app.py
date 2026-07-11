@@ -3,17 +3,13 @@
 端点：
 - POST   /api/session          创建会话，返回 session_id + 初始 form_state + 开场白
 - GET    /api/session/{id}     取回会话 form_state（跨会话恢复）
-- POST   /api/chat             SSE 流式对话
+- POST   /api/chat             普通 POST 对话（非 SSE），返回 JSON
 - POST   /api/generate/{type}  生成交付物（markdown/excel/word）
 
-chat 端点接入 agent.run_turn_stream，SSE 事件：
-- tool:  字段更新事件（前端更新表单）
-- token: AI 回复文本片段（流式）
-- done:  本轮结束，附带最新 form_state
+chat 端点接入 agent.run_agent，返回 { reply, tool_events, form_state, form_complete }。
 """
 from __future__ import annotations
 
-import json
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from typing import Literal
@@ -22,9 +18,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
-from sse_starlette.sse import EventSourceResponse
 
-from agent.gather import run_turn_stream, initial_greeting
+from agent.gather import initial_greeting
+from agent.loop import run_agent
 from delivery.markdown import generate_markdown
 from delivery.excel import generate_excel
 from delivery.word import generate_word
@@ -62,6 +58,13 @@ class ChatRequest(BaseModel):
     history: list[dict] | None = None
 
 
+class ChatResponse(BaseModel):
+    reply: str
+    tool_events: list[dict]
+    form_state: dict
+    form_complete: bool
+
+
 # ── 端点 ──────────────────────────────────────────────────────
 
 @app.post('/api/session', response_model=SessionResponse)
@@ -86,49 +89,30 @@ def get_session(session_id: str) -> SessionResponse:
     return SessionResponse(session_id=session_id, form_state=data, greeting='')
 
 
-@app.post('/api/chat')
-def chat(req: ChatRequest) -> EventSourceResponse:
-    """SSE 流式对话。"""
+@app.post('/api/chat', response_model=ChatResponse)
+def chat(req: ChatRequest) -> ChatResponse:
+    """普通 POST 对话（非 SSE）。"""
     data = db.get_session(req.session_id)
     if data is None:
         raise HTTPException(status_code=404, detail='session not found')
 
     state = from_dict(data)
+    result = run_agent(state, req.message, req.history)
 
-    async def event_generator():
-        full_reply = []
-        all_events = []
-        for kind, payload in run_turn_stream(state, req.message, req.history):
-            if kind == 'events':
-                all_events = [asdict(e) for e in payload]
-                yield {
-                    'event': 'tool',
-                    'data': json.dumps({'events': all_events}, ensure_ascii=False),
-                }
-            elif kind == 'token':
-                full_reply.append(payload)
-                yield {
-                    'event': 'token',
-                    'data': json.dumps({'text': payload}, ensure_ascii=False),
-                }
-            elif kind == 'done':
-                # 持久化更新后的 state
-                db.save_session(req.session_id, to_dict(payload.state))
-                # 存对话消息
-                db.add_message(req.session_id, 'user', req.message)
-                db.add_message(
-                    req.session_id, 'assistant', payload.reply,
-                    tool_events=all_events,
-                )
-                yield {
-                    'event': 'done',
-                    'data': json.dumps({
-                        'form_state': to_dict(payload.state),
-                        'form_complete': payload.form_complete,
-                    }, ensure_ascii=False),
-                }
+    # 持久化
+    db.save_session(req.session_id, to_dict(result.state))
+    db.add_message(req.session_id, 'user', req.message)
+    db.add_message(req.session_id, 'assistant', result.reply)
 
-    return EventSourceResponse(event_generator())
+    # tool_events 转 dict
+    events_dict = [asdict(e) for e in result.tool_events]
+
+    return ChatResponse(
+        reply=result.reply,
+        tool_events=events_dict,
+        form_state=to_dict(result.state),
+        form_complete=result.form_complete,
+    )
 
 
 @app.post('/api/generate/{doc_type}')

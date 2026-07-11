@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from fastapi.testclient import TestClient
 
 from api.app import app
-from agent.gather import ToolEvent, TurnResult
 from survey.state import create_initial_state, to_dict
 
 client = TestClient(app)
@@ -40,59 +39,32 @@ def test_get_missing_session_404():
     assert r.status_code == 404
 
 
-def _mock_run_turn_stream(user_msg, state=None):
-    """模拟流式 agent：返回一个 fill 事件 + token + done。"""
-    if state is None:
-        state = create_initial_state()
-    state.sections['customer'].fields['brand'].value = user_msg
-    events = [ToolEvent(kind='fill', section_id='customer', field_id='brand', value=user_msg)]
-    yield ('events', events)
-    yield ('token', '收到')
-    yield ('token', ' ✓')
-    yield ('done', TurnResult(
-        reply='收到 ✓',
-        tool_events=events,
-        state=state,
-        form_complete=False,
-    ))
-
-
 @patch('api.app.initial_greeting', return_value='hi')
-def test_chat_returns_tool_and_token_events(mock_greeting):
+def test_chat_returns_json_response(mock_greeting):
+    from agent.loop import AgentResult
+    from agent.tools import ToolEvent
+    from survey.state import create_initial_state
     sid = client.post('/api/session').json()['session_id']
-    with patch('api.app.run_turn_stream',
-               side_effect=lambda state, msg, history=None: _mock_run_turn_stream(msg, state)):
-        with client.stream('POST', '/api/chat',
-                           json={'session_id': sid, 'message': '云裳'}) as resp:
-            assert resp.status_code == 200
-            event_types = []
-            tool_data = None
-            done_data = None
-            current_event = None
-            for line in resp.iter_lines():
-                if line.startswith('event:'):
-                    current_event = line.split(':', 1)[1].strip()
-                    event_types.append(current_event)
-                elif line.startswith('data:') and current_event:
-                    data_str = line.split(':', 1)[1].strip()
-                    if current_event == 'tool':
-                        import json
-                        tool_data = json.loads(data_str)
-                    elif current_event == 'done':
-                        import json
-                        done_data = json.loads(data_str)
-    assert 'tool' in event_types
-    assert 'token' in event_types
-    assert event_types[-1] == 'done'
-    assert tool_data is not None
-    assert len(tool_data['events']) == 1
-    assert done_data is not None
-    assert 'form_state' in done_data
+
+    mock_result = AgentResult(
+        reply='收到云裳品牌',
+        tool_events=[ToolEvent(kind='fill', section_id='customer', field_id='brand', value='云裳')],
+        state=create_initial_state(),
+        form_complete=False,
+    )
+    with patch('api.app.run_agent', return_value=mock_result):
+        r = client.post('/api/chat', json={'session_id': sid, 'message': '云裳'})
+    assert r.status_code == 200
+    data = r.json()
+    assert data['reply'] == '收到云裳品牌'
+    assert len(data['tool_events']) == 1
+    assert data['tool_events'][0]['field_id'] == 'brand'
+    assert data['form_complete'] is False
+    assert 'form_state' in data
 
 
 def test_chat_missing_session_404():
-    r = client.post('/api/chat',
-                    json={'session_id': 'nonexistent', 'message': 'hello'})
+    r = client.post('/api/chat', json={'session_id': 'nonexistent', 'message': 'hi'})
     assert r.status_code == 404
 
 
