@@ -12,7 +12,7 @@ export function isFieldVisible(field: FieldDef, section: SectionState): boolean 
     : depValue !== field.visibleIf.value
 }
 
-function valueToText(v: FieldValue, def?: { label?: string; options?: { value: string; label: string }[] }): string {
+export function valueToText(v: FieldValue, def?: { label?: string; options?: { value: string; label: string }[] }): string {
   switch (v.type) {
     case 'text':
       return v.value
