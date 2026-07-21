@@ -21,6 +21,7 @@ from pydantic import BaseModel
 
 from agent.gather import initial_greeting
 from agent.loop import run_agent
+from agent.tools import apply_updates, ToolEvent
 from delivery.markdown import generate_markdown
 from delivery.excel import generate_excel
 from delivery.word import generate_word
@@ -56,6 +57,7 @@ class ChatRequest(BaseModel):
     session_id: str
     message: str
     history: list[dict] | None = None
+    updates: list[dict] | None = None
 
 
 class ChatResponse(BaseModel):
@@ -97,15 +99,29 @@ def chat(req: ChatRequest) -> ChatResponse:
         raise HTTPException(status_code=404, detail='session not found')
 
     state = from_dict(data)
-    result = run_agent(state, req.message, req.history)
+
+    # 前端权威 updates（chip 点击）绕过 LLM 抽取，在 run_agent 前直接 apply
+    update_events: list[ToolEvent] = []
+    if req.updates:
+        apply_updates(state, req.updates)
+        for upd in req.updates:
+            update_events.append(ToolEvent(
+                kind='fill', section_id=upd['section_id'],
+                field_id=upd['field_id'].split('.')[-1], value=upd.get('value'),
+            ))
+
+    # 从 DB 取完整历史（前端 history 作为 fallback，但 DB 是权威源）
+    history = db.get_messages(req.session_id, limit=50) or req.history
+
+    result = run_agent(state, req.message, history)
+
+    # tool_events 转 dict（updates 事件 + agent 事件）
+    events_dict = [asdict(e) for e in (update_events + result.tool_events)]
 
     # 持久化
     db.save_session(req.session_id, to_dict(result.state))
     db.add_message(req.session_id, 'user', req.message)
-    db.add_message(req.session_id, 'assistant', result.reply)
-
-    # tool_events 转 dict
-    events_dict = [asdict(e) for e in result.tool_events]
+    db.add_message(req.session_id, 'assistant', result.reply, events_dict)
 
     return ChatResponse(
         reply=result.reply,

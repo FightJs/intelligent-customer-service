@@ -171,3 +171,25 @@ def skip_section(state: StudioFormState, section_id: str) -> None:
     """标记章节为跳过（条件分支用，如没有直播间→跳过现状章）。"""
     if section_id in state.sections:
         state.sections[section_id].status = 'skipped'
+
+
+def recompute_section_status(state: StudioFormState) -> None:
+    """按必填字段填充情况重算所有章节的 status（原地修改）。
+
+    - skipped 保持
+    - 全部必填填完 → complete
+    - 部分填或为当前章节 → active
+    - 全空 → pending
+    """
+    for sec_id in SECTION_ORDER:
+        sec_def = SECTION_BY_ID[sec_id]
+        sec_state = state.sections[sec_id]
+        if sec_state.status == 'skipped':
+            continue
+        filled, total = filled_required_count(sec_def, sec_state)
+        if total > 0 and filled >= total:
+            sec_state.status = 'complete'
+        elif filled > 0 or sec_id == state.current_section_id:
+            sec_state.status = 'active'
+        else:
+            sec_state.status = 'pending'

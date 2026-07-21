@@ -37,15 +37,22 @@ export async function getSession(sessionId: string): Promise<SessionData> {
   return r.json()
 }
 
+export interface FieldUpdate {
+  section_id: SectionId
+  field_id: string
+  value: unknown
+}
+
 export async function chat(
   sessionId: string,
   message: string,
   history: { role: string; content: string }[] | undefined,
+  updates?: FieldUpdate[],
 ): Promise<ChatResult> {
   const r = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ session_id: sessionId, message, history }),
+    body: JSON.stringify({ session_id: sessionId, message, history, updates }),
   })
   if (!r.ok) throw new Error(`chat: ${r.status}`)
   return r.json()
