@@ -1,7 +1,8 @@
 """Agent loop 测试（mock anthropic 响应）。"""
 from unittest.mock import patch, MagicMock
 from survey.state import create_initial_state
-from agent.loop import run_agent, AgentResult
+from survey.models import TextValue
+from agent.loop import run_agent, AgentResult, _build_system_prompt
 
 
 def _mock_text_response(text: str):
@@ -111,3 +112,43 @@ def test_run_agent_tool_error_does_not_crash(mock_get_client):
     result = run_agent(state, '跳过某章节')
     # 不应抛异常，应有兜底回复
     assert isinstance(result.reply, str)
+
+
+def test_system_prompt_includes_collected_values():
+    """system prompt 应包含已采集字段的具体值（治"重复问"根因）。"""
+    state = create_initial_state()
+    # 空 state 应显示"暂无"
+    prompt_empty = _build_system_prompt(state)
+    assert '已采集' in prompt_empty
+
+    # 填一个字段后，应在 prompt 中看到值
+    state.sections['customer'].fields['brand'] = TextValue(type='text', value='云裳')
+    prompt_filled = _build_system_prompt(state)
+    assert '云裳' in prompt_filled
+    assert 'customer.brand' in prompt_filled
+
+
+def test_system_prompt_includes_collect_discipline():
+    """system prompt 应包含采集纪律（禁止重复问）。"""
+    state = create_initial_state()
+    prompt = _build_system_prompt(state)
+    assert '采集纪律' in prompt
+    assert '禁止重复询问' in prompt
+    assert '已采集' in prompt
+
+
+@patch('agent.loop.get_client')
+def test_run_agent_recomputes_section_status(mock_get_client):
+    """run_agent 返回前应重算 section.status（治"全 pending"显示问题）。"""
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = _mock_text_response('好的')
+    mock_get_client.return_value = mock_client
+
+    state = create_initial_state()
+    # 填完 customer 全部必填，模拟"已采集"
+    for fid in ['brand', 'contact', 'phone', 'wechat', 'city', 'source', 'date']:
+        state.sections['customer'].fields[fid] = TextValue(type='text', value='x')
+
+    result = run_agent(state, 'test')
+    # customer 章节应标记为 complete（而非 pending）
+    assert result.state.sections['customer'].status == 'complete'

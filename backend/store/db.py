@@ -51,6 +51,10 @@ def init_db() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
         ''')
+        # 旧库兼容：messages 表可能缺 tool_events 列
+        cols = [r[1] for r in conn.execute('PRAGMA table_info(messages)').fetchall()]
+        if 'tool_events' not in cols:
+            conn.execute('ALTER TABLE messages ADD COLUMN tool_events TEXT')
 
 
 # ── Session ──────────────────────────────────────────────────

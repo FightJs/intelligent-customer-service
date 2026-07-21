@@ -92,31 +92,79 @@ TOOL_DEFS: list[dict] = [
 
 # ── 执行函数 ────────────────────────────────────────────────
 
-def _apply_one(state: StudioFormState, section_id: str, field_id: str, value) -> bool:
-    """应用单个字段值，兼容带前缀的 field_id。"""
+def _apply_one(state: StudioFormState, section_id: str, field_id: str, value) -> tuple[bool, str | None]:
+    """应用单个字段值，兼容带前缀的 field_id。
+
+    返回 (ok, reason)；失败时 reason 描述原因（section 不存在/字段不存在/类型不匹配/choice 非法值）。
+    """
     clean_fid = field_id.split('.')[-1] if '.' in field_id else field_id
     sec = state.sections.get(section_id)
     if sec is None:
-        return False
+        return False, f'章节不存在: {section_id}'
     current = sec.fields.get(clean_fid)
     if current is None:
-        return False
+        return False, f'字段不存在: {section_id}.{clean_fid}'
+    fdef = FIELD_BY_ID.get(clean_fid)
     try:
         if current.type == 'text':
             current.value = str(value) if value is not None else ''
         elif current.type == 'choice-single':
-            current.value = value if isinstance(value, str) else None
+            if not isinstance(value, str):
+                return False, f'{clean_fid} 需要 string，收到 {type(value).__name__}'
+            # 校验或自动反查（label → value）
+            valid_values = {o.value for o in (fdef.options or [])}
+            if valid_values and value not in valid_values:
+                label_match = next(
+                    (o.value for o in (fdef.options or []) if o.label == value), None
+                )
+                if label_match is None:
+                    return False, f'{clean_fid} value={value} 不在 options 内'
+                value = label_match
+            current.value = value
         elif current.type == 'choice-multi':
-            current.value = list(value) if isinstance(value, list) else []
+            if not isinstance(value, list):
+                return False, f'{clean_fid} 需要 list，收到 {type(value).__name__}'
+            valid_values = {o.value for o in (fdef.options or [])}
+            cleaned: list[str] = []
+            for v in value:
+                if not isinstance(v, str):
+                    continue
+                if valid_values and v not in valid_values:
+                    label_match = next(
+                        (o.value for o in (fdef.options or []) if o.label == v), None
+                    )
+                    if label_match is None:
+                        return False, f'{clean_fid} value={v} 不在 options 内'
+                    v = label_match
+                cleaned.append(v)
+            current.value = cleaned
         elif current.type == 'dimension':
             current.value = {k: str(v) for k, v in value.items()} if isinstance(value, dict) else {}
         elif current.type == 'image':
             current.value = list(value) if isinstance(value, list) else []
         elif current.type == 'table':
             current.value = list(value) if isinstance(value, list) else []
-        return True
-    except Exception:
-        return False
+        return True, None
+    except Exception as exc:
+        return False, f'异常: {exc}'
+
+
+def apply_updates(state: StudioFormState, updates: list[dict]) -> tuple[int, list[str]]:
+    """公开 helper：批量应用字段更新（前端权威提交用，绕过 LLM）。
+
+    返回 (成功数, 失败描述列表)。
+    """
+    count = 0
+    failures: list[str] = []
+    for upd in updates:
+        ok, reason = _apply_one(
+            state, upd['section_id'], upd['field_id'], upd.get('value')
+        )
+        if ok:
+            count += 1
+        elif reason:
+            failures.append(f"{upd['section_id']}.{upd['field_id']}: {reason}")
+    return count, failures
 
 
 def execute_tool(name: str, tool_input: dict, state: StudioFormState) -> str:
@@ -124,15 +172,22 @@ def execute_tool(name: str, tool_input: dict, state: StudioFormState) -> str:
     if name == 'fill_fields':
         count = 0
         details: list[str] = []
+        failures: list[str] = []
         for upd in tool_input.get('updates', []):
-            if _apply_one(state, upd['section_id'], upd['field_id'], upd.get('value')):
+            ok, reason = _apply_one(state, upd['section_id'], upd['field_id'], upd.get('value'))
+            if ok:
                 count += 1
                 val = upd.get('value')
                 if isinstance(val, str) and val:
                     details.append(val)
+            elif reason:
+                failures.append(f"{upd['section_id']}.{upd['field_id']}: {reason}")
+        msg = f'已填充 {count} 个字段。'
         if details:
-            return f'已填充 {count} 个字段（{"、".join(details)}）。'
-        return f'已填充 {count} 个字段。'
+            msg = f'已填充 {count} 个字段（{"、".join(details)}）。'
+        if failures:
+            msg += f' 失败 {len(failures)} 个：{"; ".join(failures)}。请根据原因修正后最多重试一次。'
+        return msg
 
     if name == 'skip_section':
         sid = tool_input['section_id']

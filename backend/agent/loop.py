@@ -57,6 +57,20 @@ def _build_system_prompt(state: StudioFormState) -> str:
             field_lines.append(f'- {sec_id}.{fdef.id}: {fdef.label}({fdef.type},{req}){opts}{dims}')
     fields_text = '\n'.join(field_lines) if field_lines else '（所有字段已填）'
 
+    # 已采集字段值（治"重复问"：让 LLM 看到自己已经抓到了什么具体内容）
+    collected_lines = []
+    for sec_id in SECTION_ORDER:
+        sec_def = SECTION_BY_ID[sec_id]
+        sec_state = state.sections[sec_id]
+        if sec_state.status == 'skipped':
+            continue
+        for fdef in sec_def.fields:
+            v = sec_state.fields.get(fdef.id)
+            if v is None or flow.value_is_empty(v):
+                continue
+            collected_lines.append(f'- {sec_id}.{fdef.id}: {flow.value_to_text(v, fdef)}')
+    collected_text = '\n'.join(collected_lines) if collected_lines else '（暂无）'
+
     # 进度
     progress_lines = []
     for p in progress:
@@ -86,6 +100,15 @@ def _build_system_prompt(state: StudioFormState) -> str:
 4. 所有必填信息齐了，告知用户可生成交付物
 
 {AGENT_GUIDE}
+
+【采集纪律】
+1. 禁止重复询问下方【已采集】清单中已存在的字段
+2. 用户本轮回答涉及多个字段时，必须一次性 fill_fields 全部
+3. 严格按【下一个该问】推进，不得回跳到已采集字段（除非用户主动要求修改）
+4. 若 fill_fields 返回失败明细，根据原因修正后最多重试一次
+
+【已采集】
+{collected_text}
 
 当前可填字段：
 {fields_text}
@@ -181,6 +204,9 @@ def run_agent(
     else:
         # 循环用尽，兜底
         reply = '信息已记录，还有什么需要补充的吗？'
+
+    # 返回前重算章节 status（治"全 pending"显示问题）
+    flow.recompute_section_status(state)
 
     return AgentResult(
         reply=reply,
