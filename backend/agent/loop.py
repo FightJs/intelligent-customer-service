@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from anthropic import Anthropic
 from agent.llm import get_client, LLM_MODEL
@@ -25,6 +25,22 @@ class AgentResult:
     tool_events: list[ToolEvent]
     state: StudioFormState
     form_complete: bool
+    suggestions: list[dict] = field(default_factory=list)
+
+
+def _build_suggestions(state: StudioFormState) -> list[dict]:
+    """根据下一个未填字段，构造 chip 选项（仅 choice 类字段有 options）。"""
+    nxt = flow.next_unfilled_field(state)
+    if not nxt:
+        return []
+    sec_id, fdef = nxt
+    if not fdef.options:
+        return []
+    return [{
+        'section_id': sec_id,
+        'field_id': fdef.id,
+        'options': [{'value': o.value, 'label': o.label} for o in fdef.options],
+    }]
 
 
 def _build_system_prompt(state: StudioFormState) -> str:
@@ -187,4 +203,5 @@ def run_agent(
         tool_events=events,
         state=state,
         form_complete=flow.form_complete(state),
+        suggestions=_build_suggestions(state),
     )

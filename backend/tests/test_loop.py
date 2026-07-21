@@ -1,6 +1,7 @@
 """Agent loop 测试（mock anthropic 响应）。"""
 from unittest.mock import patch, MagicMock
 from survey.state import create_initial_state
+from survey.models import TextValue
 from agent.loop import run_agent, AgentResult
 
 
@@ -111,3 +112,37 @@ def test_run_agent_tool_error_does_not_crash(mock_get_client):
     result = run_agent(state, '跳过某章节')
     # 不应抛异常，应有兜底回复
     assert isinstance(result.reply, str)
+
+
+@patch('agent.loop.get_client')
+def test_suggestions_empty_for_text_field(mock_get_client):
+    """下一个未填字段是 text 类（无 options）时，suggestions 应为空。"""
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = _mock_text_response('品牌名是？')
+    mock_get_client.return_value = mock_client
+
+    state = create_initial_state()
+    # 初始 state 第一个未填是 customer.brand（text）
+    result = run_agent(state, '你好')
+    assert result.suggestions == []
+
+
+@patch('agent.loop.get_client')
+def test_suggestions_populated_for_choice_field(mock_get_client):
+    """下一个未填字段是 choice 类时，suggestions 应含 options 供前端渲染 chip。"""
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = _mock_text_response('行业大类是？')
+    mock_get_client.return_value = mock_client
+
+    state = create_initial_state()
+    # 填完 customer 全部字段，让 next 落到 industry.category（choice-single）
+    for fid in ['brand', 'contact', 'phone', 'wechat', 'city', 'source', 'date']:
+        state.sections['customer'].fields[fid] = TextValue(type='text', value='x')
+
+    result = run_agent(state, '下一步')
+    assert len(result.suggestions) == 1
+    s = result.suggestions[0]
+    assert s['section_id'] == 'industry'
+    assert s['field_id'] == 'category'
+    assert len(s['options']) == 9
+    assert {'value': 'women', 'label': '女装'} in s['options']

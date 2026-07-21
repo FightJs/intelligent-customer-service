@@ -63,6 +63,7 @@ class ChatResponse(BaseModel):
     tool_events: list[dict]
     form_state: dict
     form_complete: bool
+    suggestions: list[dict] = []
 
 
 # ── 端点 ──────────────────────────────────────────────────────
@@ -112,6 +113,7 @@ def chat(req: ChatRequest) -> ChatResponse:
         tool_events=events_dict,
         form_state=to_dict(result.state),
         form_complete=result.form_complete,
+        suggestions=result.suggestions,
     )
 
 
