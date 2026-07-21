@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useFormState } from '../../state/FormContext'
 import { createSession, chat } from '../../api/client'
+import type { Suggestion } from '../../api/client'
 import MessageBubble from './MessageBubble'
+import QuickChips from './QuickChips'
 
 interface ChatMessage {
   id: string
@@ -27,6 +29,7 @@ export default function ChatPanel({ onComplete }: ChatPanelProps) {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [finished, setFinished] = useState(false)
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -51,13 +54,13 @@ export default function ChatPanel({ onComplete }: ChatPanelProps) {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])
 
-  const send = useCallback(async () => {
-    const text = draft.trim()
+  const sendMessage = useCallback(async (text: string) => {
     if (!text || !sessionId || sending) return
 
     setMessages((prev) => [...prev, { id: newId(), role: 'user', text }])
     setDraft('')
     setSending(true)
+    setSuggestions([])
 
     const history = messages
       .filter((m) => m.text)
@@ -68,6 +71,7 @@ export default function ChatPanel({ onComplete }: ChatPanelProps) {
       const result = await chat(sessionId, text, history)
       setMessages((prev) => [...prev, { id: newId(), role: 'ai', text: result.reply }])
       dispatch({ type: 'replace_state', state: result.form_state })
+      setSuggestions(result.suggestions || [])
       if (result.form_complete) {
         setFinished(true)
         onComplete?.()
@@ -79,7 +83,11 @@ export default function ChatPanel({ onComplete }: ChatPanelProps) {
     } finally {
       setSending(false)
     }
-  }, [draft, sessionId, sending, messages, dispatch, onComplete])
+  }, [sessionId, sending, messages, dispatch, onComplete])
+
+  const send = useCallback(() => {
+    sendMessage(draft.trim())
+  }, [draft, sendMessage])
 
   return (
     <div className="h-full flex flex-col pt-1 px-2 pb-2">
@@ -102,23 +110,30 @@ export default function ChatPanel({ onComplete }: ChatPanelProps) {
             </div>
           )}
         </div>
-        <div className="p-3 flex gap-2">
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-            placeholder={sending ? '顾问回复中…' : '输入您的回答…'}
+        <div className="p-3 flex flex-col gap-2">
+          <QuickChips
+            options={suggestions[0]?.options || []}
+            onPick={(o) => sendMessage(o.label)}
             disabled={sending || loading || finished}
-            className="flex-1 bg-base rounded-bubble px-3.5 py-2.5 text-sm text-primary placeholder:text-muted outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
           />
-          <button
-            type="button"
-            onClick={send}
-            className="px-4 py-2.5 bg-accent text-white rounded-bubble text-sm disabled:opacity-40"
-            disabled={sending || loading || finished || draft.trim() === ''}
-          >
-            发送
-          </button>
+          <div className="flex gap-2">
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
+              placeholder={sending ? '顾问回复中…' : '输入您的回答…'}
+              disabled={sending || loading || finished}
+              className="flex-1 bg-base rounded-bubble px-3.5 py-2.5 text-sm text-primary placeholder:text-muted outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
+            />
+            <button
+              type="button"
+              onClick={send}
+              className="px-4 py-2.5 bg-accent text-white rounded-bubble text-sm disabled:opacity-40"
+              disabled={sending || loading || finished || draft.trim() === ''}
+            >
+              发送
+            </button>
+          </div>
         </div>
       </div>
     </div>

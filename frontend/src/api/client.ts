@@ -12,6 +12,17 @@ export interface ToolEvent {
   value?: unknown
 }
 
+export interface SuggestionOption {
+  value: string
+  label: string
+}
+
+export interface Suggestion {
+  section_id: SectionId
+  field_id: string
+  options: SuggestionOption[]
+}
+
 export interface SessionData {
   session_id: string
   form_state: StudioFormState
@@ -23,6 +34,7 @@ export interface ChatResult {
   tool_events: ToolEvent[]
   form_state: StudioFormState
   form_complete: boolean
+  suggestions: Suggestion[]
 }
 
 export async function createSession(): Promise<SessionData> {
