@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useFormState } from '../../state/FormContext'
 import { createSession, chat } from '../../api/client'
 import type { Suggestion } from '../../api/client'
@@ -96,7 +98,13 @@ export default function ChatPanel({ onComplete }: ChatPanelProps) {
           {loading && <div className="text-muted text-xs text-center">正在连接顾问…</div>}
           {messages.map((m) => (
             <MessageBubble key={m.id} role={m.role}>
-              <div>{m.text}</div>
+              {m.role === 'ai' ? (
+                <div className="prose-chat">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
+                </div>
+              ) : (
+                <div>{m.text}</div>
+              )}
             </MessageBubble>
           ))}
           {sending && (
