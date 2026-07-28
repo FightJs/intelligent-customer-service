@@ -30,5 +30,4 @@ React 19 · TypeScript · Vite · Tailwind CSS · Vitest
 
 ## 设计文档
 
-- 原始 2 栏设计：`../docs/superpowers/specs/2026-07-06-livestream-cs-ui-design.md`
-- 三栏重构：`../docs/superpowers/specs/2026-07-06-three-column-layout-design.md`
+历史设计稿已归档。当前架构与字段定义的单一真相源见 `backend/survey/schema_def.py`，团队协作流程见根目录 [`README.md`](../README.md) 与 [`docs/team-workflow-handbook.md`](../docs/team-workflow-handbook.md)。
