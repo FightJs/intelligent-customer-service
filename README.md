@@ -84,7 +84,7 @@ uv run uvicorn api.app:app --reload   # 启动 http://localhost:8000
 
 ## 团队协作流程
 
-> 详细约定见 [`AGENTS.md`](./AGENTS.md)，这里是要点。
+> 📖 **新成员必读**:完整操作手册见 [`docs/team-workflow-handbook.md`](./docs/team-workflow-handbook.md)(从 clone 到合并的全流程)。AI 开发约定见 [`AGENTS.md`](./AGENTS.md),这里是要点。
 
 ### 日常开发
 
