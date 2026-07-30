@@ -1,3 +1,4 @@
+import LoginScreen from './components/LoginScreen'
 import { useState } from 'react'
 import TopBar from './components/TopBar'
 import ChatPanel from './components/ChatPanel/ChatPanel'
@@ -8,6 +9,7 @@ import { FormProvider } from './state/FormContext'
 import { useTheme } from './state/theme'
 
 const DELIVERY_WIDTH_KEY = 'sidebar.delivery.width'
+const DEV_AUTH_STORAGE_KEY = 'ics_dev_auth'
 
 function loadWidth(key: string, fallback: number) {
   const v = Number(localStorage.getItem(key))
@@ -18,6 +20,9 @@ export default function App() {
   const [resetKey, setResetKey] = useState(0)
   const [progressVisible, setProgressVisible] = useState(true)
   const [deliveryOpen, setDeliveryOpen] = useState(false)
+  const [authenticated, setAuthenticated] = useState(
+    () => localStorage.getItem(DEV_AUTH_STORAGE_KEY) === 'true',
+  )
   const [deliveryWidth, setDeliveryWidth] = useState(() => loadWidth(DELIVERY_WIDTH_KEY, 360))
   const { theme, toggleTheme } = useTheme()
 
@@ -30,6 +35,20 @@ export default function App() {
     setResetKey((k) => k + 1)
     setProgressVisible(true)
     setDeliveryOpen(false)
+  }
+
+  function handleLogin(key: string): boolean {
+    if (key !== import.meta.env.VITE_DEV_KEY) {
+      return false
+    }
+
+    localStorage.setItem(DEV_AUTH_STORAGE_KEY, 'true')
+    setAuthenticated(true)
+    return true
+  }
+
+  if (!authenticated) {
+    return <LoginScreen onLogin={handleLogin} />
   }
 
   return (
