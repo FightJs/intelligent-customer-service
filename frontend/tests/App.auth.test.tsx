@@ -21,15 +21,14 @@ describe('App dev 登录门禁', () => {
     expect(screen.queryByText('客服主界面')).not.toBeInTheDocument()
   })
 
-  it('已有正确登录状态时直接进入主界面', () => {
+  it('已有正确登录状态时先进呼吸页，点击后进入主界面', () => {
     localStorage.setItem('ics_dev_auth', 'true')
 
     render(<App />)
 
+    expect(screen.getByText('智能客服工作台')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('智能客服工作台'))
     expect(screen.getByText('客服主界面')).toBeInTheDocument()
-    expect(
-      screen.queryByRole('heading', { name: '客户登录' }),
-    ).not.toBeInTheDocument()
   })
 
   it('错误的 localStorage 值不能绕过登录', () => {
@@ -54,11 +53,13 @@ describe('App dev 登录门禁', () => {
     fireEvent.click(screen.getByRole('button', { name: '进入系统' }))
 
     expect(localStorage.getItem('ics_dev_auth')).toBe('true')
+    expect(screen.getByText('智能客服工作台')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('智能客服工作台'))
     expect(screen.getByText('客服主界面')).toBeInTheDocument()
 
     unmount()
     render(<App />)
 
-    expect(screen.getByText('客服主界面')).toBeInTheDocument()
+    expect(screen.getByText('智能客服工作台')).toBeInTheDocument()
   })
 })

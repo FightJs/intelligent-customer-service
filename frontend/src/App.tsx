@@ -1,40 +1,33 @@
 import LoginScreen from './components/LoginScreen'
+import BreathingScreen from './components/BreathingScreen'
 import { useState } from 'react'
 import TopBar from './components/TopBar'
 import ChatPanel from './components/ChatPanel/ChatPanel'
 import ProgressCard from './components/ProgressCard/ProgressCard'
-import DeliveryPanel from './components/DeliveryPanel/DeliveryPanel'
-import Sidebar from './components/Sidebar'
+import CenterCard from './components/CenterCard/CenterCard'
+import FormPreviewSlot from './components/DeliveryPanel/FormPreviewSlot'
+import DeliverableSlot from './components/DeliveryPanel/DeliverableSlot'
+import GridBackground from './components/GridBackground'
+import { ZStackProvider } from './hooks/useZStack'
 import { FormProvider } from './state/FormContext'
 import { useTheme } from './state/theme'
 
-const DELIVERY_WIDTH_KEY = 'sidebar.delivery.width'
 const DEV_AUTH_STORAGE_KEY = 'ics_dev_auth'
-
-function loadWidth(key: string, fallback: number) {
-  const v = Number(localStorage.getItem(key))
-  return Number.isFinite(v) && v > 0 ? v : fallback
-}
 
 export default function App() {
   const [resetKey, setResetKey] = useState(0)
   const [progressVisible, setProgressVisible] = useState(true)
-  const [deliveryOpen, setDeliveryOpen] = useState(false)
+  const [centerExpanded, setCenterExpanded] = useState(false)
+  const [entered, setEntered] = useState(false)
   const [authenticated, setAuthenticated] = useState(
     () => localStorage.getItem(DEV_AUTH_STORAGE_KEY) === 'true',
   )
-  const [deliveryWidth, setDeliveryWidth] = useState(() => loadWidth(DELIVERY_WIDTH_KEY, 360))
   const { theme, toggleTheme } = useTheme()
-
-  function handleDeliveryWidth(w: number) {
-    setDeliveryWidth(w)
-    localStorage.setItem(DELIVERY_WIDTH_KEY, String(w))
-  }
 
   function handleReset() {
     setResetKey((k) => k + 1)
     setProgressVisible(true)
-    setDeliveryOpen(false)
+    setCenterExpanded(false)
   }
 
   function handleLogin(key: string): boolean {
@@ -51,42 +44,50 @@ export default function App() {
     return <LoginScreen onLogin={handleLogin} />
   }
 
+  if (!entered) {
+    return <BreathingScreen onEnter={() => setEntered(true)} />
+  }
+
   return (
-    <FormProvider key={resetKey}>
-      <div className="h-full flex flex-col bg-base text-primary">
-        <TopBar
-          theme={theme}
-          onToggleTheme={toggleTheme}
-          onReset={handleReset}
-          progressVisible={progressVisible}
-          deliveryOpen={deliveryOpen}
-          onToggleProgress={() => setProgressVisible((v) => !v)}
-          onToggleDelivery={() => setDeliveryOpen((o) => !o)}
-        />
-        <div className="relative flex-1 overflow-hidden">
+    <ZStackProvider>
+      <FormProvider key={resetKey}>
+        <div className="h-full flex flex-col bg-base text-primary">
+          <TopBar
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            onReset={handleReset}
+            progressVisible={progressVisible}
+            deliveryOpen={centerExpanded}
+            onToggleProgress={() => setProgressVisible((v) => !v)}
+            onToggleDelivery={() => setCenterExpanded((v) => !v)}
+          />
           <div
-            className="absolute inset-0 transition-[padding] duration-300"
-            style={{
-              paddingLeft: 0,
-              paddingRight: deliveryOpen ? deliveryWidth + 12 : 0,
-            }}
+            className="relative flex-1 overflow-hidden grid"
+            style={{ gridTemplateColumns: '120px 1fr' }}
           >
-            <ChatPanel
-              onComplete={() => setDeliveryOpen(true)}
-            />
+            {/* 底层网格背景：所有卡片浮在其上 */}
+            <GridBackground />
+            {/* 左：进度卡悬浮区占位格（进度卡是 fixed 悬浮，跨栏） */}
+            <div className="relative" />
+            {/* 中：中央卡（含 ChatPanel） */}
+            <div className="relative overflow-hidden">
+              <CenterCard expanded={centerExpanded} onToggleExpand={() => setCenterExpanded((v) => !v)}>
+                <ChatPanel onComplete={() => setCenterExpanded(true)} />
+              </CenterCard>
+            </div>
           </div>
-          <ProgressCard visible={progressVisible} />
-          <Sidebar
-            side="right"
-            open={deliveryOpen}
-            title="交付物"
-            width={deliveryWidth}
-            onWidthChange={handleDeliveryWidth}
+          {/* Loader 动效：固定右上，中央卡放大时隐藏 */}
+          <div
+            className="fixed top-8 -right-[94px] w-[449px] h-[529px] overflow-hidden transition-[opacity,transform] duration-300"
+            style={centerExpanded ? { opacity: 0, transform: 'translateX(120%)' } : undefined}
           >
-            <DeliveryPanel />
-          </Sidebar>
+            <FormPreviewSlot />
+          </div>
+          {/* 交付物：固定悬浮卡片，中央卡放大时隐藏 */}
+          <DeliverableSlot expanded={centerExpanded} />
+          <ProgressCard visible={progressVisible} />
         </div>
-      </div>
-    </FormProvider>
+      </FormProvider>
+    </ZStackProvider>
   )
 }
