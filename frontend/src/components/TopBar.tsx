@@ -16,9 +16,9 @@ export default function TopBar({
 }: Props) {
   const isDark = theme === 'dark'
   return (
-    <div className="h-10 flex items-center px-4 gap-3">
+    <header className="top-bar h-12 flex items-center px-5 gap-3.5">
       <div
-        className="w-8 h-8 rounded-full bg-base ring-1 ring-idle p-0.5 shrink-0 cursor-pointer hover:ring-accent/60 transition"
+        className="w-9 h-9 rounded-full bg-base ring-1 ring-idle p-0.5 shrink-0 cursor-pointer hover:ring-accent/60 transition"
         aria-label="账户"
         role="button"
         tabIndex={0}
@@ -33,7 +33,7 @@ export default function TopBar({
       <button
         type="button"
         onClick={onToggleProgress}
-        className="p-1.5 rounded hover:bg-active-surface text-secondary"
+        className="p-2 rounded hover:bg-active-surface text-secondary"
         aria-label={progressVisible ? '隐藏采集进度' : '显示采集进度'}
       >
         {progressVisible ? (
@@ -49,15 +49,15 @@ export default function TopBar({
         )}
       </button>
       <div className="flex-1" />
-      <div className="flex items-center gap-2">
-        <img src={isDark ? '/lit-dark.svg' : '/lit-light.svg'} alt="logo" className="w-6 h-6 rounded-md" />
-        <span className="text-secondary text-sm font-medium pointer-events-none">Livestream Studio Setup Assistant</span>
+      <div className="flex items-center gap-2.5">
+        <img src="/lit-blue.svg" alt="logo" className="w-7 h-7" />
+        <span className="text-secondary text-[16px] leading-6 font-medium pointer-events-none">Livestream Studio Setup Assistant</span>
       </div>
-      <div className="flex-1 flex items-center justify-end gap-4">
+      <div className="flex-1 flex items-center justify-end gap-3.5">
         <button
           type="button"
           onClick={onToggleTheme}
-          className="p-1.5 rounded hover:bg-active-surface text-secondary"
+          className="p-2 rounded hover:bg-active-surface text-secondary"
           aria-label={isDark ? '切换到浅色主题' : '切换到深色主题'}
         >
           {isDark ? (
@@ -74,14 +74,14 @@ export default function TopBar({
         <button
           type="button"
           onClick={onReset}
-          className="text-muted text-xs hover:text-secondary"
+          className="text-muted text-sm hover:text-secondary"
         >
           重新开始
         </button>
         <button
           type="button"
           onClick={onToggleDelivery}
-          className="p-1.5 rounded hover:bg-active-surface text-secondary"
+          className="p-2 rounded hover:bg-active-surface text-secondary"
           aria-label={deliveryOpen ? '收起交付物' : '展开交付物'}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -99,6 +99,6 @@ export default function TopBar({
           </svg>
         </button>
       </div>
-    </div>
+    </header>
   )
 }

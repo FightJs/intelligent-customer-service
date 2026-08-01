@@ -70,6 +70,14 @@ describe('useResizable', () => {
     up()
   })
 
+  it('ratio=null 时可独立调整高度', () => {
+    const { result } = renderHook(() => useResizable({ ...OPTS, ratio: null }))
+    start(result, 300, 500)
+    drag(300, 600)
+    expect(result.current.size.h).toBe(598)
+    up()
+  })
+
   it('mouseup 写入 localStorage 并 resizing=false', () => {
     const { result } = renderHook(() => useResizable(OPTS))
     start(result, 300, 500)

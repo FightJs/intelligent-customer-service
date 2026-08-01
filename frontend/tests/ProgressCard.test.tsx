@@ -36,6 +36,11 @@ describe('ProgressCard', () => {
     expect(header).toBeTruthy()
   })
 
+  it('默认态提供右下角缩放手柄', () => {
+    const { container } = renderCard()
+    expect(container.querySelector('[data-resize-handle]')).toBeTruthy()
+  })
+
   it('底部汇总显示计数', () => {
     const { getByText } = renderCard()
     // 全 pending 状态:0 完成 0 进行 10 待

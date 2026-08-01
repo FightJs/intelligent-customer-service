@@ -10,9 +10,9 @@ describe('FormPreviewSlot', () => {
     const { container } = render(<FormPreviewSlot />)
     expect(container.querySelector('svg')).toBeInTheDocument()
   })
-  it('含流光 trace 动画路径', () => {
+  it('不再渲染外部淡蓝色流光线条', () => {
     const { container } = render(<FormPreviewSlot />)
-    expect(container.querySelectorAll('.trace-flow').length).toBeGreaterThan(0)
+    expect(container.querySelectorAll('.trace-flow')).toHaveLength(0)
   })
 })
 

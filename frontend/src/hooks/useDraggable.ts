@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 
 interface Pos { x: number; y: number }
 interface Bounds { width: number; minHeight: number; topMargin: number; margin: number }
+type PositionClamp = (next: Pos, current: Pos) => Pos
 
 function clamp(v: number, min: number, max: number) {
   return Math.min(Math.max(v, min), max)
@@ -25,8 +26,9 @@ export function useDraggable(opts: {
   bounds: Bounds
   disabled?: boolean
   clamp?: boolean
+  clampPosition?: PositionClamp
 }): { pos: Pos; dragging: boolean; onDragStart: (e: React.MouseEvent) => void } {
-  const { storageKey, defaultPos, bounds, disabled = false, clamp: shouldClamp = true } = opts
+  const { storageKey, defaultPos, bounds, disabled = false, clamp: shouldClamp = true, clampPosition } = opts
   const [pos, setPos] = useState<Pos>(() => loadInitial(storageKey, defaultPos))
   const [dragging, setDragging] = useState(false)
   const startRef = useRef<{ mouseX: number; mouseY: number; posX: number; posY: number } | null>(null)
@@ -36,17 +38,25 @@ export function useDraggable(opts: {
     const maxY = window.innerHeight - bounds.minHeight - bounds.margin
     return {
       x: clamp(p.x, bounds.margin, Math.max(bounds.margin, maxX)),
-      y: clamp(p.y, bounds.topMargin + bounds.margin, Math.max(bounds.topMargin + bounds.margin, maxY)),
+      y: clamp(p.y, bounds.topMargin, Math.max(bounds.topMargin, maxY)),
     }
   }, [bounds])
 
-  const applyPos = useCallback((p: Pos): Pos => (shouldClamp ? clampPos(p) : p), [shouldClamp, clampPos])
+  const applyPos = useCallback(
+    (next: Pos, current: Pos): Pos => {
+      if (!shouldClamp) return next
+      return clampPosition ? clampPosition(next, current) : clampPos(next)
+    },
+    [shouldClamp, clampPosition, clampPos],
+  )
 
   const onMove = useCallback((e: MouseEvent) => {
-    if (!startRef.current) return
-    const dx = e.clientX - startRef.current.mouseX
-    const dy = e.clientY - startRef.current.mouseY
-    setPos(applyPos({ x: startRef.current.posX + dx, y: startRef.current.posY + dy }))
+    const start = startRef.current
+    if (!start) return
+    const dx = e.clientX - start.mouseX
+    const dy = e.clientY - start.mouseY
+    const next = { x: start.posX + dx, y: start.posY + dy }
+    setPos((current) => applyPos(next, current))
   }, [applyPos])
 
   const onUp = useCallback(() => {
@@ -78,10 +88,16 @@ export function useDraggable(opts: {
   // 窗口缩放重新 clamp（clamp=false 时不动）
   useEffect(() => {
     if (!shouldClamp) return
-    function onResize() { setPos((p) => clampPos(p)) }
+    function onResize() { setPos((current) => applyPos(current, current)) }
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
-  }, [shouldClamp, clampPos])
+  }, [shouldClamp, applyPos])
+
+  // 旧的持久化坐标也必须立即遵循当前工作区域的限制。
+  useEffect(() => {
+    if (!shouldClamp) return
+    setPos((current) => applyPos(current, current))
+  }, [shouldClamp, applyPos])
 
   // 卸载时清理
   useEffect(() => {

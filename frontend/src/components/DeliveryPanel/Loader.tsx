@@ -5,7 +5,7 @@ const Loader = () => {
     <StyledWrapper>
       <div className="main-container">
         <div className="loader">
-          <svg viewBox="80 40 740 480" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+          <svg viewBox="250 120 400 260" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
             <defs>
               <linearGradient id="traceGradient1" x1={250} y1={120} x2={100} y2={200} gradientUnits="userSpaceOnUse">
                 <stop offset="0%" stopColor="#00ccff" stopOpacity={1} />
@@ -36,12 +36,6 @@ const Loader = () => {
               <rect x={270} y={240} width={360} height={90} className="skeleton" />
               <rect x={270} y={340} width={180} height={20} className="skeleton" />
             </g>
-            <g id="traces">
-              <path d="M100 300 H250 V120" className="trace-flow" />
-              <path d="M800 200 H650 V380" className="trace-flow" />
-              <path d="M400 520 V380 H250" className="trace-flow" />
-              <path d="M500 50 V120 H650" className="trace-flow" />
-            </g>
           </svg>
         </div>
       </div>
@@ -64,29 +58,35 @@ const StyledWrapper = styled.div`
     height: 100%;
   }
 
+  .loader svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
   #browser {
     overflow: hidden;
   }
 
   .browser-frame {
-    fill: #111;
-    stroke: #666;
+    fill: rgb(var(--color-surface));
+    stroke: rgb(var(--color-outline));
     stroke-width: 1;
     filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.9));
   }
 
   .browser-top {
-    fill: #1a1a1a;
+    fill: rgb(var(--color-active-surface));
   }
 
   .loading-text {
     font-family: Haettenschweiler, sans-serif;
     font-size: 14px;
-    fill: #e4e4e4;
+    fill: rgb(var(--color-primary));
   }
 
   .skeleton {
-    fill: #2d2d2d;
+    fill: rgb(var(--color-idle));
     rx: 4;
     ry: 4;
     animation: pulse 1.8s ease-in-out infinite;
@@ -95,13 +95,13 @@ const StyledWrapper = styled.div`
 
   @keyframes pulse {
     0% {
-      fill: #2d2d2d;
+      fill: rgb(var(--color-idle));
     }
     50% {
-      fill: #505050;
+      fill: rgb(var(--color-active-surface));
     }
     100% {
-      fill: #2d2d2d;
+      fill: rgb(var(--color-idle));
     }
   }
 

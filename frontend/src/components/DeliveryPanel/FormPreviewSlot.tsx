@@ -2,7 +2,7 @@ import Loader from './Loader'
 
 export default function FormPreviewSlot() {
   return (
-    <div className="h-full w-full overflow-hidden">
+    <div className="form-preview-content">
       <Loader />
     </div>
   )

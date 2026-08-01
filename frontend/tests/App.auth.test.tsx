@@ -1,5 +1,5 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../src/App'
 
@@ -10,6 +10,7 @@ vi.mock('../src/components/ChatPanel/ChatPanel', () => ({
 describe('App dev 登录门禁', () => {
   afterEach(() => {
     vi.unstubAllEnvs()
+    vi.useRealTimers()
   })
 
   it('没有登录状态时只显示登录界面', () => {
@@ -22,12 +23,14 @@ describe('App dev 登录门禁', () => {
   })
 
   it('已有正确登录状态时先进呼吸页，点击后进入主界面', () => {
+    vi.useFakeTimers()
     localStorage.setItem('ics_dev_auth', 'true')
 
     render(<App />)
 
     expect(screen.getByText('智能客服工作台')).toBeInTheDocument()
     fireEvent.click(screen.getByText('智能客服工作台'))
+    act(() => vi.advanceTimersByTime(440))
     expect(screen.getByText('客服主界面')).toBeInTheDocument()
   })
 
@@ -43,6 +46,7 @@ describe('App dev 登录门禁', () => {
   })
 
   it('正确密钥登录后写入状态，重新挂载仍保持登录', () => {
+    vi.useFakeTimers()
     vi.stubEnv('VITE_DEV_KEY', 'dev-secret-2026')
 
     const { unmount } = render(<App />)
@@ -55,6 +59,7 @@ describe('App dev 登录门禁', () => {
     expect(localStorage.getItem('ics_dev_auth')).toBe('true')
     expect(screen.getByText('智能客服工作台')).toBeInTheDocument()
     fireEvent.click(screen.getByText('智能客服工作台'))
+    act(() => vi.advanceTimersByTime(440))
     expect(screen.getByText('客服主界面')).toBeInTheDocument()
 
     unmount()

@@ -1,6 +1,6 @@
 import LoginScreen from './components/LoginScreen'
 import BreathingScreen from './components/BreathingScreen'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import TopBar from './components/TopBar'
 import ChatPanel from './components/ChatPanel/ChatPanel'
 import ProgressCard from './components/ProgressCard/ProgressCard'
@@ -19,10 +19,12 @@ export default function App() {
   const [progressVisible, setProgressVisible] = useState(true)
   const [centerExpanded, setCenterExpanded] = useState(false)
   const [entered, setEntered] = useState(false)
+  const [entering, setEntering] = useState(false)
   const [authenticated, setAuthenticated] = useState(
     () => localStorage.getItem(DEV_AUTH_STORAGE_KEY) === 'true',
   )
   const { theme, toggleTheme } = useTheme()
+  const enterTimer = useRef<number | null>(null)
 
   function handleReset() {
     setResetKey((k) => k + 1)
@@ -40,12 +42,25 @@ export default function App() {
     return true
   }
 
+  function enterWorkbench() {
+    if (entering) return
+    setEntering(true)
+    enterTimer.current = window.setTimeout(() => setEntered(true), 440)
+  }
+
+  // 卸载时清理进入工作台的定时器，避免对已卸载组件 setState
+  useEffect(() => {
+    return () => {
+      if (enterTimer.current !== null) window.clearTimeout(enterTimer.current)
+    }
+  }, [])
+
   if (!authenticated) {
     return <LoginScreen onLogin={handleLogin} />
   }
 
   if (!entered) {
-    return <BreathingScreen onEnter={() => setEntered(true)} />
+    return <BreathingScreen onEnter={enterWorkbench} leaving={entering} />
   }
 
   return (
@@ -61,31 +76,23 @@ export default function App() {
             onToggleProgress={() => setProgressVisible((v) => !v)}
             onToggleDelivery={() => setCenterExpanded((v) => !v)}
           />
-          <div
-            className="relative flex-1 overflow-hidden grid"
-            style={{ gridTemplateColumns: '120px 1fr' }}
-          >
-            {/* 底层网格背景：所有卡片浮在其上 */}
+          <main className={`workbench-stage${centerExpanded ? ' is-center-expanded' : ''}`}>
             <GridBackground />
-            {/* 左：进度卡悬浮区占位格（进度卡是 fixed 悬浮，跨栏） */}
-            <div className="relative" />
-            {/* 中：中央卡（含 ChatPanel） */}
-            <div className="relative overflow-hidden">
+            <section className="workbench-progress-zone">
+              <ProgressCard visible={progressVisible} />
+            </section>
+            <section className="workbench-center-zone">
               <CenterCard expanded={centerExpanded} onToggleExpand={() => setCenterExpanded((v) => !v)}>
                 <ChatPanel onComplete={() => setCenterExpanded(true)} />
               </CenterCard>
-            </div>
-          </div>
-          {/* Loader 动效：固定右上，中央卡放大时隐藏 */}
-          <div
-            className="fixed top-8 -right-[94px] w-[449px] h-[529px] overflow-hidden transition-[opacity,transform] duration-300"
-            style={centerExpanded ? { opacity: 0, transform: 'translateX(120%)' } : undefined}
-          >
-            <FormPreviewSlot />
-          </div>
-          {/* 交付物：固定悬浮卡片，中央卡放大时隐藏 */}
-          <DeliverableSlot expanded={centerExpanded} />
-          <ProgressCard visible={progressVisible} />
+            </section>
+            <aside className="workbench-slots" aria-hidden={centerExpanded} inert={centerExpanded}>
+              <section className="form-preview-slot">
+                <FormPreviewSlot />
+              </section>
+              <DeliverableSlot />
+            </aside>
+          </main>
         </div>
       </FormProvider>
     </ZStackProvider>

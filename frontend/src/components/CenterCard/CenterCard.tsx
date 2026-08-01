@@ -1,3 +1,4 @@
+import { useCallback, useRef } from 'react'
 import { useDraggable } from '../../hooks/useDraggable'
 import { useResizable } from '../../hooks/useResizable'
 import { useZStack } from '../../hooks/useZStack'
@@ -22,15 +23,37 @@ interface CenterCardProps {
 // 不复用 FloatingCard：CenterCard 需 calc(-50%+pos) 居中变换，FloatingCard 仅支持 translate(pos)。
 // 后续 ChatPanel（Task6）会作为 children 传入；本 task 用占位内容。
 export default function CenterCard({ expanded, onToggleExpand, children }: CenterCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const clampPosition = useCallback((next: { x: number; y: number }, current: { x: number; y: number }) => {
+    const card = cardRef.current
+    const stage = card?.closest<HTMLElement>('.workbench-stage')
+    if (!card || !stage) return next
+
+    const cardRect = card.getBoundingClientRect()
+    const stageRect = stage.getBoundingClientRect()
+    const intendedX = next.x - current.x
+    const intendedY = next.y - current.y
+    const minX = stageRect.left - cardRect.left
+    const maxX = stageRect.right - cardRect.right
+    const minY = stageRect.top - cardRect.top
+    const maxY = stageRect.bottom - cardRect.bottom
+
+    // 主卡在整个工作台内硬性限制。边界无可用空间时固定在当前位置，避免回弹。
+    const constrain = (delta: number, min: number, max: number) => (
+      min > max ? 0 : Math.min(Math.max(delta, min), max)
+    )
+
+    return {
+      x: current.x + constrain(intendedX, minX, maxX),
+      y: current.y + constrain(intendedY, minY, maxY),
+    }
+  }, [])
   const { pos, dragging, onDragStart } = useDraggable({
     storageKey: 'centercard.pos',
     defaultPos: CENTER_DEFAULT_POS,
     bounds: CENTER_BOUNDS,
     disabled: expanded,
-    // 中央卡用 fixed 居中 + translate(calc(-50% + pos)) 定位，pos 是相对视口中心的偏移，
-    // 与进度卡的绝对坐标 clamp 模型不兼容（会强制 pos.y>=64 导致拖不到顶部）。
-    // 关闭 clamp，让卡片自由拖拽（默认居中，拖出边缘也能拖回）。
-    clamp: false,
+    clampPosition,
   })
   const { size, resizing, onResizeStart } = useResizable({
     storageKey: 'centercard.size',
@@ -41,60 +64,27 @@ export default function CenterCard({ expanded, onToggleExpand, children }: Cente
   })
   const { z, bringToFront } = useZStack({ id: 'center', defaultZ: 20 })
 
-  if (expanded) {
-    // 放大态：absolute 占中右，锁定拖拽，无缩放手柄
-    return (
-      <div
-        data-center-card
-        data-expanded="true"
-        onMouseDown={bringToFront}
-        className="absolute flex flex-col overflow-hidden rounded-xl bg-surface ring-1 ring-white/10 shadow-2xl"
-        style={{ left: 120, right: 16, top: 16, bottom: 16, zIndex: z }}
-      >
-        <div className="flex items-center px-3 py-0">
-          <span className="flex-1 text-[11px] font-medium text-secondary">中央卡片（放大态）</span>
-          <button
-            type="button"
-            onClick={onToggleExpand}
-            className="text-muted text-xs hover:text-secondary px-2 py-1 rounded hover:bg-active-surface"
-          >
-            还原
-          </button>
-        </div>
-        <div className="flex-1 overflow-hidden">
-          {children ?? (
-            <div className="h-full flex items-center justify-center text-muted text-sm">
-              内容占位（ChatPanel 将传入）
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // 默认态：fixed 居中 + 拖拽偏移
-  // left/top 50% 把原点定在视口中心，transform calc(-50% + pos) 先把卡片回退半个自身尺寸完成居中，再加拖拽偏移 pos。
   return (
     <div
+      ref={cardRef}
       data-center-card
-      data-expanded="false"
+      data-expanded={expanded}
       onMouseDown={bringToFront}
-      onDoubleClick={onToggleExpand}
-      className="fixed flex flex-col overflow-hidden rounded-xl bg-surface/95 backdrop-blur-md shadow-2xl ring-1 ring-white/10"
+      onDoubleClick={expanded ? undefined : onToggleExpand}
+      className={`center-card flex flex-col overflow-hidden rounded-xl bg-surface/95 backdrop-blur-md shadow-2xl${expanded ? ' is-expanded' : ''}${dragging || resizing ? ' is-interacting' : ''}`}
       style={{
-        left: '50%',
-        top: '50%',
-        width: size.w,
-        height: size.h,
-        transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px))`,
+        inset: 0,
+        width: expanded ? '100%' : size.w,
+        height: expanded ? '100%' : size.h,
+        transform: `translate3d(${expanded ? 0 : pos.x}px, ${expanded ? 0 : pos.y}px, 0)`,
         zIndex: z,
         opacity: dragging || resizing ? 0.9 : 1,
       }}
     >
       <div
         data-card-handle
-        onMouseDown={onDragStart}
-        className="flex items-center px-3 py-0 cursor-move group"
+        onMouseDown={expanded ? undefined : onDragStart}
+        className={`flex items-center px-3 py-0 group${expanded ? '' : ' cursor-move'}`}
       >
         <span className="flex-1 text-[11px] font-medium text-secondary group-hover:text-primary transition-colors">
           中央卡片 4:3
@@ -103,9 +93,13 @@ export default function CenterCard({ expanded, onToggleExpand, children }: Cente
           type="button"
           onClick={onToggleExpand}
           onMouseDown={(e) => e.stopPropagation()}
-          className="text-muted text-xs hover:text-secondary px-2 py-1 rounded hover:bg-active-surface"
+          className="center-card-expand-button"
+          aria-label={expanded ? '还原' : '放大'}
+          title={expanded ? '恢复默认大小' : '放大主卡'}
         >
-          放大
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            {expanded ? <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" /> : <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />}
+          </svg>
         </button>
       </div>
       <div className="flex-1 overflow-hidden relative">
@@ -114,17 +108,13 @@ export default function CenterCard({ expanded, onToggleExpand, children }: Cente
             内容占位（ChatPanel 将传入）
           </div>
         )}
-        {/* 右下角缩放手柄：4:3 ratio 由 useResizable 锁定 */}
-        <div
-          data-resize-handle
-          onMouseDown={onResizeStart}
-          className="absolute right-0 bottom-0 w-4 h-4 cursor-nwse-resize"
-          style={{
-            borderRight: '2px solid rgb(59 130 246)',
-            borderBottom: '2px solid rgb(59 130 246)',
-            borderBottomRightRadius: '12px',
-          }}
-        />
+        {!expanded && (
+          <div
+            data-resize-handle
+            onMouseDown={onResizeStart}
+            className="center-card-resize-handle"
+          />
+        )}
       </div>
     </div>
   )

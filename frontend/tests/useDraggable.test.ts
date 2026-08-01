@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useDraggable } from '../src/hooks/useDraggable'
 
-const BOUNDS = { width: 280, minHeight: 80, topMargin: 40, margin: 8 }
+const BOUNDS = { width: 280, minHeight: 80, topMargin: 48, margin: 8 }
 
 function startDrag(result: any, x = 100, y = 100) {
   act(() => {

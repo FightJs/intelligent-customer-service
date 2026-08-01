@@ -3,7 +3,7 @@ import styled from 'styled-components';
 // 工作台底层网格背景。铺满父容器，所有卡片浮在其上。
 // 网格线 #222 / 0.5px，对应原 Loader 的 grid-line 规格。
 const GridBackground = () => {
-  return <StyledWrapper />
+  return <StyledWrapper className="workbench-grid" />
 }
 
 const StyledWrapper = styled.div`

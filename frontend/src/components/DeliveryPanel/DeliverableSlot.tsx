@@ -8,16 +8,26 @@ const API_BASE = 'http://localhost:8000/api'
 const OVERVIEW_SECTION_IDS = ['customer', 'industry', 'venue', 'budget', 'goal'] as const
 
 const DELIVERABLES = [
-  { type: 'markdown', label: '场景设计说明', desc: 'Markdown 格式，含完整需求清单', icon: '📄' },
-  { type: 'excel', label: '设备参数清单', desc: 'Excel 格式，现有 + 推荐设备', icon: '📊' },
-  { type: 'word', label: '需求确认书', desc: 'Word 格式，可签字确认', icon: '📝' },
+  { type: 'markdown', label: '场景设计说明', desc: 'Markdown 格式，含完整需求清单', icon: 'pdf' },
+  { type: 'excel', label: '设备参数清单', desc: 'Excel 格式，现有 + 推荐设备', icon: 'excel' },
+  { type: 'word', label: '需求确认书', desc: 'Word 格式，可签字确认', icon: 'word' },
 ] as const
 
-interface DeliverableSlotProps {
-  expanded?: boolean
+function FileTypeIcon({ type }: { type: (typeof DELIVERABLES)[number]['icon'] }) {
+  const color = type === 'excel' ? '#22c55e' : type === 'word' ? '#3b82f6' : '#ef4444'
+
+  return (
+    <svg width="19" height="21" viewBox="0 0 20 22" fill="none" aria-hidden="true">
+      <path d="M4 1.5h8l4 4V20a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 4 20V2a.5.5 0 0 1 .5-.5Z" stroke={color} strokeWidth="1.5" />
+      <path d="M12 1.5V6h4" stroke={color} strokeWidth="1.5" />
+      {type === 'excel' && <><path d="M6.5 10h7M6.5 13h7M6.5 16h7" stroke={color} strokeWidth="1.35" /><path d="M9.5 9v8M12 9v8" stroke={color} strokeWidth="1.35" /></>}
+      {type === 'word' && <><path d="M6.5 10h7M6.5 13h7M6.5 16h4.5" stroke={color} strokeWidth="1.6" strokeLinecap="round" /></>}
+      {type === 'pdf' && <><path d="M6.5 15.5c1.5-2.5 2.5-4.8 3-7 .7 2.3 1.6 4.2 4 5.4-2.8-.4-4.7.4-7 1.6Z" stroke={color} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /><path d="M6.5 18h7" stroke={color} strokeWidth="1.5" strokeLinecap="round" /></>}
+    </svg>
+  )
 }
 
-export default function DeliverableSlot({ expanded = false }: DeliverableSlotProps) {
+export default function DeliverableSlot() {
   const { state } = useFormState()
   const [downloading, setDownloading] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -66,11 +76,8 @@ export default function DeliverableSlot({ expanded = false }: DeliverableSlotPro
   }
 
   return (
-    <div
-      className="fixed bottom-3 right-[10px] w-[240px] max-h-[60vh] flex flex-col rounded-[10px] p-3 overflow-hidden bg-surface/95 backdrop-blur-md shadow-2xl ring-1 ring-accent transition-[opacity,transform] duration-300"
-      style={expanded ? { opacity: 0, transform: 'translateX(120%)', pointerEvents: 'none' } : undefined}
-    >
-      <div className="flex-1 overflow-hidden space-y-4">
+    <section className="workbench-slot deliverable-slot">
+      <div className="delivery-panel-scroll flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
         <section>
           <h3 className="text-secondary text-xs mb-2">方案概要</h3>
           <div className="grid grid-cols-2 gap-2">
@@ -78,7 +85,7 @@ export default function DeliverableSlot({ expanded = false }: DeliverableSlotPro
               const sec = state.sections[id]
               const def = SECTIONS.find((s) => s.id === id)!
               return (
-                <div key={id} className="bg-surface rounded-card p-2.5">
+                <div key={id} className="rounded-card border border-idle/50 bg-surface p-2.5">
                   <div className="text-muted text-[10px]">{def.title}</div>
                   <div className="text-primary text-xs truncate">
                     {makeSummary(sec, def)}
@@ -105,10 +112,10 @@ export default function DeliverableSlot({ expanded = false }: DeliverableSlotPro
                 type="button"
                 onClick={() => handleDownload(type)}
                 disabled={!canGenerate || downloading !== null}
-                className="w-full bg-surface rounded-card p-3 text-left transition-colors hover:bg-active-surface disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full rounded-card border border-idle/50 bg-surface p-3 text-left transition-colors hover:border-accent/60 hover:bg-active-surface disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">{icon}</span>
+                  <span className="shrink-0"><FileTypeIcon type={icon} /></span>
                   <div className="flex-1 min-w-0">
                     <div className="text-primary text-xs font-medium">
                       {downloading === type ? '生成中…' : label}
@@ -127,6 +134,6 @@ export default function DeliverableSlot({ expanded = false }: DeliverableSlotPro
           )}
         </section>
       </div>
-    </div>
+    </section>
   )
 }

@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 export type Theme = 'dark' | 'light'
 
 export function useTheme(): { theme: Theme; toggleTheme: () => void } {
+  const transitionTimerRef = useRef<number | null>(null)
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem('theme')
     return saved === 'light' ? 'light' : 'dark'
@@ -15,7 +16,18 @@ export function useTheme(): { theme: Theme; toggleTheme: () => void } {
     localStorage.setItem('theme', theme)
   }, [theme])
 
+  useEffect(() => () => {
+    if (transitionTimerRef.current !== null) window.clearTimeout(transitionTimerRef.current)
+  }, [])
+
   const toggleTheme = useCallback(() => {
+    const root = document.documentElement
+    if (transitionTimerRef.current !== null) window.clearTimeout(transitionTimerRef.current)
+    root.classList.add('theme-transition')
+    transitionTimerRef.current = window.setTimeout(() => {
+      root.classList.remove('theme-transition')
+      transitionTimerRef.current = null
+    }, 300)
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
   }, [])
 

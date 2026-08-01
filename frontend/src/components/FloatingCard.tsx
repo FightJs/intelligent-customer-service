@@ -7,9 +7,13 @@ interface FloatingCardProps {
   z: number
   onBringToFront: () => void
   width: number
+  height?: number
+  resizing?: boolean
+  onResizeStart?: (e: React.MouseEvent) => void
   handleLabel?: string
   handleExtra?: ReactNode
   children: ReactNode
+  className?: string
 }
 
 // 通用浮动卡片壳:固定定位 + transform 平移 + z-index 层叠 + 拖拽手柄。
@@ -21,20 +25,25 @@ export default function FloatingCard({
   z,
   onBringToFront,
   width,
+  height,
+  resizing = false,
+  onResizeStart,
   handleLabel,
   handleExtra,
   children,
+  className = '',
 }: FloatingCardProps) {
   return (
     <div
       data-floating-card
       onMouseDown={onBringToFront}
-      className="fixed flex flex-col overflow-hidden rounded-xl bg-surface/95 backdrop-blur-md shadow-2xl ring-1 ring-white/10 transition-[opacity,transform] duration-100"
+      className={`floating-card fixed flex flex-col overflow-hidden rounded-xl bg-surface/95 backdrop-blur-md shadow-2xl ${className}`}
       style={{
         transform: `translate(${pos.x}px, ${pos.y}px)`,
         zIndex: z,
         width,
-        opacity: dragging ? 0.9 : 1,
+        height,
+        opacity: dragging || resizing ? 0.9 : 1,
       }}
     >
       {handleLabel !== undefined && (
@@ -50,6 +59,14 @@ export default function FloatingCard({
         </div>
       )}
       {children}
+      {onResizeStart && (
+        <div
+          data-resize-handle
+          onMouseDown={onResizeStart}
+          className="floating-card-resize-handle"
+          aria-label="调整卡片大小"
+        />
+      )}
     </div>
   )
 }

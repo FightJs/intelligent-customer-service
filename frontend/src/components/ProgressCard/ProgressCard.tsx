@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useMemo } from 'react'
 import type { SectionId } from '../../types/schema'
 import { SECTIONS, SECTION_ORDER } from '../../data/sections'
 import { useFormState } from '../../state/FormContext'
 import { filledCount } from '../../utils/summary'
 import { useDraggable } from '../../hooks/useDraggable'
+import { useResizable } from '../../hooks/useResizable'
 import { useZStack } from '../../hooks/useZStack'
 import FloatingCard from '../FloatingCard'
 import SectionList from './SectionList'
@@ -13,14 +15,31 @@ interface Props {
 }
 
 // 稳定引用:避免 clampPos 依赖 [bounds] 每次渲染都重新绑定 resize 监听器
-const PROGRESS_BOUNDS = { width: 280, minHeight: 80, topMargin: 40, margin: 8 }
+const PROGRESS_DEFAULT_SIZE = { w: 280, h: 540 }
+const PROGRESS_MIN_SIZE = { w: 240, h: 260 }
+const PROGRESS_MAX_SIZE = { w: 560, h: 760 }
 
 export default function ProgressCard({ visible }: Props) {
   const { state } = useFormState()
+  const [expanded, setExpanded] = useState(false)
+  const { size, resizing, onResizeStart } = useResizable({
+    storageKey: 'progresscard.size',
+    defaultSize: PROGRESS_DEFAULT_SIZE,
+    minSize: PROGRESS_MIN_SIZE,
+    maxSize: PROGRESS_MAX_SIZE,
+    ratio: null,
+  })
+  const progressBounds = useMemo(() => ({
+    width: size.w,
+    minHeight: size.h,
+    topMargin: 48,
+    margin: 8,
+  }), [size.h, size.w])
   const { pos, dragging, onDragStart } = useDraggable({
     storageKey: 'progresscard.pos',
     defaultPos: { x: 16, y: 80 },
-    bounds: PROGRESS_BOUNDS,
+    bounds: progressBounds,
+    disabled: expanded || resizing,
   })
   const { z, bringToFront } = useZStack({ id: 'progress', defaultZ: 30 })
   const [expandedSections, setExpandedSections] = useState<Set<SectionId>>(new Set())
@@ -57,7 +76,11 @@ export default function ProgressCard({ visible }: Props) {
       onDragStart={onDragStart}
       z={z}
       onBringToFront={bringToFront}
-      width={280}
+      width={size.w}
+      height={expanded ? undefined : size.h}
+      resizing={resizing}
+      onResizeStart={expanded ? undefined : onResizeStart}
+      className={`progress-card${expanded ? ' is-expanded' : ''}`}
       handleLabel={`采集进度 ${totalFilled}/${totalRequired}`}
       handleExtra={
         <>
@@ -74,8 +97,9 @@ export default function ProgressCard({ visible }: Props) {
           <button
             type="button"
             className="p-1 ml-1 rounded text-muted hover:text-secondary"
-            aria-label="展开"
+            aria-label={expanded ? '收起进度' : '展开'}
             onMouseDown={(e) => e.stopPropagation()}
+            onClick={() => setExpanded((value) => !value)}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
@@ -85,7 +109,7 @@ export default function ProgressCard({ visible }: Props) {
       }
     >
       {/* 列表 + 底部汇总:maxHeight 限定卡片可视高度,超出时内部滚动 */}
-      <div className="flex flex-col" style={{ maxHeight: '70vh' }}>
+      <div className="flex flex-1 flex-col min-h-0" style={{ maxHeight: expanded ? 'none' : undefined }}>
         <SectionList
           expandedSections={expandedSections}
           onToggleSection={toggleSection}

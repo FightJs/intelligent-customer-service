@@ -31,12 +31,15 @@ export function useResizable(opts: {
   // 起始锚点:拖拽期间不再依赖 state,避免监听器身份在每次 setSize 后变化导致监听器丢失
   const startRef = useRef<{ mouseX: number; mouseY: number; w: number; h: number } | null>(null)
 
-  // 右下角缩放:以宽度变化为基准,ratio 锁定时高度 = 宽 / ratio 联动;否则高度取起始值
+  // 右下角缩放:锁定比例时高度随宽度联动;否则按鼠标横纵位移独立调整。
   const onMove = useCallback((e: MouseEvent) => {
     if (!startRef.current) return
     const dw = e.clientX - startRef.current.mouseX
+    const dh = e.clientY - startRef.current.mouseY
     const w = clamp(startRef.current.w + dw, minSize.w, maxSize.w)
-    const h = ratio ? w / ratio : clamp(startRef.current.h, minSize.h, maxSize.h)
+    const h = ratio
+      ? w / ratio
+      : clamp(startRef.current.h + dh, minSize.h, maxSize.h)
     setSize({ w, h })
   }, [minSize.w, maxSize.w, minSize.h, maxSize.h, ratio])
 

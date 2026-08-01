@@ -32,4 +32,9 @@ describe('CenterCard', () => {
     const { container } = render(<CenterCard expanded={false} onToggleExpand={() => {}} />)
     expect(container.querySelector('[data-center-card]')).toHaveAttribute('data-expanded', 'false')
   })
+
+  it('两种状态均锚定在中央 Grid 区，避免缩放时切换定位坐标系', () => {
+    const { container } = render(<CenterCard expanded={false} onToggleExpand={() => {}} />)
+    expect(container.querySelector('[data-center-card]')).toHaveStyle({ inset: '0' })
+  })
 })

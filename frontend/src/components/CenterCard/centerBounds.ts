@@ -1,4 +1,4 @@
-// 中央卡常量。bounds 用于 useDraggable 的 clamp（CenterCard 关了 clamp，bounds 仅满足类型）。
+// 中央卡常量。bounds 仅提供默认拖拽尺寸，实际范围按工作台区域实时计算。
 export const CENTER_BOUNDS = { width: 280, minHeight: 200, topMargin: 48, margin: 16 }
 export const CENTER_DEFAULT_POS = { x: 0, y: 0 }
 export const CENTER_DEFAULT_SIZE = { w: 400, h: 300 }

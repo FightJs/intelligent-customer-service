@@ -1,6 +1,6 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../src/App'
 
 vi.mock('../src/components/ChatPanel/ChatPanel', () => ({
@@ -8,12 +8,18 @@ vi.mock('../src/components/ChatPanel/ChatPanel', () => ({
 }))
 
 function enterWorkbench() {
+  vi.useFakeTimers()
   localStorage.setItem('ics_dev_auth', 'true')
   render(<App />)
   fireEvent.click(screen.getByText('智能客服工作台'))
+  act(() => vi.advanceTimersByTime(440))
 }
 
 describe('App 工作台布局', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('进入工作台后渲染中央卡、Loader 和交付物', () => {
     enterWorkbench()
     expect(screen.getByText('客服主界面')).toBeInTheDocument()
