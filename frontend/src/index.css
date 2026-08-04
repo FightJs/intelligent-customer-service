@@ -434,3 +434,9 @@ html.theme-transition #root * {
   opacity: 0.9;
 }
 .prose-chat th { font-weight: 600; opacity: 1; }
+
+/* admin 抽屉滑入动画 */
+@keyframes admin-drawer-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}

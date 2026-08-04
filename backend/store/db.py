@@ -204,13 +204,44 @@ def get_user_by_id(user_id: int) -> dict[str, Any] | None:
     return dict(row) if row else None
 
 
-def list_users() -> list[dict[str, Any]]:
-    """列出所有用户（不含 password_hash），按创建时间倒序。"""
+# users 列表允许排序的字段白名单（防 SQL 注入：列名不能参数化）
+_USER_SORT_COLUMNS = {'id', 'username', 'created_at'}
+
+
+def list_users(
+    search: str | None = None,
+    sort_by: str = 'id',
+    order: str = 'asc',
+    page: int = 1,
+    size: int = 20,
+) -> dict[str, Any]:
+    """列出用户（不含 password_hash），支持搜索/排序/分页。
+
+    - search: 按 username 模糊匹配（LIKE %search%），None 或空串不过滤
+    - sort_by: id | username | created_at（白名单外回退 id）
+    - order: asc | desc（其它值当 asc 处理）
+    - page/size: 从 1 开始的分页，返回 {items, total, page, size}
+    """
+    sort_col = sort_by if sort_by in _USER_SORT_COLUMNS else 'id'
+    direction = 'DESC' if order.lower() == 'desc' else 'ASC'
+    page = max(page, 1)
+    size = max(size, 1)
+    offset = (page - 1) * size
+
+    where = ''
+    params: list[Any] = []
+    if search:
+        where = 'WHERE username LIKE ?'
+        params.append(f'%{search}%')
+
     with _connect() as conn:
+        total = conn.execute(f'SELECT COUNT(*) FROM users {where}', params).fetchone()[0]
         rows = conn.execute(
-            'SELECT id, username, role, created_at FROM users ORDER BY id ASC'
+            f'''SELECT id, username, role, created_at FROM users {where}
+                ORDER BY {sort_col} {direction} LIMIT ? OFFSET ?''',
+            [*params, size, offset],
         ).fetchall()
-    return [dict(r) for r in rows]
+    return {'items': [dict(r) for r in rows], 'total': total, 'page': page, 'size': size}
 
 
 # ── Deliveries（交付物持久化，仅 markdown） ───────────────────
@@ -232,27 +263,57 @@ def create_delivery(
         return int(cur.lastrowid)
 
 
-def list_deliveries(user_id: int | None = None, limit: int = 100) -> list[dict[str, Any]]:
-    """列出交付物（不含 markdown 正文，避免列表过重）。可按 user_id 筛选。"""
+# deliveries 列表允许排序的字段白名单（防 SQL 注入：列名不能参数化）。
+# JOIN users 后需带表名前缀避免歧义。
+_DELIVERY_SORT_COLUMNS = {'id': 'd.id', 'customer_name': 'd.customer_name', 'created_at': 'd.created_at'}
+
+
+def list_deliveries(
+    user_id: int | None = None,
+    search: str | None = None,
+    sort_by: str = 'id',
+    order: str = 'desc',
+    page: int = 1,
+    size: int = 20,
+) -> dict[str, Any]:
+    """列出交付物（不含 markdown 正文），支持用户筛选/搜索/排序/分页。
+
+    - user_id: 按归属用户筛选，None 不过滤
+    - search: 按 customer_name 或 owner_username 模糊匹配
+    - sort_by: id | customer_name | created_at（白名单外回退 id）
+    - order: asc | desc（默认 desc，最新在前）
+    - page/size: 从 1 开始的分页，返回 {items, total, page, size}
+    """
+    sort_col = _DELIVERY_SORT_COLUMNS.get(sort_by, 'd.id')
+    direction = 'DESC' if order.lower() == 'desc' else 'ASC'
+    page = max(page, 1)
+    size = max(size, 1)
+    offset = (page - 1) * size
+
+    clauses: list[str] = []
+    params: list[Any] = []
+    if user_id is not None:
+        clauses.append('d.user_id = ?')
+        params.append(user_id)
+    if search:
+        clauses.append('(d.customer_name LIKE ? OR u.username LIKE ?)')
+        params.extend([f'%{search}%', f'%{search}%'])
+    where = f'WHERE {" AND ".join(clauses)}' if clauses else ''
+
     with _connect() as conn:
-        if user_id is None:
-            rows = conn.execute(
-                '''SELECT d.id, d.session_id, d.user_id, d.customer_name, d.created_at,
-                          u.username AS owner_username
-                   FROM deliveries d LEFT JOIN users u ON d.user_id = u.id
-                   ORDER BY d.id DESC LIMIT ?''',
-                (limit,),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                '''SELECT d.id, d.session_id, d.user_id, d.customer_name, d.created_at,
-                          u.username AS owner_username
-                   FROM deliveries d LEFT JOIN users u ON d.user_id = u.id
-                   WHERE d.user_id = ?
-                   ORDER BY d.id DESC LIMIT ?''',
-                (user_id, limit),
-            ).fetchall()
-    return [dict(r) for r in rows]
+        total = conn.execute(
+            f'''SELECT COUNT(*) FROM deliveries d LEFT JOIN users u ON d.user_id = u.id {where}''',
+            params,
+        ).fetchone()[0]
+        rows = conn.execute(
+            f'''SELECT d.id, d.session_id, d.user_id, d.customer_name, d.created_at,
+                      u.username AS owner_username
+               FROM deliveries d LEFT JOIN users u ON d.user_id = u.id
+               {where}
+               ORDER BY {sort_col} {direction} LIMIT ? OFFSET ?''',
+            [*params, size, offset],
+        ).fetchall()
+    return {'items': [dict(r) for r in rows], 'total': total, 'page': page, 'size': size}
 
 
 def get_delivery(delivery_id: int) -> dict[str, Any] | None:

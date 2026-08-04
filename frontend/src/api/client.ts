@@ -178,15 +178,42 @@ export interface AdminDeliveryDetail extends AdminDeliveryListItem {
   markdown: string
 }
 
-export async function adminListUsers(): Promise<AdminUser[]> {
-  const r = await request('/admin/users')
+/** 分页列表响应。 */
+export interface Paged<T> {
+  items: T[]
+  total: number
+  page: number
+  size: number
+}
+
+/** admin 列表查询参数。 */
+export interface AdminListParams {
+  search?: string
+  sort_by?: string
+  order?: 'asc' | 'desc'
+  page?: number
+  size?: number
+}
+
+function buildQuery(params: object): string {
+  const sp = new URLSearchParams()
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null && v !== '') sp.set(k, String(v))
+  }
+  const s = sp.toString()
+  return s ? `?${s}` : ''
+}
+
+export async function adminListUsers(params: AdminListParams = {}): Promise<Paged<AdminUser>> {
+  const r = await request(`/admin/users${buildQuery(params)}`)
   if (!r.ok) throw new Error(`adminListUsers: ${r.status}`)
   return r.json()
 }
 
-export async function adminListDeliveries(userId?: number): Promise<AdminDeliveryListItem[]> {
-  const q = userId ? `?user_id=${userId}` : ''
-  const r = await request(`/admin/deliverables${q}`)
+export async function adminListDeliveries(
+  params: AdminListParams & { user_id?: number } = {},
+): Promise<Paged<AdminDeliveryListItem>> {
+  const r = await request(`/admin/deliverables${buildQuery(params)}`)
   if (!r.ok) throw new Error(`adminListDeliveries: ${r.status}`)
   return r.json()
 }

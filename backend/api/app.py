@@ -294,19 +294,38 @@ def generate(
 # ── Admin 端点（仅 role=admin 可访问） ────────────────────────
 
 @app.get('/api/admin/users')
-def admin_list_users(admin: dict = Depends(get_admin_user)) -> list[dict]:
-    """列出所有用户（不含 password_hash）。"""
-    return db.list_users()
+def admin_list_users(
+    search: str | None = None,
+    sort_by: str = 'id',
+    order: str = 'asc',
+    page: int = 1,
+    size: int = 20,
+    admin: dict = Depends(get_admin_user),
+) -> dict:
+    """列出用户（不含 password_hash），支持搜索/排序/分页。
+
+    返回 {items, total, page, size}。sort_by 仅允许 id/username/created_at。
+    """
+    return db.list_users(search=search, sort_by=sort_by, order=order, page=page, size=size)
 
 
 @app.get('/api/admin/deliverables')
 def admin_list_deliverables(
     user_id: int | None = None,
-    limit: int = 100,
+    search: str | None = None,
+    sort_by: str = 'id',
+    order: str = 'desc',
+    page: int = 1,
+    size: int = 20,
     admin: dict = Depends(get_admin_user),
-) -> list[dict]:
-    """列出交付物（不含 markdown 正文，避免列表过重）。可按 user_id 筛选。"""
-    return db.list_deliveries(user_id=user_id, limit=limit)
+) -> dict:
+    """列出交付物（不含 markdown 正文），支持用户筛选/搜索/排序/分页。
+
+    返回 {items, total, page, size}。sort_by 仅允许 id/customer_name/created_at。
+    """
+    return db.list_deliveries(
+        user_id=user_id, search=search, sort_by=sort_by, order=order, page=page, size=size
+    )
 
 
 @app.get('/api/admin/deliverables/{delivery_id}')

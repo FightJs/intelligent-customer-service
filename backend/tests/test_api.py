@@ -210,7 +210,7 @@ def test_generate_markdown_persists_delivery(client, auth_headers, admin_headers
 
     r = client.get('/api/admin/deliverables', headers=admin_headers)
     assert r.status_code == 200
-    items = r.json()
+    items = r.json()['items']
     assert any(d['session_id'] == sid for d in items)
 
 
@@ -227,33 +227,61 @@ def test_admin_endpoints_require_admin_role(client, auth_headers):
 def test_admin_users_list_includes_admin(client, admin_headers):
     r = client.get('/api/admin/users', headers=admin_headers)
     assert r.status_code == 200
-    users = r.json()
-    assert any(u['username'] == 'admin' and u['role'] == 'admin' for u in users)
+    body = r.json()
+    assert {'items', 'total', 'page', 'size'} <= body.keys()
+    assert any(u['username'] == 'admin' and u['role'] == 'admin' for u in body['items'])
+
+
+def test_admin_users_search_sort_pagination(client, admin_headers):
+    """users 端点支持 search/sort/order/page/size 参数。"""
+    # 搜索 admin
+    r = client.get('/api/admin/users?search=admin', headers=admin_headers)
+    assert r.status_code == 200
+    assert r.json()['total'] == 1
+
+    # 分页：size=1
+    r = client.get('/api/admin/users?size=1&page=1&sort_by=id&order=asc', headers=admin_headers)
+    body = r.json()
+    assert body['size'] == 1
+    assert len(body['items']) == 1
+    assert body['items'][0]['id'] == 1  # id 最小的
+
+    # 排序：username desc
+    r = client.get('/api/admin/users?sort_by=username&order=desc', headers=admin_headers)
+    names = [u['username'] for u in r.json()['items']]
+    assert names == sorted(names, reverse=True)
 
 
 def test_admin_deliverables_list(client, admin_headers):
     r = client.get('/api/admin/deliverables', headers=admin_headers)
     assert r.status_code == 200
-    assert isinstance(r.json(), list)
+    body = r.json()
+    assert {'items', 'total', 'page', 'size'} <= body.keys()
 
 
-def test_admin_deliverables_filter_by_user(client, admin_headers, auth_headers):
-    """按 user_id 筛选交付物。"""
+def test_admin_deliverables_search_and_filter(client, auth_headers, admin_headers):
+    """deliveries 端点支持 search 与 user_id 筛选。"""
     sid = client.post('/api/session', headers=auth_headers).json()['session_id']
     client.post(f'/api/generate/markdown?session_id={sid}', headers=auth_headers)
-    user_id = client.get('/api/auth/me', headers=auth_headers).json()['id']
 
-    r = client.get(f'/api/admin/deliverables?user_id={user_id}', headers=admin_headers)
-    assert r.status_code == 200
-    items = r.json()
-    assert all(d['user_id'] == user_id for d in items)
+    # search 匹配 owner（admin 用户的交付物）
+    r = client.get('/api/admin/deliverables', headers=admin_headers)
+    owner = r.json()['items'][0]['owner_username']
+
+    r = client.get(f'/api/admin/deliverables?search={owner}', headers=admin_headers)
+    assert r.json()['total'] >= 1
+
+    # user_id 筛选
+    uid = r.json()['items'][0]['user_id']
+    r = client.get(f'/api/admin/deliverables?user_id={uid}', headers=admin_headers)
+    assert all(d['user_id'] == uid for d in r.json()['items'])
 
 
 def test_admin_get_deliverable_detail(client, admin_headers, auth_headers):
     """取单条交付物详情，含 markdown 正文。"""
     sid = client.post('/api/session', headers=auth_headers).json()['session_id']
     client.post(f'/api/generate/markdown?session_id={sid}', headers=auth_headers)
-    list_item = client.get('/api/admin/deliverables', headers=admin_headers).json()[0]
+    list_item = client.get('/api/admin/deliverables', headers=admin_headers).json()['items'][0]
 
     r = client.get(f"/api/admin/deliverables/{list_item['id']}", headers=admin_headers)
     assert r.status_code == 200

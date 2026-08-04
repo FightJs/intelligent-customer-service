@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import TopBar from '../components/TopBar'
+import AdminEntryButton from '../components/AdminEntryButton'
 import ChatPanel from '../components/ChatPanel/ChatPanel'
 import ProgressCard from '../components/ProgressCard/ProgressCard'
 import CenterCard from '../components/CenterCard/CenterCard'
@@ -53,21 +53,14 @@ export default function Workbench() {
             theme={theme}
             onToggleTheme={toggleTheme}
             onReset={handleReset}
+            onLogout={logout}
+            role={user?.role}
             progressVisible={progressVisible}
             deliveryOpen={centerExpanded}
             onToggleProgress={() => setProgressVisible((v) => !v)}
             onToggleDelivery={() => setCenterExpanded((v) => !v)}
           />
-          <div className="px-5 py-1.5 text-xs text-muted flex items-center gap-3 border-b border-idle">
-            <span>当前用户：<b className="text-secondary">{user?.username}</b></span>
-            <span className="text-muted/60">·</span>
-            <span>角色：{user?.role}</span>
-            {user?.role === 'admin' && (
-              <Link to="/admin" className="text-accent hover:underline">管理后台</Link>
-            )}
-            <div className="flex-1" />
-            <button type="button" onClick={logout} className="text-muted hover:text-secondary">退出登录</button>
-          </div>
+          {user?.role === 'admin' && <AdminEntryButton />}
           <main className={`workbench-stage${centerExpanded ? ' is-center-expanded' : ''}`}>
             <GridBackground />
             <section className="workbench-progress-zone">
