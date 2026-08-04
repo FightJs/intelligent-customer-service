@@ -17,6 +17,11 @@ dependencies = [
     "python-docx>=1.1",    # Word
     # HTTP（agent 调 LLM 用）
     "httpx>=0.28",
+    # Auth —— 密码 hash + JWT + env（auth 改造新增）
+    "passlib[bcrypt]>=1.7",
+    "bcrypt>=4.0,<5.0",  # passlib 1.7 与 bcrypt 5 不兼容，约束到 4.x
+    "python-jose[cryptography]>=3.3",
+    "python-dotenv>=1.0",  # 之前是传递依赖，显式声明
 ]
 
 [project.optional-dependencies]
