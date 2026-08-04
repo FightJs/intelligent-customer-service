@@ -54,6 +54,28 @@ def value_is_empty(v: FieldValue) -> bool:
     return True
 
 
+def is_field_required(
+    state: StudioFormState,
+    section_id: str,
+    field: FieldDef,
+) -> bool:
+    """判断字段在当前表单状态下是否必填。"""
+    if field.required:
+        return True
+
+    if (
+        section_id == 'equipment'
+        and field.id == 'inventory'
+    ):
+        has_existing = state.sections[
+            'budget'
+        ].fields['has_existing']
+
+        return has_existing.value == 'yes'
+
+    return False
+
+
 def value_to_text(v: FieldValue, field: FieldDef) -> str:
     """字段值转可读文本（给 agent 和交付物用）。"""
     if value_is_empty(v):
@@ -96,30 +118,87 @@ def visible_fields(state: StudioFormState) -> list[tuple[str, FieldDef]]:
     return result
 
 
-def filled_required_count(section: SectionDef, sec_state: SectionState) -> tuple[int, int]:
-    """必填字段的 (已填数, 总数)，跳过不可见字段。"""
+def filled_required_count(
+    state: StudioFormState,
+    section_id: str,
+) -> tuple[int, int]:
+    """计算章节必填字段的已填数和总数。"""
+    section = SECTION_BY_ID[section_id]
+    section_state = state.sections[section_id]
+
     filled = 0
     total = 0
-    for f in section.fields:
-        if not f.required:
+
+    for field in section.fields:
+        if not is_field_required(
+            state,
+            section_id,
+            field,
+        ):
             continue
-        if not is_field_visible(f, sec_state):
+
+        if not is_field_visible(
+            field,
+            section_state,
+        ):
             continue
+
         total += 1
-        v = sec_state.fields.get(f.id)
-        if v is not None and not value_is_empty(v):
+
+        value = section_state.fields.get(
+            field.id
+        )
+
+        if (
+            value is not None
+            and not value_is_empty(value)
+        ):
             filled += 1
+
     return filled, total
 
 
-def next_unfilled_field(state: StudioFormState) -> tuple[str, FieldDef] | None:
-    """找到下一个未填的可见必填字段。没有则返回 None（采集完成）。"""
-    for sec_id, f in visible_fields(state):
-        if not f.required:
+def next_unfilled_field(
+    state: StudioFormState,
+) -> tuple[str, FieldDef] | None:
+    """找到下一个需要填写的字段。"""
+    equipment_field = next(
+        field
+        for field in SECTION_BY_ID[
+            'equipment'
+        ].fields
+        if field.id == 'inventory'
+    )
+
+    equipment_value = state.sections[
+        'equipment'
+    ].fields['inventory']
+
+    if (
+        is_field_required(
+            state,
+            'equipment',
+            equipment_field,
+        )
+        and value_is_empty(equipment_value)
+    ):
+        return 'equipment', equipment_field
+
+    for section_id, field in visible_fields(state):
+        if not is_field_required(
+            state,
+            section_id,
+            field,
+        ):
             continue
-        v = state.sections[sec_id].fields.get(f.id)
-        if v is None or value_is_empty(v):
-            return sec_id, f
+
+        value = state.sections[
+            section_id
+        ].fields.get(field.id)
+
+        if value is None or value_is_empty(value):
+            return section_id, field
+
     return None
 
 
@@ -129,7 +208,7 @@ def section_progress(state: StudioFormState) -> list[dict]:
     for sec_id in SECTION_ORDER:
         sec_def = SECTION_BY_ID[sec_id]
         sec_state = state.sections[sec_id]
-        filled, total = filled_required_count(sec_def, sec_state)
+        filled, total = filled_required_count(state,sec_id,)
         result.append({
             'section_id': sec_id,
             'title': sec_def.title,
@@ -146,16 +225,22 @@ def form_complete(state: StudioFormState) -> bool:
     return next_unfilled_field(state) is None
 
 
-def overall_progress(state: StudioFormState) -> tuple[int, int]:
-    """全局 (已填必填数, 必填总数)。"""
+def overall_progress(
+    state: StudioFormState,
+) -> tuple[int, int]:
+    """全局已填必填数和必填总数。"""
     filled_total = 0
     count_total = 0
+
     for sec_id in SECTION_ORDER:
-        sec_def = SECTION_BY_ID[sec_id]
-        sec_state = state.sections[sec_id]
-        f, t = filled_required_count(sec_def, sec_state)
-        filled_total += f
-        count_total += t
+        filled, total = filled_required_count(
+            state,
+            sec_id,
+        )
+
+        filled_total += filled
+        count_total += total
+
     return filled_total, count_total
 
 
@@ -186,7 +271,7 @@ def recompute_section_status(state: StudioFormState) -> None:
         sec_state = state.sections[sec_id]
         if sec_state.status == 'skipped':
             continue
-        filled, total = filled_required_count(sec_def, sec_state)
+        filled, total = filled_required_count( state,sec_id,)
         if total > 0 and filled >= total:
             sec_state.status = 'complete'
         elif filled > 0 or sec_id == state.current_section_id:

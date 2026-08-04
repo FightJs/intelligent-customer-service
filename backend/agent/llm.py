@@ -17,6 +17,7 @@ load_dotenv()
 LLM_API_KEY = os.getenv('LLM_API_KEY', '')
 LLM_BASE_URL = os.getenv('LLM_BASE_URL', 'https://api.deepseek.com/anthropic')
 LLM_MODEL = os.getenv('LLM_MODEL', 'deepseek-v4-flash')
+LLM_TEMPERATURE = 0.3
 
 
 @lru_cache(maxsize=1)

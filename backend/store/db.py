@@ -117,9 +117,10 @@ def get_messages(session_id: str, limit: int = 100) -> list[dict[str, Any]]:
     with _connect() as conn:
         rows = conn.execute(
             '''SELECT role, content, tool_events FROM messages
-               WHERE session_id = ? ORDER BY id ASC LIMIT ?''',
+               WHERE session_id = ? ORDER BY id DESC LIMIT ?''',
             (session_id, limit),
         ).fetchall()
+    rows.reverse()
     result = []
     for r in rows:
         msg: dict[str, Any] = {'role': r['role'], 'content': r['content']}

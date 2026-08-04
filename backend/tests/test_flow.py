@@ -85,3 +85,63 @@ def test_value_is_empty():
     assert not value_is_empty(MultiChoiceValue(value=['a']))
     assert value_is_empty(DimensionValue(value={'宽': '', '深': ''}))
     assert not value_is_empty(DimensionValue(value={'宽': '4', '深': ''}))
+
+
+def test_existing_equipment_requires_inventory_immediately():
+    """用户确认有设备后，设备明细立即成为下一个必填字段。"""
+    state = create_initial_state()
+
+    state.sections['budget'].fields[
+        'has_existing'
+    ].value = 'yes'
+
+    nxt = next_unfilled_field(state)
+
+    assert nxt is not None
+    assert nxt[0] == 'equipment'
+    assert nxt[1].id == 'inventory'
+
+    _, total = overall_progress(state)
+    assert total == 30
+
+
+def test_no_existing_equipment_does_not_require_inventory():
+    """用户确认没有设备时，不要求填写设备明细。"""
+    state = create_initial_state()
+
+    state.sections['budget'].fields[
+        'has_existing'
+    ].value = 'no'
+
+    nxt = next_unfilled_field(state)
+
+    assert nxt is not None
+    assert nxt[0] == 'customer'
+    assert nxt[1].id == 'brand'
+
+    _, total = overall_progress(state)
+    assert total == 29
+
+
+def test_inventory_completed_resumes_normal_flow():
+    """设备明细填写后，恢复原来的字段采集顺序。"""
+    state = create_initial_state()
+
+    state.sections['budget'].fields[
+        'has_existing'
+    ].value = 'yes'
+
+    state.sections['equipment'].fields[
+        'inventory'
+    ].value = [{
+        'type': '相机',
+        'model': 'Sony A7M4',
+        'qty': '1',
+        'note': '',
+    }]
+
+    nxt = next_unfilled_field(state)
+
+    assert nxt is not None
+    assert nxt[0] == 'customer'
+    assert nxt[1].id == 'brand'

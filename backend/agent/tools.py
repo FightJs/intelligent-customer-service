@@ -26,9 +26,21 @@ class ToolEvent:
 # ── Tool 定义（Anthropic 格式）──────────────────────────────
 
 TOOL_DEFS: list[dict] = [
-    {
+        {
         'name': 'fill_fields',
-        'description': '把从用户消息提取的信息填入调研表字段，可一次填多个。choice-single 填选项 value（英文标识），text 填原话，choice-multi 填 value 数组，dimension 填 {维度:值} 对象。',
+        'description': (
+            '只提取最后一条用户消息中新出现、补充或明确修改的信息。'
+            '历史消息只用于判断当前回答对应哪个字段，'
+            '不要重新传递历史中已经保存的值。'
+            '没有可写入的信息时，必须返回 updates=[]。'
+            'choice-single 填选项 value（英文标识），text 填原话。'
+            'choice-multi、dimension、table 只传本轮新增或补充的内容，'
+            '后端会与已有值合并。'
+            'table 填行对象数组，例如 '
+            '[{"type":"相机","model":"Sony A7M4","qty":"1","note":""}]。'
+            'choice-single 修改已有值时，必须先向用户确认，'
+            '确认后传 confirmed=true。'
+        ),
         'input_schema': {
             'type': 'object',
             'properties': {
@@ -37,11 +49,33 @@ TOOL_DEFS: list[dict] = [
                     'items': {
                         'type': 'object',
                         'properties': {
-                            'section_id': {'type': 'string', 'description': '章节 id，如 customer'},
-                            'field_id': {'type': 'string', 'description': '字段 id，如 brand'},
-                            'value': {'description': '字段值'},
+                            'section_id': {
+                                'type': 'string',
+                                'description': '章节 id，如 customer',
+                            },
+                            'field_id': {
+                                'type': 'string',
+                                'description': '字段 id，如 brand',
+                            },
+                            'value': {
+                                'description': (
+                                    '字段值；table 必须传行对象数组，'
+                                    '列 id 使用 type、model、qty、note'
+                                ),
+                            },
+                            'confirmed': {
+                                'type': 'boolean',
+                                'description': (
+                                    '仅当用户明确确认修改已有 '
+                                    'choice-single 值时传 true'
+                                ),
+                            },
                         },
-                        'required': ['section_id', 'field_id', 'value'],
+                        'required': [
+                            'section_id',
+                            'field_id',
+                            'value',
+                        ],
                     },
                 },
             },
@@ -92,7 +126,7 @@ TOOL_DEFS: list[dict] = [
 
 # ── 执行函数 ────────────────────────────────────────────────
 
-def _apply_one(state: StudioFormState, section_id: str, field_id: str, value) -> tuple[bool, str | None]:
+def _apply_one(state: StudioFormState,section_id: str,field_id: str,value,confirmed: bool = False,) -> tuple[bool, str | None]:
     """应用单个字段值，兼容带前缀的 field_id。
 
     返回 (ok, reason)；失败时 reason 描述原因（section 不存在/字段不存在/类型不匹配/choice 非法值）。
@@ -110,16 +144,45 @@ def _apply_one(state: StudioFormState, section_id: str, field_id: str, value) ->
             current.value = str(value) if value is not None else ''
         elif current.type == 'choice-single':
             if not isinstance(value, str):
-                return False, f'{clean_fid} 需要 string，收到 {type(value).__name__}'
-            # 校验或自动反查（label → value）
-            valid_values = {o.value for o in (fdef.options or [])}
+                return False, (
+                    f'{clean_fid} 需要 string，'
+                    f'收到 {type(value).__name__}'
+                )
+
+            valid_values = {
+                option.value
+                for option in (fdef.options or [])
+            }
+
             if valid_values and value not in valid_values:
                 label_match = next(
-                    (o.value for o in (fdef.options or []) if o.label == value), None
+                    (
+                        option.value
+                        for option in (fdef.options or [])
+                        if option.label == value
+                    ),
+                    None,
                 )
+
                 if label_match is None:
-                    return False, f'{clean_fid} value={value} 不在 options 内'
+                    return False, (
+                        f'{clean_fid} value={value} '
+                        '不在 options 内'
+                    )
+
                 value = label_match
+
+            if (
+                current.value is not None
+                and current.value != value
+                and not confirmed
+            ):
+                return False, (
+                    f'{clean_fid} 已有值 {current.value}，'
+                    f'新值为 {value}。'
+                    '请先向用户确认，确认后传 confirmed=true。'
+                )
+
             current.value = value
         elif current.type == 'choice-multi':
             if not isinstance(value, list):
@@ -137,13 +200,83 @@ def _apply_one(state: StudioFormState, section_id: str, field_id: str, value) ->
                         return False, f'{clean_fid} value={v} 不在 options 内'
                     v = label_match
                 cleaned.append(v)
-            current.value = cleaned
+            current.value = list(dict.fromkeys([
+                *current.value,
+                *cleaned,
+            ]))
         elif current.type == 'dimension':
-            current.value = {k: str(v) for k, v in value.items()} if isinstance(value, dict) else {}
+            if not isinstance(value, dict):
+                return False, (
+                    f'{clean_fid} 需要 object，'
+                    f'收到 {type(value).__name__}'
+                )
+
+            valid_dims = set(fdef.dims or [])
+            unknown_dims = set(value) - valid_dims
+
+            if unknown_dims:
+                return False, (
+                    f'{clean_fid} 包含未知维度：'
+                    f'{", ".join(sorted(unknown_dims))}'
+                )
+
+            new_values = {
+                key: str(item)
+                for key, item in value.items()
+                if item is not None
+                and str(item).strip()
+            }
+
+            current.value = {
+                **current.value,
+                **new_values,
+            }
         elif current.type == 'image':
             current.value = list(value) if isinstance(value, list) else []
         elif current.type == 'table':
-            current.value = list(value) if isinstance(value, list) else []
+            if not isinstance(value, list):
+                return False, (
+                    f'{clean_fid} table 需要 list，'
+                    f'收到 {type(value).__name__}'
+                )
+
+            valid_columns = {
+                column.id
+                for column in (fdef.columns or [])
+            }
+
+            cleaned_rows: list[dict[str, str]] = []
+
+            for index, row in enumerate(value, start=1):
+                if not isinstance(row, dict):
+                    return False, (
+                        f'{clean_fid} 第 {index} 行需要 object，'
+                        f'收到 {type(row).__name__}'
+                    )
+
+                unknown_columns = set(row) - valid_columns
+                if unknown_columns:
+                    column_names = ', '.join(
+                        sorted(unknown_columns)
+                    )
+                    return False, (
+                        f'{clean_fid} 包含未知列: '
+                        f'{column_names}'
+                    )
+
+                cleaned_row = {
+                    key: '' if cell is None else str(cell)
+                    for key, cell in row.items()
+                }
+                cleaned_rows.append(cleaned_row)
+
+            merged_rows = list(current.value)
+
+            for row in cleaned_rows:
+                if row not in merged_rows:
+                    merged_rows.append(row)
+
+            current.value = merged_rows    
         return True, None
     except Exception as exc:
         return False, f'异常: {exc}'
@@ -158,7 +291,11 @@ def apply_updates(state: StudioFormState, updates: list[dict]) -> tuple[int, lis
     failures: list[str] = []
     for upd in updates:
         ok, reason = _apply_one(
-            state, upd['section_id'], upd['field_id'], upd.get('value')
+            state,
+            upd['section_id'],
+            upd['field_id'],
+            upd.get('value'),
+            confirmed=upd.get('confirmed') is True,
         )
         if ok:
             count += 1
@@ -174,7 +311,13 @@ def execute_tool(name: str, tool_input: dict, state: StudioFormState) -> str:
         details: list[str] = []
         failures: list[str] = []
         for upd in tool_input.get('updates', []):
-            ok, reason = _apply_one(state, upd['section_id'], upd['field_id'], upd.get('value'))
+            ok, reason = _apply_one(
+                state,
+                upd['section_id'],
+                upd['field_id'],
+                upd.get('value'),
+                confirmed=upd.get('confirmed') is True,
+            )
             if ok:
                 count += 1
                 val = upd.get('value')

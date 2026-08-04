@@ -111,3 +111,72 @@ def test_apply_updates_helper_returns_counts():
     assert count == 1
     assert len(failures) == 1
     assert state.sections['customer'].fields['brand'].value == '云裳'
+
+
+def test_fill_fields_tool_describes_table_structure():
+    fill_fields = next(
+        tool for tool in TOOL_DEFS
+        if tool['name'] == 'fill_fields'
+    )
+
+    assert 'table' in fill_fields['description']
+    assert 'model' in fill_fields['description']
+
+
+def test_fill_fields_table_writes_structured_rows():
+    state = create_initial_state()
+
+    result = execute_tool('fill_fields', {
+        'updates': [{
+            'section_id': 'equipment',
+            'field_id': 'inventory',
+            'value': [{
+                'type': '相机',
+                'model': 'Sony A7M4',
+                'qty': 1,
+                'note': '',
+            }],
+        }],
+    }, state)
+
+    assert state.sections['equipment'].fields['inventory'].value == [{
+        'type': '相机',
+        'model': 'Sony A7M4',
+        'qty': '1',
+        'note': '',
+    }]
+    assert '失败' not in result
+
+
+def test_fill_fields_table_rejects_non_list():
+    state = create_initial_state()
+
+    result = execute_tool('fill_fields', {
+        'updates': [{
+            'section_id': 'equipment',
+            'field_id': 'inventory',
+            'value': 'Sony A7M4',
+        }],
+    }, state)
+
+    assert state.sections['equipment'].fields['inventory'].value == []
+    assert '失败' in result
+    assert 'list' in result
+
+
+def test_fill_fields_table_rejects_unknown_columns():
+    state = create_initial_state()
+
+    result = execute_tool('fill_fields', {
+        'updates': [{
+            'section_id': 'equipment',
+            'field_id': 'inventory',
+            'value': [{
+                'brand': 'Sony',
+            }],
+        }],
+    }, state)
+
+    assert state.sections['equipment'].fields['inventory'].value == []
+    assert '失败' in result
+    assert '未知列' in result

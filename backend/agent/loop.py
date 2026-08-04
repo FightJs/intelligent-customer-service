@@ -10,14 +10,24 @@ import json
 from dataclasses import dataclass, field
 
 from anthropic import Anthropic
-from agent.llm import get_client, LLM_MODEL
+from agent.llm import (
+    get_client,
+    LLM_MODEL,
+    LLM_TEMPERATURE,
+)
 from agent.tools import TOOL_DEFS, execute_tool, ToolEvent, _apply_one
 from agent import flow
 from survey.models import StudioFormState
 from survey.schema_def import SECTION_BY_ID, FIELD_BY_ID, SECTIONS, SECTION_ORDER, AGENT_GUIDE
 
 MAX_ITERATIONS = 5
+RECENT_MESSAGE_LIMIT = 12
 
+FILL_FIELDS_TOOL = next(
+    tool
+    for tool in TOOL_DEFS
+    if tool['name'] == 'fill_fields'
+)
 
 @dataclass
 class AgentResult:
@@ -26,6 +36,64 @@ class AgentResult:
     state: StudioFormState
     form_complete: bool
     suggestions: list[dict] = field(default_factory=list)
+
+
+def _summarize_history(
+    client: Anthropic,
+    history: list[dict],
+) -> str:
+    """把较早的对话压缩成供 LLM 使用的记忆摘要。"""
+    if not history:
+        return ''
+
+    history_lines: list[str] = []
+
+    for message in history:
+        content = message.get('content')
+
+        if not isinstance(content, str):
+            continue
+
+        speaker = (
+            '客户'
+            if message.get('role') == 'user'
+            else '客服'
+        )
+
+        history_lines.append(
+            f'{speaker}：{content}'
+        )
+
+    transcript = '\n'.join(history_lines)
+
+    response = client.messages.create(
+        model=LLM_MODEL,
+        max_tokens=300,
+        temperature=LLM_TEMPERATURE,
+        thinking={'type': 'disabled'},
+        system=(
+            '你是对话记忆整理器。'
+            '请总结客户已经明确提供的信息、'
+            '客户对旧答案的修改、'
+            '仍未解决的问题和重要上下文。'
+            '新答案与旧答案冲突时，'
+            '以用户最新明确确认的答案为准。'
+            '不要补充或猜测用户没有说过的信息。'
+            '摘要控制在 300 字以内。'
+        ),
+        messages=[{
+            'role': 'user',
+            'content': transcript,
+        }],
+    )
+
+    text_parts = [
+        block.text
+        for block in response.content
+        if block.type == 'text'
+    ]
+
+    return ''.join(text_parts).strip()
 
 
 def _build_suggestions(state: StudioFormState) -> list[dict]:
@@ -43,35 +111,89 @@ def _build_suggestions(state: StudioFormState) -> list[dict]:
     }]
 
 
-def _build_system_prompt(state: StudioFormState) -> str:
+def _build_system_prompt(state: StudioFormState,history_summary: str = '',) -> str:
     """构造 system prompt，含字段说明 + 当前进度 + SOP。"""
     progress = flow.section_progress(state)
     filled, total = flow.overall_progress(state)
     nxt = flow.next_unfilled_field(state)
 
-    # 可填字段说明
-    field_lines = []
+
+    summary_text = (
+        history_summary
+        if history_summary
+        else '（暂无）'
+    )
+
+        # 必填字段主动推进，选填字段只在用户主动提及时记录
+    required_field_lines: list[str] = []
+    optional_field_lines: list[str] = []
+
     for sec_id in SECTION_ORDER:
         sec_def = SECTION_BY_ID[sec_id]
         sec_state = state.sections[sec_id]
+
         if sec_state.status == 'skipped':
             continue
-        f, t = flow.filled_required_count(sec_def, sec_state)
-        if t > 0 and f >= t:
-            continue
+
         for fdef in sec_def.fields:
             if not flow.is_field_visible(fdef, sec_state):
                 continue
-            v = sec_state.fields.get(fdef.id)
-            if v is not None and not flow.value_is_empty(v):
+
+            value = sec_state.fields.get(fdef.id)
+            if value is not None and not flow.value_is_empty(value):
                 continue
-            opts = ''
+
+            field_required = flow.is_field_required(state,sec_id,fdef,)
+
+            options_text = ''
             if fdef.options:
-                opts = '  可选: ' + ', '.join(f'{o.value}={o.label}' for o in fdef.options)
-            dims = f'  维度{fdef.dims}' if fdef.dims else ''
-            req = '必填' if fdef.required else '选填'
-            field_lines.append(f'- {sec_id}.{fdef.id}: {fdef.label}({fdef.type},{req}){opts}{dims}')
-    fields_text = '\n'.join(field_lines) if field_lines else '（所有字段已填）'
+                options_text = '  可选: ' + ', '.join(
+                    f'{option.value}={option.label}'
+                    for option in fdef.options
+                )
+
+            dimensions_text = ''
+            if fdef.dims:
+                dimensions_text = f'  维度{fdef.dims}'
+
+            columns_text = ''
+            if fdef.columns:
+                columns_text = '  列: ' + ', '.join(
+                    f'{column.id}={column.label}'
+                    for column in fdef.columns
+                )
+
+            field_type = (
+                '必填'
+                if field_required
+                else '选填'
+            )
+
+            field_line = (
+                f'- {sec_id}.{fdef.id}: {fdef.label}'
+                f'({fdef.type},{field_type})'
+                f'{options_text}'
+                f'{dimensions_text}'
+                f'{columns_text}'
+            )
+
+            if field_required:
+                required_field_lines.append(field_line)
+            else:
+                optional_field_lines.append(field_line)
+
+    required_fields_text = (
+        '\n'.join(required_field_lines)
+        if required_field_lines
+        else '（所有必填字段已填）'
+    )
+
+    optional_fields_text = (
+        '\n'.join(optional_field_lines)
+        if optional_field_lines
+        else '（暂无）'
+    )
+
 
     # 已采集字段值（治"重复问"：让 LLM 看到自己已经抓到了什么具体内容）
     collected_lines = []
@@ -117,17 +239,26 @@ def _build_system_prompt(state: StudioFormState) -> str:
 
 {AGENT_GUIDE}
 
+【较早对话摘要】
+{summary_text}
+
 【采集纪律】
-1. 禁止重复询问下方【已采集】清单中已存在的字段
+1. 信息成功写入表单优先于减少重复。已成功写入且无冲突的字段避免重复询问；信息不确定、新旧答案冲突或工具写入失败时，允许再次确认
 2. 用户本轮回答涉及多个字段时，必须一次性 fill_fields 全部
-3. 严格按【下一个该问】推进，不得回跳到已采集字段（除非用户主动要求修改）
-4. 若 fill_fields 返回失败明细，根据原因修正后最多重试一次
+3. 优先按【下一个该问】推进；只有信息不确定、用户主动修改或工具写入失败时，才回到相关字段确认
+4. 选填字段只在用户主动提供时记录，禁止主动询问选填字段
+5. 用户回答“无”“没有”“不用补充”时，禁止再次询问“还有什么需要补充”；仍有必填字段就继续【下一个该问】，全部完成就告知可以生成交付物
+6. 若 fill_fields 返回失败明细，根据原因修正后最多重试一次
+
 
 【已采集】
 {collected_text}
 
-当前可填字段：
-{fields_text}
+当前需要推进的必填字段：
+{required_fields_text}
+
+用户主动提及时可记录的选填字段（禁止主动询问）：
+{optional_fields_text}
 
 当前进度（{filled}/{total}）：
 {chr(10).join(progress_lines)}
@@ -149,27 +280,69 @@ def run_agent(
     client = get_client()
     events: list[ToolEvent] = []
 
-    system_prompt = _build_system_prompt(state)
+        # 历史拆分为“较早摘要 + 近期原文”。
+    full_history = history or []
 
-    # 构造初始 messages（history 限 6 条）
-    # Anthropic API 要求第一条 message 的 role 必须是 user，
-    # 前端传来的 history 可能以 assistant（开场白）开头，需丢弃开头的非 user 消息
+    older_history = full_history[
+        :-RECENT_MESSAGE_LIMIT
+    ]
+    recent_history = full_history[
+        -RECENT_MESSAGE_LIMIT:
+    ]
+
+    history_summary = _summarize_history(
+        client,
+        older_history,
+    )
+
+    # Anthropic API 要求第一条消息必须是 user。
     messages: list[dict] = []
-    if history:
-        trimmed = history[-6:]
-        while trimmed and trimmed[0].get('role') != 'user':
-            trimmed = trimmed[1:]
-        messages.extend(trimmed)
-    messages.append({'role': 'user', 'content': user_message})
+    trimmed = list(recent_history)
+
+    while (
+        trimmed
+        and trimmed[0].get('role') != 'user'
+    ):
+        trimmed = trimmed[1:]
+
+    messages.extend(trimmed)
+    messages.append({
+        'role': 'user',
+        'content': user_message,
+    })
 
     for iteration in range(MAX_ITERATIONS):
         # 每轮刷新 system prompt（state 可能变了）
+        is_capture_turn = iteration == 0
+
+        request_tools = (
+            [FILL_FIELDS_TOOL]
+            if is_capture_turn
+            else TOOL_DEFS
+        )
+
+        request_tool_choice = (
+            {
+                'type': 'tool',
+                'name': 'fill_fields',
+            }
+            if is_capture_turn
+            else {
+                'type': 'auto',
+            }
+        )
+        
         resp = client.messages.create(
             model=LLM_MODEL,
             max_tokens=800,
+            temperature=LLM_TEMPERATURE,
             thinking={'type': 'disabled'},
-            system=_build_system_prompt(state),
-            tools=TOOL_DEFS,
+                        system=_build_system_prompt(
+                state,
+                history_summary,
+            ),
+            tools=request_tools,
+            tool_choice=request_tool_choice,
             messages=messages,
         )
 
@@ -182,9 +355,21 @@ def run_agent(
             elif block.type == 'tool_use':
                 tool_use_blocks.append(block)
 
+        if is_capture_turn:
+            has_fill_fields = any(
+                block.name == 'fill_fields'
+                for block in tool_use_blocks
+            )
+
+            if not has_fill_fields:
+                raise RuntimeError(
+                    '当前轮没有返回必须的 fill_fields 工具调用'
+                )
+
         if resp.stop_reason != 'tool_use' or not tool_use_blocks:
             # end_turn，取文本回复
             reply = ''.join(text_parts).strip()
+
             break
 
         # 执行 tools，收集 assistant 消息 + tool_result
@@ -199,10 +384,26 @@ def run_agent(
             if tb.name == 'fill_fields':
                 for upd in tb.input.get('updates', []):
                     raw_fid = upd.get('field_id', '')
-                    clean_fid = raw_fid.split('.')[-1] if '.' in raw_fid else raw_fid
+                    clean_fid = (
+                        raw_fid.split('.')[-1]
+                        if '.' in raw_fid
+                        else raw_fid
+                    )
+
+                    section_id = upd.get('section_id', '')
+                    section_state = state.sections.get(section_id)
+                    if section_state is None:
+                        continue
+
+                    stored_field = section_state.fields.get(clean_fid)
+                    if stored_field is None:
+                        continue
+
                     events.append(ToolEvent(
-                        kind='fill', section_id=upd['section_id'],
-                        field_id=clean_fid, value=upd.get('value'),
+                        kind='fill',
+                        section_id=section_id,
+                        field_id=clean_fid,
+                        value=stored_field.value,
                     ))
             elif tb.name == 'skip_section':
                 events.append(ToolEvent(kind='skip', section_id=tb.input['section_id']))
