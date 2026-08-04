@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { useFormState } from '../../state/FormContext'
 import { SECTIONS } from '../../data/sections'
 import { makeSummary, filledCount } from '../../utils/summary'
-
-const API_BASE = 'http://localhost:8000/api'
+import { generateUrl } from '../../api/client'
 
 const OVERVIEW_SECTION_IDS = ['customer', 'industry', 'venue', 'budget', 'goal'] as const
 
@@ -36,9 +35,7 @@ export default function DeliveryPanel() {
     }
     setDownloading(type)
     try {
-      const r = await fetch(`${API_BASE}/generate/${type}?session_id=${sessionId}`, {
-        method: 'POST',
-      })
+      const r = await generateUrl(type as 'markdown' | 'excel' | 'word', sessionId)
       if (!r.ok) throw new Error(`生成失败：${r.status}`)
       const blob = await r.blob()
       // 从 Content-Disposition 取文件名
