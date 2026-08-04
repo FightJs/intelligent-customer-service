@@ -186,7 +186,7 @@ export async function adminListUsers(): Promise<AdminUser[]> {
 
 export async function adminListDeliveries(userId?: number): Promise<AdminDeliveryListItem[]> {
   const q = userId ? `?user_id=${userId}` : ''
-  const r = await request(`/admin/deliveries${q}`)
+  const r = await request(`/admin/deliverables${q}`)
   if (!r.ok) throw new Error(`adminListDeliveries: ${r.status}`)
   return r.json()
 }
