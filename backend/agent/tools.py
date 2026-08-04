@@ -38,7 +38,8 @@ TOOL_DEFS: list[dict] = [
             '后端会与已有值合并。'
             'table 填行对象数组，例如 '
             '[{"type":"相机","model":"Sony A7M4","qty":"1","note":""}]。'
-            'choice-single 修改已有值时，必须先向用户确认，'
+            'text 或 choice-single 修改已有值时，'
+            '必须先向用户确认，'
             '确认后传 confirmed=true。'
         ),
         'input_schema': {
@@ -67,7 +68,7 @@ TOOL_DEFS: list[dict] = [
                                 'type': 'boolean',
                                 'description': (
                                     '仅当用户明确确认修改已有 '
-                                    'choice-single 值时传 true'
+                                    'text 或 choice-single 值时传 true'
                                 ),
                             },
                         },
@@ -141,7 +142,26 @@ def _apply_one(state: StudioFormState,section_id: str,field_id: str,value,confir
     fdef = FIELD_BY_ID.get(clean_fid)
     try:
         if current.type == 'text':
-            current.value = str(value) if value is not None else ''
+            new_value = (
+                str(value)
+                if value is not None
+                else ''
+            )
+
+            if (
+                current.value
+                and current.value != new_value
+                and not confirmed
+            ):
+                return False, (
+                    f'{clean_fid} 已有值 '
+                    f'{current.value}，'
+                    f'新值为 {new_value}。'
+                    '请先向用户确认，'
+                    '确认后传 confirmed=true。'
+                )
+
+            current.value = new_value
         elif current.type == 'choice-single':
             if not isinstance(value, str):
                 return False, (
@@ -232,7 +252,23 @@ def _apply_one(state: StudioFormState,section_id: str,field_id: str,value,confir
                 **new_values,
             }
         elif current.type == 'image':
-            current.value = list(value) if isinstance(value, list) else []
+            if not isinstance(value, list):
+                return False, (
+                    f'{clean_fid} image 需要 list，'
+                    f'收到 {type(value).__name__}'
+                )
+
+            new_images = [
+                str(item)
+                for item in value
+                if item is not None
+                and str(item).strip()
+            ]
+
+            current.value = list(dict.fromkeys([
+                *current.value,
+                *new_images,
+            ]))
         elif current.type == 'table':
             if not isinstance(value, list):
                 return False, (

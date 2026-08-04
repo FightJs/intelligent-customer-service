@@ -180,3 +180,80 @@ def test_fill_fields_table_rejects_unknown_columns():
     assert state.sections['equipment'].fields['inventory'].value == []
     assert '失败' in result
     assert '未知列' in result
+
+
+def test_text_conflict_requires_confirmation():
+    """text 已有不同值时不能静默覆盖。"""
+    state = create_initial_state()
+
+    state.sections['customer'].fields[
+        'brand'
+    ].value = '云裳'
+
+    result = execute_tool('fill_fields', {
+        'updates': [{
+            'section_id': 'customer',
+            'field_id': 'brand',
+            'value': '新品牌',
+        }],
+    }, state)
+
+    assert state.sections['customer'].fields[
+        'brand'
+    ].value == '云裳'
+
+    assert '失败' in result
+    assert '确认' in result
+
+
+def test_text_conflict_updates_after_confirmation():
+    """用户确认修改后允许更新 text 字段。"""
+    state = create_initial_state()
+
+    state.sections['customer'].fields[
+        'brand'
+    ].value = '云裳'
+
+    result = execute_tool('fill_fields', {
+        'updates': [{
+            'section_id': 'customer',
+            'field_id': 'brand',
+            'value': '新品牌',
+            'confirmed': True,
+        }],
+    }, state)
+
+    assert state.sections['customer'].fields[
+        'brand'
+    ].value == '新品牌'
+
+    assert '失败' not in result
+
+
+def test_image_fields_merge_incrementally():
+    """分多轮上传图片时保留旧图片并去重。"""
+    state = create_initial_state()
+
+    state.sections['venue'].fields[
+        'venue_photo'
+    ].value = ['room-1.jpg']
+
+    result = execute_tool('fill_fields', {
+        'updates': [{
+            'section_id': 'venue',
+            'field_id': 'venue_photo',
+            'value': [
+                'room-2.jpg',
+                'room-1.jpg',
+            ],
+        }],
+    }, state)
+
+    assert state.sections['venue'].fields[
+        'venue_photo'
+    ].value == [
+        'room-1.jpg',
+        'room-2.jpg',
+    ]
+
+    assert '失败' not in result

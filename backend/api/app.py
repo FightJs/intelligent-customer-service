@@ -210,7 +210,8 @@ def chat(req: ChatRequest, current: dict = Depends(get_current_user)) -> ChatRes
                 field_id=upd['field_id'].split('.')[-1], value=upd.get('value'),
             ))
 
-    # 从 DB 取完整历史（前端 history 作为 fallback，但 DB 是权威源）
+    # 从 DB 取最近 50 条历史。
+    # 前端 history 仅作为空会话 fallback，DB 是权威源。
     history = db.get_messages(req.session_id, limit=50) or req.history
 
     result = run_agent(state, req.message, history)

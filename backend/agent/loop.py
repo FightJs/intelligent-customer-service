@@ -362,9 +362,7 @@ def run_agent(
             )
 
             if not has_fill_fields:
-                raise RuntimeError(
-                    '当前轮没有返回必须的 fill_fields 工具调用'
-                )
+                continue
 
         if resp.stop_reason != 'tool_use' or not tool_use_blocks:
             # end_turn，取文本回复

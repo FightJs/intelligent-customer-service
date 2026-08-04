@@ -150,8 +150,11 @@ def add_message(
         )
 
 
-def get_messages(session_id: str, limit: int = 100) -> list[dict[str, Any]]:
-    """取会话的对话历史（按时间正序）。"""
+def get_messages(
+    session_id: str,
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    """取最近 limit 条会话消息，并按时间正序返回。"""
     with _connect() as conn:
         rows = conn.execute(
             '''SELECT role, content, tool_events FROM messages

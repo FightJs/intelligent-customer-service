@@ -65,6 +65,41 @@ def test_run_agent_text_only(mock_get_client):
 
 
 @patch('agent.loop.get_client')
+def test_run_agent_capture_without_tool_does_not_crash(
+    mock_get_client,
+):
+    """捕获轮没有返回工具时，不应导致请求 500。"""
+    mock_client = MagicMock()
+
+    mock_client.messages.create.side_effect = [
+        _mock_text_response(''),
+        _mock_text_response(
+            '您好！请问有什么可以帮您？'
+        ),
+    ]
+
+    mock_get_client.return_value = mock_client
+
+    state = create_initial_state()
+
+    result = run_agent(
+        state,
+        '你好',
+    )
+
+    assert result.reply == (
+        '您好！请问有什么可以帮您？'
+    )
+
+    assert result.tool_events == []
+
+    assert (
+        mock_client.messages.create.call_count
+        == 2
+    )
+
+
+@patch('agent.loop.get_client')
 def test_run_agent_fill_fields_then_reply(mock_get_client):
     """模型先调 fill_fields，再回复文本。"""
     mock_client = MagicMock()
