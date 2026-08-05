@@ -294,6 +294,90 @@ def test_suggestions_populated_for_choice_field(mock_get_client):
 
 
 @patch('agent.loop.get_client')
+def test_suggestions_filtered_when_reply_does_not_match_choice(
+    mock_get_client,
+):
+    """最终回复未询问候选字段时，不返回快捷回答。"""
+    mock_client = MagicMock()
+    mock_client.messages.create.side_effect = [
+        _mock_empty_capture_response(),
+        _mock_text_response(
+            '接下来请介绍一下您的主播团队。'
+        ),
+    ]
+    mock_get_client.return_value = mock_client
+
+    state = create_initial_state()
+
+    for field_id in [
+        'brand',
+        'contact',
+        'phone',
+        'wechat',
+        'city',
+        'source',
+        'date',
+    ]:
+        state.sections[
+            'customer'
+        ].fields[field_id] = TextValue(
+            type='text',
+            value='x',
+        )
+
+    result = run_agent(
+        state,
+        '下一步',
+    )
+
+    assert result.suggestions == []
+
+
+@patch('agent.loop.get_client')
+def test_suggestions_match_multiple_option_labels(
+    mock_get_client,
+):
+    """回复提到多个候选项时返回快捷回答。"""
+    mock_client = MagicMock()
+    mock_client.messages.create.side_effect = [
+        _mock_empty_capture_response(),
+        _mock_text_response(
+            '您主要做女装、美妆还是珠宝？'
+        ),
+    ]
+    mock_get_client.return_value = mock_client
+
+    state = create_initial_state()
+
+    for field_id in [
+        'brand',
+        'contact',
+        'phone',
+        'wechat',
+        'city',
+        'source',
+        'date',
+    ]:
+        state.sections[
+            'customer'
+        ].fields[field_id] = TextValue(
+            type='text',
+            value='x',
+        )
+
+    result = run_agent(
+        state,
+        '下一步',
+    )
+
+    assert len(result.suggestions) == 1
+    assert (
+        result.suggestions[0]['field_id']
+        == 'category'
+    )
+
+
+@patch('agent.loop.get_client')
 def test_run_agent_uses_summary_and_recent_messages(
     mock_get_client,
 ):

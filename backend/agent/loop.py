@@ -18,10 +18,40 @@ from agent.llm import (
 from agent.tools import TOOL_DEFS, execute_tool, ToolEvent, _apply_one
 from agent import flow
 from survey.models import StudioFormState
-from survey.schema_def import SECTION_BY_ID, FIELD_BY_ID, SECTIONS, SECTION_ORDER, AGENT_GUIDE
+from survey.schema_def import (
+    AGENT_GUIDE,
+    FIELD_BY_ID,
+    SECTION_BY_ID,
+    SECTIONS,
+    SECTION_ORDER,
+    FieldDef,
+)
 
 MAX_ITERATIONS = 5
 RECENT_MESSAGE_LIMIT = 12
+
+SUGGESTION_FIELD_PREFIXES = (
+    '目标客群',
+    '客户',
+    '商品',
+    '品牌',
+    '直播间',
+    '场地',
+    '预算',
+    '现有',
+    '需求与',
+)
+
+SUGGESTION_GENERIC_WORDS = {
+    '目标',
+    '客户',
+    '商品',
+    '品牌',
+    '场地',
+    '预算',
+    '现有',
+    '需求',
+}
 
 FILL_FIELDS_TOOL = next(
     tool
@@ -96,18 +126,81 @@ def _summarize_history(
     return ''.join(text_parts).strip()
 
 
-def _build_suggestions(state: StudioFormState) -> list[dict]:
-    """根据下一个未填字段，构造 chip 选项（仅 choice 类字段有 options）。"""
-    nxt = flow.next_unfilled_field(state)
-    if not nxt:
+def _suggestion_matches_reply(
+    field_def: FieldDef,
+    reply: str,
+) -> bool:
+    """判断客服回复是否确实在询问候选字段。"""
+    if not reply:
+        return False
+
+    field_tail = field_def.label
+
+    for prefix in SUGGESTION_FIELD_PREFIXES:
+        if field_tail.startswith(prefix):
+            field_tail = field_tail[len(prefix):]
+            break
+
+    keywords = (
+        field_def.label,
+        field_tail,
+        field_def.label[:2],
+    )
+
+    if any(
+        keyword in reply
+        for keyword in keywords
+        if (
+            len(keyword) > 1
+            and keyword
+            not in SUGGESTION_GENERIC_WORDS
+        )
+    ):
+        return True
+
+    mentioned_options = [
+        option
+        for option in (field_def.options or [])
+        if (
+            len(option.label) > 1
+            and option.label in reply
+        )
+    ]
+
+    return len(mentioned_options) >= 2
+
+
+def _build_suggestions(
+    state: StudioFormState,
+    reply: str,
+) -> list[dict]:
+    """仅为回复实际询问的 choice 字段返回快捷回答。"""
+    next_field = flow.next_unfilled_field(state)
+
+    if not next_field:
         return []
-    sec_id, fdef = nxt
-    if not fdef.options:
+
+    section_id, field_def = next_field
+
+    if not field_def.options:
         return []
+
+    if not _suggestion_matches_reply(
+        field_def,
+        reply,
+    ):
+        return []
+
     return [{
-        'section_id': sec_id,
-        'field_id': fdef.id,
-        'options': [{'value': o.value, 'label': o.label} for o in fdef.options],
+        'section_id': section_id,
+        'field_id': field_def.id,
+        'options': [
+            {
+                'value': option.value,
+                'label': option.label,
+            }
+            for option in field_def.options
+        ],
     }]
 
 
@@ -428,5 +521,5 @@ def run_agent(
         tool_events=events,
         state=state,
         form_complete=flow.form_complete(state),
-        suggestions=_build_suggestions(state),
+        suggestions=_build_suggestions(state,reply,),
     )
