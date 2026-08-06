@@ -161,7 +161,7 @@ html.theme-transition #root * {
 
 .workbench-slots {
   display: grid;
-  grid-template-rows: minmax(0, .85fr) minmax(0, 1.15fr);
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
   overflow: hidden;
   transform-origin: right center;
@@ -191,97 +191,14 @@ html.theme-transition #root * {
 
 .deliverable-slot {
   flex-direction: column;
+  width: calc(100% - 20px);
+  justify-self: center;
 }
 
 .form-preview-slot {
-  display: grid;
-  place-items: start center;
-  min-height: 0;
-}
-
-.form-preview-content {
-  width: 240px;
-  aspect-ratio: 400 / 260;
-}
-
-.requirement-preview {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  flex-direction: column;
+  position: relative;
   overflow: hidden;
-  border: 1px solid rgb(var(--color-outline));
-  border-radius: 8px;
-  background: rgb(var(--color-surface));
-  color: rgb(var(--color-primary));
-  text-align: left;
-  box-shadow: 0 8px 18px rgb(0 0 0 / .24);
-}
-
-.requirement-preview-header,
-.requirement-preview-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex: 0 0 auto;
-  padding: 7px 9px;
-  color: rgb(var(--color-secondary));
-  font-size: 10px;
-}
-
-.requirement-preview-header {
-  border-bottom: 1px solid rgb(var(--color-idle));
-  color: rgb(var(--color-primary));
-  font-weight: 600;
-}
-
-.requirement-preview-header span:last-child {
-  color: rgb(var(--color-accent));
-  font-variant-numeric: tabular-nums;
-}
-
-.requirement-preview-table {
-  display: flex;
   min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  padding: 2px 9px;
-}
-
-.requirement-preview-row {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: 40% minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-  flex: 1;
-  border-bottom: 1px solid rgb(var(--color-idle) / .6);
-  color: rgb(var(--color-muted));
-  font-size: 9px;
-}
-
-.requirement-preview-row:last-child { border-bottom: 0; }
-.requirement-preview-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.requirement-preview-row span:last-child { color: rgb(var(--color-secondary)); }
-
-.requirement-preview-footer {
-  justify-content: flex-start;
-  border-top: 1px solid rgb(var(--color-idle));
-  color: rgb(var(--color-muted));
-}
-
-.form-preview-trigger {
-  display: block;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
-.form-preview-trigger:focus-visible {
-  outline: 2px solid rgb(var(--color-accent));
-  outline-offset: 4px;
-  border-radius: 8px;
 }
 
 .delivery-order-button {
@@ -306,11 +223,11 @@ html.theme-transition #root * {
 }
 
 .deliverable-file-row {
-  display: grid;
-  min-width: 0;
-  place-items: center;
-  gap: 5px;
-  padding: 7px 3px 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
   border: 1px solid rgb(var(--color-outline));
   border-radius: 8px;
   color: inherit;
@@ -326,10 +243,11 @@ html.theme-transition #root * {
   background: rgb(var(--color-active-surface));
 }
 
-.deliverable-file-row:disabled { cursor: not-allowed; opacity: .45; }
+.deliverable-file-row:disabled { cursor: not-allowed; }
 
 .deliverable-file-icon {
   display: grid;
+  flex: none;
   width: 24px;
   height: 24px;
   place-items: center;
@@ -340,18 +258,19 @@ html.theme-transition #root * {
 .deliverable-file-icon.is-hovered { transform: scale(1.08); }
 
 .deliverable-file-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .deliverable-file-label {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   color: rgb(var(--color-primary));
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.35;
-  text-align: center;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -547,6 +466,13 @@ html.theme-transition #root * {
 .floating-card:hover .floating-card-resize-handle,
 .floating-card:focus-within .floating-card-resize-handle {
   border-color: rgb(var(--color-accent));
+}
+
+/* 进度卡：白色高亮描边，无发光（primary 色适配深浅主题） */
+.progress-card {
+  box-shadow:
+    0 0 0 1.5px rgb(var(--color-primary) / .35),
+    0 25px 50px -12px rgb(0 0 0 / .5);
 }
 
 .progress-card.is-expanded {

@@ -2,11 +2,9 @@ import { useState } from 'react'
 import { ArrowDown } from 'lucide-react'
 import { useFormState } from '../../state/FormContext'
 import { SECTIONS } from '../../data/sections'
-import { makeSummary, filledCount } from '../../utils/summary'
+import { filledCount } from '../../utils/summary'
 import { generateUrl } from '../../api/client'
 
-
-const OVERVIEW_SECTION_IDS = ['customer', 'industry', 'venue', 'budget', 'goal'] as const
 
 const DELIVERABLES = [
   { type: 'markdown', label: '场景设计说明', desc: 'Markdown 格式，含完整需求清单', icon: 'pdf' },
@@ -87,24 +85,6 @@ export default function DeliverableSlot({ onSendOrder }: DeliverableSlotProps) {
   return (
     <section className="workbench-slot deliverable-slot">
       <div className="delivery-panel-scroll flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
-        <section>
-          <h3 className="text-secondary text-xs mb-2">方案概要</h3>
-          <div className="grid grid-cols-2 gap-2">
-            {OVERVIEW_SECTION_IDS.map((id) => {
-              const sec = state.sections[id]
-              const def = SECTIONS.find((s) => s.id === id)!
-              return (
-                <div key={id} className="rounded-card border border-idle/50 bg-surface p-2.5">
-                  <div className="text-muted text-[10px]">{def.title}</div>
-                  <div className="text-primary text-xs truncate">
-                    {makeSummary(sec, def)}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-
         <section>
           <h3 className="text-secondary text-xs mb-2">
             交付物生成（{filled}/{total}）
