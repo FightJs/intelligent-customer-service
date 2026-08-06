@@ -44,6 +44,16 @@ describe('DataTable', () => {
     expect(container.querySelectorAll('.animate-pulse')).toHaveLength(6) // 3 行 × 2 列
   })
 
+  it('已有数据刷新时保留当前行，避免排序闪动', () => {
+    const { container } = render(
+      <DataTable columns={COLUMNS} rows={ROWS} rowKey={(r) => r.id} loading />,
+    )
+
+    expect(screen.getByText('alice')).toBeInTheDocument()
+    expect(screen.getByText('bob')).toBeInTheDocument()
+    expect(container.querySelectorAll('.animate-pulse')).toHaveLength(0)
+  })
+
   it('点击可排序列头触发 onSortChange', () => {
     const onSortChange = vi.fn()
     render(

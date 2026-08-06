@@ -23,10 +23,12 @@ function renderBar(overrides: Partial<React.ComponentProps<typeof TopBar>> = {})
 }
 
 describe('TopBar', () => {
-  it('头像环色按角色区分：admin=done(绿)', () => {
+  it('管理员头像使用中性描边和蓝色盾牌角标', () => {
     const { container } = renderBar({ role: 'admin' })
     const avatar = container.querySelector('[role="button"][aria-label="管理员"]')
-    expect(avatar?.className).toContain('ring-done')
+    expect(avatar?.className).toContain('border-idle')
+    expect(avatar?.className).not.toContain('ring-done')
+    expect(container.querySelector('[data-admin-shield-badge]')).toBeInTheDocument()
   })
 
   it('头像环色按角色区分：user=accent(蓝)', () => {
@@ -68,5 +70,21 @@ describe('TopBar', () => {
     const header = screen.getByRole('banner')
     // header 内不应含「重新开始」「切换到浅色主题」这类文本按钮
     expect(header.textContent).not.toContain('重新开始')
+  })
+
+  it('进度卡切换图标使用亮度与缩放反馈，不亮起按钮外框', () => {
+    renderBar()
+    const button = screen.getByRole('button', { name: '隐藏采集进度' })
+    expect(button).toHaveClass('top-bar-icon-button')
+    expect(button).not.toHaveClass('hover:bg-active-surface')
+    expect(button).toHaveAttribute('data-icon-feedback', 'scale-brightness')
+  })
+
+  it('右侧主卡放大态图标使用同样的亮度与缩放反馈', () => {
+    renderBar()
+    const button = screen.getByRole('button', { name: '放大主卡' })
+    expect(button).toHaveClass('top-bar-icon-button')
+    expect(button).not.toHaveClass('hover:bg-active-surface')
+    expect(button).toHaveAttribute('data-icon-feedback', 'scale-brightness')
   })
 })

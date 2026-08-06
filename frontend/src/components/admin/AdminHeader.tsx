@@ -17,8 +17,14 @@ const TABS: { id: Tab; label: string; icon: typeof Package }[] = [
 export default function AdminHeader({ tab, onTabChange }: AdminHeaderProps) {
   return (
     <header className="flex h-12 shrink-0 items-center gap-4 border-b border-idle/40 px-5">
-      <span className="text-sm font-semibold text-primary">管理后台</span>
-      <nav className="ml-2 flex gap-1">
+      <Link
+        to="/workbench"
+        className="inline-flex items-center gap-1 text-sm text-muted hover:text-secondary"
+      >
+        <ArrowLeft size={14} />
+        返回工作台
+      </Link>
+      <nav className="flex gap-1">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -36,13 +42,7 @@ export default function AdminHeader({ tab, onTabChange }: AdminHeaderProps) {
         ))}
       </nav>
       <div className="flex-1" />
-      <Link
-        to="/"
-        className="inline-flex items-center gap-1 text-sm text-muted hover:text-secondary"
-      >
-        <ArrowLeft size={14} />
-        返回工作台
-      </Link>
+      <span className="text-sm font-semibold text-primary">后台管理</span>
     </header>
   )
 }

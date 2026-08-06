@@ -23,7 +23,7 @@ export default function AuthScreen() {
       } else {
         await register(username, password)
       }
-      navigate('/')
+      navigate('/breathing')
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败')
     } finally {
@@ -33,7 +33,10 @@ export default function AuthScreen() {
 
   return (
     <div className="h-full flex items-center justify-center bg-base text-primary px-4">
-      <div className="w-full max-w-sm rounded-card bg-surface p-6 shadow-xl ring-1 ring-idle">
+      <div
+        data-testid="auth-form-container"
+        className="auth-form-container w-full max-w-sm p-6 shadow-xl"
+      >
         <div className="mb-6 text-center">
           <img src="/favicon.svg" alt="" className="mx-auto mb-3 h-10 w-10" />
           <h1 className="text-xl font-semibold">

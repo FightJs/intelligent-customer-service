@@ -11,7 +11,7 @@ describe('AdminEntryButton', () => {
         <AdminEntryButton />
       </MemoryRouter>,
     )
-    const link = screen.getByText('管理后台').closest('a')
+    const link = screen.getByRole('link', { name: '后台管理' })
     expect(link).toBeInTheDocument()
     expect(link).toHaveAttribute('href', '/admin')
   })
@@ -22,9 +22,24 @@ describe('AdminEntryButton', () => {
         <AdminEntryButton />
       </MemoryRouter>,
     )
-    const link = screen.getByText('管理后台').closest('a')!
+    const link = screen.getByRole('link', { name: '后台管理' })
     expect(link.className).toContain('fixed')
     expect(link.className).toContain('bottom-4')
     expect(link.className).toContain('left-4')
+  })
+
+  it('显示图标和后台管理文字，悬浮反馈不使用外框', () => {
+    render(
+      <MemoryRouter>
+        <AdminEntryButton />
+      </MemoryRouter>,
+    )
+    const link = screen.getByRole('link', { name: '后台管理' })
+    expect(link).toHaveClass('admin-entry-button')
+    expect(link).toHaveAttribute('data-icon-feedback', 'scale-brightness')
+    expect(link).toHaveAttribute('title', '后台管理')
+    expect(link).not.toHaveClass('border')
+    expect(link).toHaveTextContent('后台管理')
+    expect(link.querySelector('span')).toHaveClass('admin-entry-label')
   })
 })

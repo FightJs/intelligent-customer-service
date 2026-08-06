@@ -61,7 +61,7 @@ export default function DataTable<T>({
               return (
                 <th
                   key={col.key}
-                  className={`px-3.5 py-2.5 font-medium ${col.sortable ? 'cursor-pointer select-none hover:text-primary' : ''} ${col.className ?? ''}`}
+                  className={`px-3.5 py-2.5 first:pl-7 font-medium ${col.sortable ? 'cursor-pointer select-none hover:text-primary' : ''} ${col.className ?? ''}`}
                   onClick={() => handleSort(col)}
                 >
                   <span className="inline-flex items-center gap-1">
@@ -84,11 +84,11 @@ export default function DataTable<T>({
           </tr>
         </thead>
         <tbody>
-          {loading ? (
+          {loading && rows.length === 0 ? (
             Array.from({ length: skeletonRows }).map((_, i) => (
               <tr key={`sk-${i}`} className="border-t border-idle/30">
                 {columns.map((col) => (
-                  <td key={col.key} className="px-3.5 py-2.5">
+                  <td key={col.key} className="px-3.5 py-2.5 first:pl-7">
                     <div className="h-4 w-3/4 animate-pulse rounded bg-idle/30" />
                   </td>
                 ))}
@@ -108,7 +108,7 @@ export default function DataTable<T>({
                 className={`border-t border-idle/30 transition-colors ${onRowClick ? 'cursor-pointer hover:bg-active-surface/30' : ''}`}
               >
                 {columns.map((col) => (
-                  <td key={col.key} className={`px-3.5 py-2.5 text-primary ${col.className ?? ''}`}>
+                  <td key={col.key} className={`px-3.5 py-2.5 first:pl-7 text-primary ${col.className ?? ''}`}>
                     {col.render ? col.render(row) : String((row as Record<string, unknown>)[col.key] ?? '')}
                   </td>
                 ))}

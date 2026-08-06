@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import TopBar from '../components/TopBar'
 import AdminEntryButton from '../components/AdminEntryButton'
 import ChatPanel from '../components/ChatPanel/ChatPanel'
@@ -6,8 +6,9 @@ import ProgressCard from '../components/ProgressCard/ProgressCard'
 import CenterCard from '../components/CenterCard/CenterCard'
 import FormPreviewSlot from '../components/DeliveryPanel/FormPreviewSlot'
 import DeliverableSlot from '../components/DeliveryPanel/DeliverableSlot'
+import FormPreviewModal from '../components/DeliveryPanel/FormPreviewModal'
+import OrderConfirmationModal from '../components/DeliveryPanel/OrderConfirmationModal'
 import GridBackground from '../components/GridBackground'
-import BreathingScreen from '../components/BreathingScreen'
 import { ZStackProvider } from '../hooks/useZStack'
 import { FormProvider } from '../state/FormContext'
 import { useTheme } from '../state/theme'
@@ -18,31 +19,14 @@ export default function Workbench() {
   const [resetKey, setResetKey] = useState(0)
   const [progressVisible, setProgressVisible] = useState(true)
   const [centerExpanded, setCenterExpanded] = useState(false)
-  const [entered, setEntered] = useState(false)
-  const [entering, setEntering] = useState(false)
+  const [formPreviewOpen, setFormPreviewOpen] = useState(false)
+  const [orderModalOpen, setOrderModalOpen] = useState(false)
   const { theme, toggleTheme } = useTheme()
-  const enterTimer = useRef<number | null>(null)
 
   function handleReset() {
     setResetKey((k) => k + 1)
     setProgressVisible(true)
     setCenterExpanded(false)
-  }
-
-  function enterWorkbench() {
-    if (entering) return
-    setEntering(true)
-    enterTimer.current = window.setTimeout(() => setEntered(true), 440)
-  }
-
-  useEffect(() => {
-    return () => {
-      if (enterTimer.current !== null) window.clearTimeout(enterTimer.current)
-    }
-  }, [])
-
-  if (!entered) {
-    return <BreathingScreen onEnter={enterWorkbench} leaving={entering} />
   }
 
   return (
@@ -73,11 +57,13 @@ export default function Workbench() {
             </section>
             <aside className="workbench-slots" aria-hidden={centerExpanded} inert={centerExpanded}>
               <section className="form-preview-slot">
-                <FormPreviewSlot />
+                <FormPreviewSlot onPreview={() => setFormPreviewOpen(true)} />
               </section>
-              <DeliverableSlot />
+              <DeliverableSlot onSendOrder={() => setOrderModalOpen(true)} />
             </aside>
           </main>
+          {formPreviewOpen && <FormPreviewModal onClose={() => setFormPreviewOpen(false)} />}
+          {orderModalOpen && <OrderConfirmationModal onClose={() => setOrderModalOpen(false)} />}
         </div>
       </FormProvider>
     </ZStackProvider>

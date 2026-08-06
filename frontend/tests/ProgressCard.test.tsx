@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, fireEvent } from '@testing-library/react'
+import { act, render, fireEvent } from '@testing-library/react'
 import ProgressCard from '../src/components/ProgressCard/ProgressCard'
 import { FormProvider } from '../src/state/FormContext'
 
@@ -21,6 +21,13 @@ describe('ProgressCard', () => {
     const { container, getByText } = renderCard()
     expect(container.querySelector('[data-floating-card]')).toBeTruthy()
     expect(getByText(/采集进度/)).toBeTruthy()
+  })
+
+  it('默认位置下移至 y=96，为上移保留更多空间', () => {
+    const { container } = renderCard()
+    expect(container.querySelector('[data-floating-card]')).toHaveStyle({
+      transform: 'translate(16px, 96px)',
+    })
   })
 
   it('初始状态(全 pending)显示所有章节,无已完成分组', () => {
@@ -54,13 +61,30 @@ describe('ProgressCard', () => {
     expect(container.querySelector('[data-field-detail]')).toBeTruthy()
   })
 
+  it('向上拖拽时贴齐工作台顶部，不越过导航栏', () => {
+    const { container } = renderCard()
+    const header = container.querySelector('[data-card-handle]') as HTMLElement
+    const card = container.querySelector('[data-floating-card]') as HTMLElement
+
+    fireEvent.mouseDown(header, { clientX: 50, clientY: 96 })
+    act(() => {
+      document.dispatchEvent(new MouseEvent('mousemove', { clientX: 50, clientY: -1000 }))
+    })
+
+    expect(card.style.transform).toBe('translate(16px, 0px)')
+
+    act(() => {
+      document.dispatchEvent(new MouseEvent('mouseup'))
+    })
+  })
+
   it('拖拽 header 改变 transform', () => {
     const { container } = renderCard()
     const header = container.querySelector('[data-card-handle]') as HTMLElement
     fireEvent.mouseDown(header, { clientX: 50, clientY: 50 })
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 100, clientY: 80 }))
     const card = container.querySelector('[data-floating-card]') as HTMLElement
-    // pos 从 (16, 80) → (16+50, 80+30) = (66, 110)
+    // pos 从 (16, 96) → (16+50, 96+30) = (66, 126)
     expect(card.style.transform).toContain('translate')
   })
 })

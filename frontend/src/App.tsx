@@ -1,8 +1,10 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { useAuth } from './state/AuthContext'
 import AuthScreen from './screens/AuthScreen'
 import Workbench from './screens/Workbench'
 import AdminScreen from './screens/AdminScreen'
+import BreathingScreen from './components/BreathingScreen'
 
 /** 受保护路由：未登录跳 /login，loading 时显示占位 */
 function Protected({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
@@ -15,12 +17,51 @@ function Protected({ children, adminOnly = false }: { children: React.ReactNode;
   return <>{children}</>
 }
 
+function GuestOnly({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) {
+    return <div className="h-full flex items-center justify-center bg-base text-muted text-sm">加载中…</div>
+  }
+  if (user) return <Navigate to="/breathing" replace />
+  return <>{children}</>
+}
+
+function BreathingRoute() {
+  const navigate = useNavigate()
+  const [leaving, setLeaving] = useState(false)
+  const timerRef = useRef<number | null>(null)
+
+  useEffect(() => () => {
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current)
+  }, [])
+
+  function enterWorkbench() {
+    if (leaving) return
+    setLeaving(true)
+    timerRef.current = window.setTimeout(() => navigate('/workbench'), 440)
+  }
+
+  return <BreathingScreen onEnter={enterWorkbench} leaving={leaving} />
+}
+
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<AuthScreen />} />
+      <Route path="/login" element={<GuestOnly><AuthScreen /></GuestOnly>} />
       <Route
         path="/"
+        element={<Navigate to="/workbench" replace />}
+      />
+      <Route
+        path="/breathing"
+        element={
+          <Protected>
+            <BreathingRoute />
+          </Protected>
+        }
+      />
+      <Route
+        path="/workbench"
         element={
           <Protected>
             <Workbench />
@@ -35,7 +76,7 @@ export default function App() {
           </Protected>
         }
       />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/workbench" replace />} />
     </Routes>
   )
 }

@@ -6,8 +6,10 @@ import CenterCard from '../src/components/CenterCard/CenterCard'
 describe('CenterCard', () => {
   it('默认态渲染卡片和放大按钮', () => {
     render(<CenterCard expanded={false} onToggleExpand={() => {}} />)
-    expect(screen.getByRole('button', { name: '放大' })).toBeInTheDocument()
-    expect(screen.getByText(/4:3|中央/)).toBeInTheDocument()
+    const expandButton = screen.getByRole('button', { name: '放大' })
+    expect(expandButton).toBeInTheDocument()
+    expect(expandButton).not.toHaveClass('hover:bg-active-surface')
+    expect(screen.queryByText('中央卡片 4:3')).not.toBeInTheDocument()
   })
 
   it('点击放大按钮触发 onToggleExpand', () => {

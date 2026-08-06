@@ -14,12 +14,14 @@
 """
 from __future__ import annotations
 
+import logging
 import os
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from typing import Literal
 
 from dotenv import load_dotenv
+from anthropic import APIStatusError
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
@@ -42,6 +44,9 @@ from store import db
 from survey.state import create_initial_state, to_dict, from_dict
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
+LLM_BALANCE_ERROR = 'LLM 服务余额不足，请联系管理员充值后重试。'
 
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
 ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123456')  # 仅测试期默认，生产必改 env
@@ -214,7 +219,13 @@ def chat(req: ChatRequest, current: dict = Depends(get_current_user)) -> ChatRes
     # 前端 history 仅作为空会话 fallback，DB 是权威源。
     history = db.get_messages(req.session_id, limit=50) or req.history
 
-    result = run_agent(state, req.message, history)
+    try:
+        result = run_agent(state, req.message, history)
+    except APIStatusError as exc:
+        if exc.status_code != 402:
+            raise
+        logger.warning('LLM chat unavailable because the account balance is insufficient')
+        raise HTTPException(status_code=503, detail=LLM_BALANCE_ERROR) from exc
 
     # tool_events 转 dict（updates 事件 + agent 事件）
     events_dict = [asdict(e) for e in (update_events + result.tool_events)]

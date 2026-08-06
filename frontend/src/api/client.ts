@@ -50,6 +50,12 @@ async function request(path: string, init: RequestInit = {}): Promise<Response> 
   return r
 }
 
+async function responseError(r: Response, fallback: string): Promise<Error> {
+  const body = await r.json().catch(() => ({})) as { detail?: unknown }
+  const detail = typeof body.detail === 'string' ? body.detail : ''
+  return new Error(detail || fallback)
+}
+
 // ── Auth ─────────────────────────────────────────────────────
 
 export async function register(username: string, password: string): Promise<{ token: string; user: AuthUser }> {
@@ -120,13 +126,13 @@ export interface ChatResult {
 
 export async function createSession(): Promise<SessionData> {
   const r = await request('/session', { method: 'POST' })
-  if (!r.ok) throw new Error(`createSession: ${r.status}`)
+  if (!r.ok) throw await responseError(r, `createSession: ${r.status}`)
   return r.json()
 }
 
 export async function getSession(sessionId: string): Promise<SessionData> {
   const r = await request(`/session/${sessionId}`)
-  if (!r.ok) throw new Error(`getSession: ${r.status}`)
+  if (!r.ok) throw await responseError(r, `getSession: ${r.status}`)
   return r.json()
 }
 
@@ -147,7 +153,7 @@ export async function chat(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId, message, history, updates }),
   })
-  if (!r.ok) throw new Error(`chat: ${r.status}`)
+  if (!r.ok) throw await responseError(r, `chat: ${r.status}`)
   return r.json()
 }
 

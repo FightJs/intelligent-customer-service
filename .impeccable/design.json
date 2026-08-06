@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-04T23:19:04+08:00",
+  "title": "Design System: 智能客服工作台",
+  "extensions": {
+    "colorMeta": {
+      "base-dark": { "role": "neutral", "displayName": "夜间画布", "canonical": "#0A0A0A", "tonalRamp": ["#0A0A0A", "#171717", "#262626", "#404040", "#737373", "#A3A3A3", "#D4D4D4", "#F5F5F5"] },
+      "chat-dark": { "role": "neutral", "displayName": "深层对话面", "canonical": "#050608", "tonalRamp": ["#050608", "#101216", "#1B1E24", "#30353D", "#555D69", "#8A94A4", "#C7CED8", "#F6F8FC"] },
+      "accent-blue": { "role": "primary", "displayName": "操作蓝", "canonical": "#3B82F6", "tonalRamp": ["#172554", "#1E3A8A", "#1D4ED8", "#2563EB", "#3B82F6", "#60A5FA", "#93C5FD", "#DBEAFE"] },
+      "success-mint-dark": { "role": "secondary", "displayName": "完成绿", "canonical": "#34D399", "tonalRamp": ["#064E3B", "#065F46", "#047857", "#059669", "#10B981", "#34D399", "#6EE7B7", "#D1FAE5"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "产品标题", "purpose": "仅用于登录和进入页的页面标题。" },
+      "body": { "displayName": "工作正文", "purpose": "用于聊天、表单和常规说明，优先保证中文可读性。" },
+      "label": { "displayName": "紧凑标签", "purpose": "用于面板手柄、进度、概要字段与辅助信息。" },
+      "mono": { "displayName": "代码与数据", "purpose": "仅用于 Markdown 中的代码片段与预格式化内容。" }
+    },
+    "shadows": [
+      { "name": "floating-card", "value": "Tailwind shadow-2xl with backdrop-filter: blur(12px)", "purpose": "进度卡和主对话卡从工作台画布中浮起。" },
+      { "name": "recess-dark", "value": "inset 0 3px 9px rgb(0 0 0 / .58), inset 0 -1px rgb(255 255 255 / .05)", "purpose": "右侧静态预览和交付槽位表现下沉关系。" }
+    ],
+    "motion": [
+      { "name": "standard", "value": "160-280ms ease-out", "purpose": "图标、文本、消息复制和颜色状态。" },
+      { "name": "workspace", "value": "420-600ms cubic-bezier(.22, 1, .36, 1)", "purpose": "卡片尺寸、位置和工作区列重排。" },
+      { "name": "theme", "value": "280ms cubic-bezier(.22, 1, .36, 1)", "purpose": "深浅主题切换。" }
+    ],
+    "breakpoints": [
+      { "name": "compact-workbench", "value": "900px", "purpose": "隐藏右侧交付槽位，仅保留进度和主对话。" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Floating Card",
+      "kind": "card",
+      "refersTo": "floating-card",
+      "description": "工作台上的可拖拽与可缩放信息面板。",
+      "html": "<section class=\"ds-floating-card\"><header>采集进度 0/20</header><p>卡片内容</p><i aria-hidden=\"true\"></i></section>",
+      "css": ".ds-floating-card{position:relative;width:280px;padding:12px;border:1px solid #404040;border-radius:12px;background:rgba(23,23,23,.95);color:#f5f5f5;box-shadow:0 20px 25px -5px rgba(0,0,0,.45);backdrop-filter:blur(12px);font:14px -apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif}.ds-floating-card header{padding-bottom:10px;color:#a3a3a3;font-size:13px;font-weight:500;border-bottom:1px solid rgba(64,64,64,.3)}.ds-floating-card p{margin:12px 0 0}.ds-floating-card i{position:absolute;right:0;bottom:0;width:14px;height:14px;border-right:2px solid rgba(59,130,246,.3);border-bottom:2px solid rgba(59,130,246,.3);border-radius:0 0 12px 0}.ds-floating-card:hover i{border-color:#3b82f6}"
+    },
+    {
+      "name": "Chat Input",
+      "kind": "input",
+      "refersTo": "chat-input",
+      "description": "对话工作区的单行自动增长输入框。",
+      "html": "<label class=\"ds-chat-input\"><input placeholder=\"输入您的回答...\" aria-label=\"输入您的回答\"></label>",
+      "css": ".ds-chat-input{display:block;padding:10px 14px;border-radius:14px;background:#171717;box-sizing:border-box}.ds-chat-input input{width:100%;border:0;outline:0;background:transparent;color:#f5f5f5;font:14px -apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif}.ds-chat-input:focus-within{box-shadow:0 0 0 1px #3b82f6}.ds-chat-input input::placeholder{color:#737373}"
+    },
+    {
+      "name": "User Message",
+      "kind": "chip",
+      "refersTo": "chat-user-message",
+      "description": "用户已提交信息的高显著性聊天气泡。",
+      "html": "<p class=\"ds-user-message\">预算在 10 万元以内</p>",
+      "css": ".ds-user-message{display:inline-block;margin:0;padding:10px 14px;border-radius:14px 14px 4px 14px;background:#3b82f6;color:#fff;font:14px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif}"
+    },
+    {
+      "name": "Suggestion Chip",
+      "kind": "chip",
+      "refersTo": "suggestion-chip",
+      "description": "对话建议的低显著性快捷选项。",
+      "html": "<button class=\"ds-chip\">直播带货</button>",
+      "css": ".ds-chip{padding:6px 12px;border:0;border-radius:18px;background:rgba(255,255,255,.05);color:#a3a3a3;font:12px -apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;cursor:pointer;transition:background-color .16s ease-out,color .16s ease-out}.ds-chip:hover,.ds-chip:focus-visible{background:rgba(255,255,255,.1);color:#f5f5f5;outline:0}"
+    },
+    {
+      "name": "Delivery Item",
+      "kind": "card",
+      "refersTo": "delivery-item",
+      "description": "交付物下载列表中的紧凑操作项。",
+      "html": "<button class=\"ds-delivery\"><span class=\"ds-file\">DOC</span><span><b>需求确认书</b><small>Word 格式，可签字确认</small></span><em>↓</em></button>",
+      "css": ".ds-delivery{display:flex;align-items:center;gap:8px;width:100%;padding:12px;border:1px solid rgba(64,64,64,.5);border-radius:8px;background:#171717;color:#f5f5f5;text-align:left;font:12px -apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;cursor:pointer;transition:border-color .16s ease-out,background-color .16s ease-out}.ds-delivery:hover,.ds-delivery:focus-visible{border-color:rgba(59,130,246,.6);background:#262626;outline:0}.ds-delivery .ds-file{color:#3b82f6;font-weight:600}.ds-delivery b,.ds-delivery small{display:block}.ds-delivery small,.ds-delivery em{color:#737373;font-style:normal}.ds-delivery em{margin-left:auto;font-size:14px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "直播控制台",
+    "overview": "这是一个服务于需求采集与方案交付的桌面工作台。深色默认、克制的操作色和画布上的可操作面板，共同把注意力收束到对话、进度和交付物。",
+    "keyCharacteristics": ["深色默认，细边框和内阴影建立层级。", "蓝色只表达操作与当前态，绿色只表达完成。", "单一系统无衬线字体，紧凑而清晰。", "可操作面板浮起，静态交付区下沉。"],
+    "rules": [
+      { "name": "Accent-as-Action Rule", "body": "蓝色永远指向可以执行、正在聚焦或由用户提交的信息；非交互内容保持中性灰阶。", "section": "colors" },
+      { "name": "Density Rule", "body": "主要工作区保持 11-14px 的紧凑信息尺度；只有登录、进入页和任务结果才允许升至 20px 标题。", "section": "typography" },
+      { "name": "Recess Rule", "body": "可拖动、可置顶的对象浮起；静态预览与交付区下沉。", "section": "elevation" }
+    ],
+    "dos": ["Do 默认从深色主题开始并保留细边框层级。", "Do 把 #3B82F6 限定给发送、焦点、当前选择、链接和用户消息。", "Do 用圆角浮动主面板和下沉槽位表达空间关系。"],
+    "donts": ["Don't 把蓝色用于大面积装饰或非交互卡片。", "Don't 在登录、管理页、浅色主题或普通内容区复用工作台网格背景。", "Don't 用展示字体、紫色霓虹渐变或无任务含义的编排动画破坏工具感。"]
+  }
+}

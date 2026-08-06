@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ArrowDown } from 'lucide-react'
 import { useFormState } from '../../state/FormContext'
 import { SECTIONS } from '../../data/sections'
 import { makeSummary, filledCount } from '../../utils/summary'
@@ -13,8 +14,10 @@ const DELIVERABLES = [
   { type: 'word', label: '需求确认书', desc: 'Word 格式，可签字确认', icon: 'word' },
 ] as const
 
-function FileTypeIcon({ type }: { type: (typeof DELIVERABLES)[number]['icon'] }) {
+function FileTypeIcon({ type, hovered }: { type: (typeof DELIVERABLES)[number]['icon']; hovered: boolean }) {
   const color = type === 'excel' ? '#22c55e' : type === 'word' ? '#3b82f6' : '#ef4444'
+
+  if (hovered) return <ArrowDown size={18} aria-hidden="true" />
 
   return (
     <svg width="19" height="21" viewBox="0 0 20 22" fill="none" aria-hidden="true">
@@ -27,9 +30,14 @@ function FileTypeIcon({ type }: { type: (typeof DELIVERABLES)[number]['icon'] })
   )
 }
 
-export default function DeliverableSlot() {
+interface DeliverableSlotProps {
+  onSendOrder?: () => void
+}
+
+export default function DeliverableSlot({ onSendOrder }: DeliverableSlotProps) {
   const { state } = useFormState()
   const [downloading, setDownloading] = useState<string | null>(null)
+  const [hoveredType, setHoveredType] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   // 计算总进度
@@ -103,30 +111,27 @@ export default function DeliverableSlot() {
           </h3>
           {!canGenerate && (
             <div className="text-muted text-[11px] mb-2">
-              请先在左侧对话采集需求，填入信息后即可生成交付物
+            文件已就绪，可单独下载
             </div>
           )}
-          <div className="space-y-2">
+          <div className="deliverable-file-grid">
             {DELIVERABLES.map(({ type, label, desc, icon }) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => handleDownload(type)}
+                onMouseEnter={() => setHoveredType(type)}
+                onMouseLeave={() => setHoveredType(null)}
+                onFocus={() => setHoveredType(type)}
+                onBlur={() => setHoveredType(null)}
                 disabled={!canGenerate || downloading !== null}
-                className="w-full rounded-card border border-idle/50 bg-surface p-3 text-left transition-colors hover:border-accent/60 hover:bg-active-surface disabled:cursor-not-allowed disabled:opacity-40"
+                className="deliverable-file-row"
+                aria-label={`${label}，${desc}`}
               >
-                <div className="flex items-center gap-2">
-                  <span className="shrink-0"><FileTypeIcon type={icon} /></span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-primary text-xs font-medium">
-                      {downloading === type ? '生成中…' : label}
-                    </div>
-                    <div className="text-muted text-[10px] truncate">{desc}</div>
-                  </div>
-                  <span className="text-muted text-xs">
-                    {downloading === type ? '⏳' : '↓'}
-                  </span>
-                </div>
+                <span className={`deliverable-file-icon${hoveredType === type ? ' is-hovered' : ''}`} data-testid={hoveredType === type ? `download-icon-${type}` : undefined}>
+                  <FileTypeIcon type={icon} hovered={hoveredType === type} />
+                </span>
+                <span className="deliverable-file-label">{downloading === type ? '下载中…' : label}</span>
               </button>
             ))}
           </div>
@@ -135,6 +140,13 @@ export default function DeliverableSlot() {
           )}
         </section>
       </div>
+      <button
+        type="button"
+        className="delivery-order-button"
+        onClick={onSendOrder}
+      >
+        发送订单
+      </button>
     </section>
   )
 }

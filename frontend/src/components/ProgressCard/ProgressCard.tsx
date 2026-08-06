@@ -32,12 +32,12 @@ export default function ProgressCard({ visible }: Props) {
   const progressBounds = useMemo(() => ({
     width: size.w,
     minHeight: size.h,
-    topMargin: 48,
+    topMargin: 0,
     margin: 8,
   }), [size.h, size.w])
   const { pos, dragging, onDragStart } = useDraggable({
     storageKey: 'progresscard.pos',
-    defaultPos: { x: 16, y: 80 },
+    defaultPos: { x: 16, y: 96 },
     bounds: progressBounds,
     disabled: expanded || resizing,
   })

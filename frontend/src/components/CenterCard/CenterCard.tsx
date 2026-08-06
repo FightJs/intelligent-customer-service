@@ -86,9 +86,7 @@ export default function CenterCard({ expanded, onToggleExpand, children }: Cente
         onMouseDown={expanded ? undefined : onDragStart}
         className={`flex items-center px-3 py-0 group${expanded ? '' : ' cursor-move'}`}
       >
-        <span className="flex-1 text-[11px] font-medium text-secondary group-hover:text-primary transition-colors">
-          中央卡片 4:3
-        </span>
+        <div className="flex-1" aria-hidden="true" />
         <button
           type="button"
           onClick={onToggleExpand}

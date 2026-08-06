@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Package, Filter } from 'lucide-react'
+import { Package } from 'lucide-react'
 import {
   adminListDeliveries,
   adminListUsers,
@@ -15,6 +15,7 @@ import SearchInput from '../../components/admin/SearchInput'
 import StatCard from '../../components/admin/StatCard'
 import EmptyState from '../../components/admin/EmptyState'
 import DeliveryDrawer from '../../components/admin/DeliveryDrawer'
+import DeliveryFilterMenu from '../../components/admin/DeliveryFilterMenu'
 
 const COLUMNS: Column<AdminDeliveryListItem>[] = [
   {
@@ -36,7 +37,11 @@ const COLUMNS: Column<AdminDeliveryListItem>[] = [
   },
 ]
 
-export default function DeliveriesTab() {
+interface DeliveriesTabProps {
+  onUnsupportedDocument: () => void
+}
+
+export default function DeliveriesTab({ onUnsupportedDocument }: DeliveriesTabProps) {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [filterUserId, setFilterUserId] = useState<number | ''>('')
 
@@ -48,7 +53,7 @@ export default function DeliveriesTab() {
     fetcher: (params) =>
       adminListDeliveries({ ...params, user_id: filterUserId || undefined }),
     initialSort: { sort_by: 'id', order: 'desc' },
-    initialSize: 10,
+    initialSize: 30,
   })
 
   // 单独拉用户列表填充筛选下拉，失败不影响交付物（修复原 Promise.all 一败俱败）
@@ -86,24 +91,14 @@ export default function DeliveriesTab() {
             onChange={list.onSearch}
             placeholder="搜索客户名或用户名…"
           />
-          <div className="inline-flex items-center gap-1.5 rounded-card bg-surface px-2.5 py-2 ring-1 ring-idle">
-            <Filter size={14} className="text-muted" />
-            <select
-              value={filterUserId}
-              onChange={(e) => {
-                setFilterUserId(e.target.value ? Number(e.target.value) : '')
-                list.onPageChange(1)
-              }}
-              className="bg-surface text-sm text-secondary outline-none"
-            >
-              <option value="">全部用户</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.username}
-                </option>
-              ))}
-            </select>
-          </div>
+          <DeliveryFilterMenu
+            users={users}
+            value={filterUserId}
+            onChange={(userId) => {
+              setFilterUserId(userId)
+              list.onPageChange(1)
+            }}
+          />
         </div>
       </div>
 
@@ -134,6 +129,7 @@ export default function DeliveriesTab() {
           detail={previewDetail}
           loading={previewLoading}
           error={previewError}
+          onUnsupportedDocument={onUnsupportedDocument}
           onClose={() => {
             setPreviewDetail(null)
             setPreviewError('')
