@@ -160,3 +160,221 @@ def test_list_deliveries_search_sort_pagination(tmp_path, monkeypatch):
     res = db.list_deliveries(user_id=uid_a, page=2, size=2, sort_by='id', order='asc')
     assert len(res['items']) == 1
     assert res['items'][0]['customer_name'] == '客户丙'
+
+
+def test_list_users_returns_global_admin_count(
+    tmp_path,
+    monkeypatch,
+):
+    """管理员数量是全局统计，不受搜索和分页影响。"""
+    monkeypatch.setattr(
+        db,
+        'DB_PATH',
+        tmp_path / 'test.db',
+    )
+    db.init_db()
+
+    db.create_user(
+        'admin-one',
+        'hash',
+        role='admin',
+    )
+    db.create_user(
+        'admin-two',
+        'hash',
+        role='admin',
+    )
+    db.create_user(
+        'visible-user',
+        'hash',
+        role='user',
+    )
+
+    result = db.list_users(
+        search='visible-user',
+        page=1,
+        size=1,
+    )
+
+    assert result['total'] == 1
+    assert len(result['items']) == 1
+
+    # 即使搜索结果只有普通用户，
+    # 也应该返回数据库中全部管理员数量。
+    assert result['admin_count'] == 2
+
+
+def test_get_user_detail_includes_delivery_count(
+    tmp_path,
+    monkeypatch,
+):
+    """用户详情包含该用户的交付物总数。"""
+    monkeypatch.setattr(
+        db,
+        'DB_PATH',
+        tmp_path / 'test.db',
+    )
+    db.init_db()
+
+    user_id = db.create_user(
+        'detail-user',
+        'hash',
+        role='user',
+    )
+    session_id = db.create_session(
+        user_id,
+        {},
+    )
+
+    db.create_delivery(
+        session_id,
+        user_id,
+        '客户甲',
+        '# 方案一',
+    )
+    db.create_delivery(
+        session_id,
+        user_id,
+        '客户乙',
+        '# 方案二',
+    )
+
+    detail = db.get_user_detail(user_id)
+
+    assert detail is not None
+    assert detail['username'] == 'detail-user'
+    assert detail['delivery_count'] == 2
+    assert 'password_hash' not in detail
+
+
+def test_update_user_updates_allowed_fields(
+    tmp_path,
+    monkeypatch,
+):
+    """管理员可以修改用户名、密码哈希和角色。"""
+    monkeypatch.setattr(
+        db,
+        'DB_PATH',
+        tmp_path / 'test.db',
+    )
+    db.init_db()
+
+    user_id = db.create_user(
+        'before-user',
+        'old-hash',
+        role='user',
+    )
+
+    updated = db.update_user(
+        user_id,
+        {
+            'username': 'after-user',
+            'password_hash': 'new-hash',
+            'role': 'admin',
+        },
+    )
+
+    assert updated is not None
+    assert updated['username'] == 'after-user'
+    assert updated['role'] == 'admin'
+    assert 'password_hash' not in updated
+
+    stored = db.get_user_by_id(user_id)
+
+    assert stored is not None
+    assert stored['password_hash'] == 'new-hash'
+
+
+def test_delete_user_removes_related_data(
+    tmp_path,
+    monkeypatch,
+):
+    """删除用户时同步清理会话、消息和交付物。"""
+    monkeypatch.setattr(
+        db,
+        'DB_PATH',
+        tmp_path / 'test.db',
+    )
+    db.init_db()
+
+    user_id = db.create_user(
+        'delete-user',
+        'hash',
+        role='user',
+    )
+    session_id = db.create_session(
+        user_id,
+        {},
+    )
+
+    db.add_message(
+        session_id,
+        'user',
+        '测试消息',
+    )
+    delivery_id = db.create_delivery(
+        session_id,
+        user_id,
+        '测试客户',
+        '# 测试交付物',
+    )
+
+    deleted = db.delete_user(user_id)
+
+    assert deleted is True
+    assert db.get_user_by_id(user_id) is None
+    assert db.get_session(session_id) is None
+    assert db.get_messages(session_id) == []
+    assert db.get_delivery(delivery_id) is None
+
+    # 重复删除不存在的用户，应返回 False。
+    assert db.delete_user(user_id) is False
+
+
+def test_update_and_delete_delivery(
+    tmp_path,
+    monkeypatch,
+):
+    """管理员可以修改和删除交付物。"""
+    monkeypatch.setattr(
+        db,
+        'DB_PATH',
+        tmp_path / 'test.db',
+    )
+    db.init_db()
+
+    user_id = db.create_user(
+        'delivery-user',
+        'hash',
+        role='user',
+    )
+    session_id = db.create_session(
+        user_id,
+        {},
+    )
+    delivery_id = db.create_delivery(
+        session_id,
+        user_id,
+        '修改前客户',
+        '# 修改前内容',
+    )
+
+    updated = db.update_delivery(
+        delivery_id,
+        {
+            'customer_name': '修改后客户',
+            'markdown': '# 修改后内容',
+        },
+    )
+
+    assert updated is not None
+    assert updated['customer_name'] == '修改后客户'
+    assert updated['markdown'] == '# 修改后内容'
+
+    deleted = db.delete_delivery(delivery_id)
+
+    assert deleted is True
+    assert db.get_delivery(delivery_id) is None
+
+    # 重复删除不存在的交付物，应返回 False。
+    assert db.delete_delivery(delivery_id) is False

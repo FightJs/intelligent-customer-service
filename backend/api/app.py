@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sqlite3
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from typing import Literal
@@ -168,6 +169,23 @@ class ChatResponse(BaseModel):
     suggestions: list[dict] = []
 
 
+class AdminUserCreate(BaseModel):
+    username: str
+    password: str
+    role: Literal['user', 'admin'] = 'user'
+
+
+class AdminUserUpdate(BaseModel):
+    username: str | None = None
+    password: str | None = None
+    role: Literal['user', 'admin'] | None = None
+
+
+class AdminDeliveryUpdate(BaseModel):
+    customer_name: str | None = None
+    markdown: str | None = None
+
+
 # ── 端点 ──────────────────────────────────────────────────────
 
 @app.post('/api/session', response_model=SessionResponse)
@@ -313,11 +331,213 @@ def admin_list_users(
     size: int = 20,
     admin: dict = Depends(get_admin_user),
 ) -> dict:
-    """列出用户（不含 password_hash），支持搜索/排序/分页。
+    """列出用户，支持搜索、排序和分页。"""
+    return db.list_users(
+        search=search,
+        sort_by=sort_by,
+        order=order,
+        page=page,
+        size=size,
+    )
 
-    返回 {items, total, page, size}。sort_by 仅允许 id/username/created_at。
-    """
-    return db.list_users(search=search, sort_by=sort_by, order=order, page=page, size=size)
+
+@app.post(
+    '/api/admin/users',
+    status_code=201,
+)
+def admin_create_user(
+    req: AdminUserCreate,
+    admin: dict = Depends(get_admin_user),
+) -> dict:
+    """由管理员创建普通用户或管理员。"""
+    username = req.username.strip()
+
+    if len(username) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail='用户名至少需要 2 个字符',
+        )
+
+    if len(req.password) < 6:
+        raise HTTPException(
+            status_code=400,
+            detail='密码至少需要 6 个字符',
+        )
+
+    try:
+        user_id = db.create_user(
+            username,
+            hash_password(req.password),
+            role=req.role,
+        )
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail='用户名已存在',
+        ) from exc
+
+    detail = db.get_user_detail(user_id)
+
+    if detail is None:
+        raise HTTPException(
+            status_code=500,
+            detail='创建用户后读取失败',
+        )
+
+    return detail
+
+
+@app.get('/api/admin/users/{user_id}')
+def admin_get_user(
+    user_id: int,
+    admin: dict = Depends(get_admin_user),
+) -> dict:
+    """获取用户详情和交付物数量。"""
+    detail = db.get_user_detail(user_id)
+
+    if detail is None:
+        raise HTTPException(
+            status_code=404,
+            detail='用户不存在',
+        )
+
+    return detail
+
+
+@app.patch('/api/admin/users/{user_id}')
+def admin_update_user(
+    user_id: int,
+    req: AdminUserUpdate,
+    admin: dict = Depends(get_admin_user),
+) -> dict:
+    """修改用户名、密码或角色。"""
+    target = db.get_user_by_id(user_id)
+
+    if target is None:
+        raise HTTPException(
+            status_code=404,
+            detail='用户不存在',
+        )
+
+    submitted_fields = req.model_fields_set
+
+    if not submitted_fields:
+        raise HTTPException(
+            status_code=400,
+            detail='至少需要提供一个修改字段',
+        )
+
+    changes: dict = {}
+
+    if 'username' in submitted_fields:
+        username = (
+            req.username.strip()
+            if req.username is not None
+            else ''
+        )
+
+        if len(username) < 2:
+            raise HTTPException(
+                status_code=400,
+                detail='用户名至少需要 2 个字符',
+            )
+
+        changes['username'] = username
+
+    if 'password' in submitted_fields:
+        if (
+            req.password is None
+            or len(req.password) < 6
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail='密码至少需要 6 个字符',
+            )
+
+        changes['password_hash'] = hash_password(
+            req.password,
+        )
+
+    if 'role' in submitted_fields:
+        if req.role is None:
+            raise HTTPException(
+                status_code=400,
+                detail='角色不能为空',
+            )
+
+        if (
+            target['role'] == 'admin'
+            and req.role != 'admin'
+            and db.count_admins() <= 1
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail='不能降级系统最后一个管理员',
+            )
+
+        changes['role'] = req.role
+
+    try:
+        updated = db.update_user(
+            user_id,
+            changes,
+        )
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail='用户名已存在',
+        ) from exc
+
+    if updated is None:
+        raise HTTPException(
+            status_code=404,
+            detail='用户不存在',
+        )
+
+    return updated
+
+
+@app.delete(
+    '/api/admin/users/{user_id}',
+    status_code=204,
+)
+def admin_delete_user(
+    user_id: int,
+    admin: dict = Depends(get_admin_user),
+) -> Response:
+    """删除用户及其会话、消息和交付物。"""
+    target = db.get_user_by_id(user_id)
+
+    if target is None:
+        raise HTTPException(
+            status_code=404,
+            detail='用户不存在',
+        )
+
+    if target['id'] == admin['id']:
+        raise HTTPException(
+            status_code=409,
+            detail='不能删除当前登录的管理员',
+        )
+
+    if (
+        target['role'] == 'admin'
+        and db.count_admins() <= 1
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail='不能删除系统最后一个管理员',
+        )
+
+    deleted = db.delete_user(user_id)
+
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail='用户不存在',
+        )
+
+    return Response(status_code=204)
 
 
 @app.get('/api/admin/deliverables')
@@ -330,12 +550,14 @@ def admin_list_deliverables(
     size: int = 20,
     admin: dict = Depends(get_admin_user),
 ) -> dict:
-    """列出交付物（不含 markdown 正文），支持用户筛选/搜索/排序/分页。
-
-    返回 {items, total, page, size}。sort_by 仅允许 id/customer_name/created_at。
-    """
+    """列出交付物，支持筛选、搜索和分页。"""
     return db.list_deliveries(
-        user_id=user_id, search=search, sort_by=sort_by, order=order, page=page, size=size
+        user_id=user_id,
+        search=search,
+        sort_by=sort_by,
+        order=order,
+        page=page,
+        size=size,
     )
 
 
@@ -344,8 +566,83 @@ def admin_get_deliverable(
     delivery_id: int,
     admin: dict = Depends(get_admin_user),
 ) -> dict:
-    """取单条交付物详情（含 markdown 正文）。"""
-    d = db.get_delivery(delivery_id)
-    if d is None:
-        raise HTTPException(status_code=404, detail='delivery not found')
-    return d
+    """获取包含 Markdown 正文的交付物详情。"""
+    detail = db.get_delivery(delivery_id)
+
+    if detail is None:
+        raise HTTPException(
+            status_code=404,
+            detail='交付物不存在',
+        )
+
+    return detail
+
+
+@app.patch('/api/admin/deliverables/{delivery_id}')
+def admin_update_delivery(
+    delivery_id: int,
+    req: AdminDeliveryUpdate,
+    admin: dict = Depends(get_admin_user),
+) -> dict:
+    """修改交付物客户名称或 Markdown 正文。"""
+    submitted_fields = req.model_fields_set
+
+    if not submitted_fields:
+        raise HTTPException(
+            status_code=400,
+            detail='至少需要提供一个修改字段',
+        )
+
+    changes: dict = {}
+
+    if 'customer_name' in submitted_fields:
+        changes['customer_name'] = (
+            req.customer_name.strip()
+            if req.customer_name
+            else None
+        )
+
+    if 'markdown' in submitted_fields:
+        if (
+            req.markdown is None
+            or not req.markdown.strip()
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail='Markdown 正文不能为空',
+            )
+
+        changes['markdown'] = req.markdown
+
+    updated = db.update_delivery(
+        delivery_id,
+        changes,
+    )
+
+    if updated is None:
+        raise HTTPException(
+            status_code=404,
+            detail='交付物不存在',
+        )
+
+    return updated
+
+
+@app.delete(
+    '/api/admin/deliverables/{delivery_id}',
+    status_code=204,
+)
+def admin_delete_delivery(
+    delivery_id: int,
+    admin: dict = Depends(get_admin_user),
+) -> Response:
+    """删除指定交付物。"""
+    deleted = db.delete_delivery(delivery_id)
+
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail='交付物不存在',
+        )
+
+    return Response(status_code=204)

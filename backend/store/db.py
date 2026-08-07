@@ -204,6 +204,146 @@ def get_user_by_id(user_id: int) -> dict[str, Any] | None:
     return dict(row) if row else None
 
 
+def count_admins() -> int:
+    """返回数据库中的管理员总数。"""
+    with _connect() as conn:
+        row = conn.execute(
+            '''
+            SELECT COUNT(*)
+            FROM users
+            WHERE role = 'admin'
+            '''
+        ).fetchone()
+
+    return int(row[0])
+
+
+def get_user_detail(
+    user_id: int,
+) -> dict[str, Any] | None:
+    """返回不含密码哈希的用户详情和交付物数量。"""
+    with _connect() as conn:
+        row = conn.execute(
+            '''
+            SELECT
+                u.id,
+                u.username,
+                u.role,
+                u.created_at,
+                COUNT(d.id) AS delivery_count
+            FROM users u
+            LEFT JOIN deliveries d
+                ON d.user_id = u.id
+            WHERE u.id = ?
+            GROUP BY
+                u.id,
+                u.username,
+                u.role,
+                u.created_at
+            ''',
+            (user_id,),
+        ).fetchone()
+
+    return dict(row) if row else None
+
+
+_USER_UPDATE_COLUMNS = {
+    'username',
+    'password_hash',
+    'role',
+}
+
+
+def update_user(
+    user_id: int,
+    changes: dict[str, Any],
+) -> dict[str, Any] | None:
+    """修改用户允许更新的字段，返回更新后的安全详情。"""
+    safe_changes = {
+        key: value
+        for key, value in changes.items()
+        if key in _USER_UPDATE_COLUMNS
+    }
+
+    if not safe_changes:
+        return get_user_detail(user_id)
+
+    assignments = ', '.join(
+        f'{column} = ?'
+        for column in safe_changes
+    )
+    params = [
+        *safe_changes.values(),
+        user_id,
+    ]
+
+    with _connect() as conn:
+        cursor = conn.execute(
+            f'''
+            UPDATE users
+            SET {assignments}
+            WHERE id = ?
+            ''',
+            params,
+        )
+
+        if cursor.rowcount == 0:
+            return None
+
+    return get_user_detail(user_id)
+
+
+def delete_user(user_id: int) -> bool:
+    """删除用户，并在同一事务中清理关联数据。"""
+    with _connect() as conn:
+        exists = conn.execute(
+            '''
+            SELECT 1
+            FROM users
+            WHERE id = ?
+            ''',
+            (user_id,),
+        ).fetchone()
+
+        if exists is None:
+            return False
+
+        conn.execute(
+            '''
+            DELETE FROM messages
+            WHERE session_id IN (
+                SELECT session_id
+                FROM sessions
+                WHERE user_id = ?
+            )
+            ''',
+            (user_id,),
+        )
+        conn.execute(
+            '''
+            DELETE FROM deliveries
+            WHERE user_id = ?
+            ''',
+            (user_id,),
+        )
+        conn.execute(
+            '''
+            DELETE FROM sessions
+            WHERE user_id = ?
+            ''',
+            (user_id,),
+        )
+        conn.execute(
+            '''
+            DELETE FROM users
+            WHERE id = ?
+            ''',
+            (user_id,),
+        )
+
+    return True
+
+
 # users 列表允许排序的字段白名单（防 SQL 注入：列名不能参数化）
 _USER_SORT_COLUMNS = {'id', 'username', 'created_at'}
 
@@ -215,33 +355,75 @@ def list_users(
     page: int = 1,
     size: int = 20,
 ) -> dict[str, Any]:
-    """列出用户（不含 password_hash），支持搜索/排序/分页。
-
-    - search: 按 username 模糊匹配（LIKE %search%），None 或空串不过滤
-    - sort_by: id | username | created_at（白名单外回退 id）
-    - order: asc | desc（其它值当 asc 处理）
-    - page/size: 从 1 开始的分页，返回 {items, total, page, size}
-    """
-    sort_col = sort_by if sort_by in _USER_SORT_COLUMNS else 'id'
-    direction = 'DESC' if order.lower() == 'desc' else 'ASC'
+    """列出用户并返回全局管理员数量。"""
+    sort_col = (
+        sort_by
+        if sort_by in _USER_SORT_COLUMNS
+        else 'id'
+    )
+    direction = (
+        'DESC'
+        if order.lower() == 'desc'
+        else 'ASC'
+    )
     page = max(page, 1)
     size = max(size, 1)
     offset = (page - 1) * size
 
     where = ''
     params: list[Any] = []
+
     if search:
         where = 'WHERE username LIKE ?'
         params.append(f'%{search}%')
 
     with _connect() as conn:
-        total = conn.execute(f'SELECT COUNT(*) FROM users {where}', params).fetchone()[0]
+        admin_count = conn.execute(
+            '''
+            SELECT COUNT(*)
+            FROM users
+            WHERE role = 'admin'
+            '''
+        ).fetchone()[0]
+
+        total = conn.execute(
+            f'''
+            SELECT COUNT(*)
+            FROM users
+            {where}
+            ''',
+            params,
+        ).fetchone()[0]
+
         rows = conn.execute(
-            f'''SELECT id, username, role, created_at FROM users {where}
-                ORDER BY {sort_col} {direction} LIMIT ? OFFSET ?''',
-            [*params, size, offset],
+            f'''
+            SELECT
+                id,
+                username,
+                role,
+                created_at
+            FROM users
+            {where}
+            ORDER BY {sort_col} {direction}
+            LIMIT ? OFFSET ?
+            ''',
+            [
+                *params,
+                size,
+                offset,
+            ],
         ).fetchall()
-    return {'items': [dict(r) for r in rows], 'total': total, 'page': page, 'size': size}
+
+    return {
+        'items': [
+            dict(row)
+            for row in rows
+        ],
+        'total': total,
+        'admin_count': admin_count,
+        'page': page,
+        'size': size,
+    }
 
 
 # ── Deliveries（交付物持久化，仅 markdown） ───────────────────
@@ -327,3 +509,62 @@ def get_delivery(delivery_id: int) -> dict[str, Any] | None:
             (delivery_id,),
         ).fetchone()
     return dict(row) if row else None
+
+
+_DELIVERY_UPDATE_COLUMNS = {
+    'customer_name',
+    'markdown',
+}
+
+
+def update_delivery(
+    delivery_id: int,
+    changes: dict[str, Any],
+) -> dict[str, Any] | None:
+    """修改交付物允许更新的字段。"""
+    safe_changes = {
+        key: value
+        for key, value in changes.items()
+        if key in _DELIVERY_UPDATE_COLUMNS
+    }
+
+    if not safe_changes:
+        return get_delivery(delivery_id)
+
+    assignments = ', '.join(
+        f'{column} = ?'
+        for column in safe_changes
+    )
+    params = [
+        *safe_changes.values(),
+        delivery_id,
+    ]
+
+    with _connect() as conn:
+        cursor = conn.execute(
+            f'''
+            UPDATE deliveries
+            SET {assignments}
+            WHERE id = ?
+            ''',
+            params,
+        )
+
+        if cursor.rowcount == 0:
+            return None
+
+    return get_delivery(delivery_id)
+
+
+def delete_delivery(delivery_id: int) -> bool:
+    """删除指定交付物，不影响用户和会话。"""
+    with _connect() as conn:
+        cursor = conn.execute(
+            '''
+            DELETE FROM deliveries
+            WHERE id = ?
+            ''',
+            (delivery_id,),
+        )
+
+    return cursor.rowcount > 0
