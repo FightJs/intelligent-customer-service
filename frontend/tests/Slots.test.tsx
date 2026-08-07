@@ -40,9 +40,8 @@ describe('FormPreviewSlot', () => {
       screen.getByRole('button', { name: '预览需求表' }),
     ).toBeInTheDocument()
     expect(container.querySelector('.folder-card')).toBeInTheDocument()
-    expect(
-      screen.getByText(/客户基础信息/),
-    ).toBeInTheDocument()
+    expect(screen.getByText('客户需求表')).toBeInTheDocument()
+    expect(container.querySelector('.Usericon svg')).toBeInTheDocument()
   })
 
   it('不再渲染外部淡蓝色流光线条', () => {
@@ -57,7 +56,7 @@ describe('FormPreviewSlot', () => {
     ).toHaveLength(0)
   })
 
-  it('打开文件夹后点击文件触发完整预览', () => {
+  it('点击需求表卡片触发完整预览', () => {
     const onPreview = vi.fn()
     render(
       <FormProvider>
@@ -66,29 +65,18 @@ describe('FormPreviewSlot', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: '预览需求表' }))
-    fireEvent.click(screen.getByRole('button', { name: '预览客户基础信息' }))
 
     expect(onPreview).toHaveBeenCalledTimes(1)
   })
 
-  it('搜索框过滤板块文件', () => {
-    render(
+  it('渲染四条文档摘要暗条', () => {
+    const { container } = render(
       <FormProvider>
         <FormPreviewSlot />
       </FormProvider>,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: '预览需求表' }))
-    fireEvent.change(screen.getByPlaceholderText('搜索板块…'), {
-      target: { value: '预算' },
-    })
-
-    expect(
-      screen.getByRole('button', { name: '预览预算范围信息' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: '预览客户基础信息' }),
-    ).not.toBeInTheDocument()
+    expect(container.querySelectorAll('.Description-bar')).toHaveLength(4)
   })
 })
 

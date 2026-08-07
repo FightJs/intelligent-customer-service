@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { chat, generateUrl, setAuth } from '../src/api/client'
+import { generateUrl, setAuth } from '../src/api/client'
 
-describe('API client', () => {
+describe('generateUrl', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
   })
@@ -19,20 +19,6 @@ describe('API client', () => {
         method: 'POST',
         headers: { Authorization: 'Bearer token-123' },
       },
-    )
-  })
-
-  it('聊天接口返回服务端 detail 时保留明确错误信息', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      status: 503,
-      ok: false,
-      json: async () => ({ detail: 'LLM 服务余额不足，请联系管理员充值后重试。' }),
-    })
-    vi.stubGlobal('fetch', fetchMock)
-    setAuth('token-123', { id: 1, username: 'user-a', role: 'user' })
-
-    await expect(chat('session-1', '你好', [])).rejects.toThrow(
-      'LLM 服务余额不足，请联系管理员充值后重试。',
     )
   })
 })

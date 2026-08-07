@@ -9,6 +9,7 @@ type Tab = 'deliveries' | 'users'
 /** 管理后台编排层：顶栏 tab 切换 + 内容区。各 tab 自管理数据与状态。 */
 export default function AdminScreen() {
   const [tab, setTab] = useState<Tab>('deliveries')
+  const [deliveryUserId, setDeliveryUserId] = useState<number | undefined>()
   const [unsupportedDocumentVisible, setUnsupportedDocumentVisible] = useState(false)
   const [unsupportedDocumentNotificationId, setUnsupportedDocumentNotificationId] = useState(0)
   const unsupportedDocumentTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -44,7 +45,7 @@ export default function AdminScreen() {
             aria-hidden={tab !== 'deliveries'}
             inert={tab !== 'deliveries'}
           >
-            <DeliveriesTab onUnsupportedDocument={showUnsupportedDocument} />
+            <DeliveriesTab onUnsupportedDocument={showUnsupportedDocument} selectedUserId={deliveryUserId} onFilterUserIdChange={(userId) => setDeliveryUserId(userId === '' ? undefined : userId)} />
           </section>
           <section
             data-testid="admin-tab-users"
@@ -53,7 +54,7 @@ export default function AdminScreen() {
             aria-hidden={tab !== 'users'}
             inert={tab !== 'users'}
           >
-            <UsersTab />
+            <UsersTab onViewDeliveries={(userId) => { setDeliveryUserId(userId); setTab('deliveries') }} />
           </section>
         </div>
       </main>

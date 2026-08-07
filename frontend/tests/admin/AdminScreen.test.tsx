@@ -194,9 +194,10 @@ describe('AdminScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /用户/ }))
     await waitFor(() => expect(adminListUsersMock).toHaveBeenCalled())
 
-    // role 列的 admin 渲染为带 accent 类的 badge
-    const badges = screen.getAllByText('admin')
-    const roleBadge = badges.find((el) => el.closest('span')?.className.includes('text-accent'))
+    // 角色列的管理员渲染为 accent 样式的 badge
+    const roleBadge = screen
+      .getAllByText('管理员')
+      .find((element) => element.classList.contains('text-accent'))
     expect(roleBadge).toBeDefined()
   })
 })

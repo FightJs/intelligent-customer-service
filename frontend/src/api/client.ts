@@ -167,8 +167,24 @@ export async function generateUrl(docType: 'markdown' | 'excel' | 'word', sessio
 export interface AdminUser {
   id: number
   username: string
-  role: string
+  role: 'user' | 'admin'
   created_at: string
+}
+
+export interface AdminUserDetail extends AdminUser {
+  delivery_count: number
+}
+
+export interface AdminUserCreate {
+  username: string
+  password: string
+  role: AdminUser['role']
+}
+
+export interface AdminUserUpdate {
+  username?: string
+  password?: string
+  role?: AdminUser['role']
 }
 
 export interface AdminDeliveryListItem {
@@ -192,6 +208,10 @@ export interface Paged<T> {
   size: number
 }
 
+export interface AdminUsersPage extends Paged<AdminUser> {
+  admin_count: number
+}
+
 /** admin 列表查询参数。 */
 export interface AdminListParams {
   search?: string
@@ -210,22 +230,71 @@ function buildQuery(params: object): string {
   return s ? `?${s}` : ''
 }
 
-export async function adminListUsers(params: AdminListParams = {}): Promise<Paged<AdminUser>> {
+export async function adminListUsers(params: AdminListParams = {}): Promise<AdminUsersPage> {
   const r = await request(`/admin/users${buildQuery(params)}`)
-  if (!r.ok) throw new Error(`adminListUsers: ${r.status}`)
+  if (!r.ok) throw await responseError(r, `adminListUsers: ${r.status}`)
   return r.json()
+}
+
+export async function adminCreateUser(payload: AdminUserCreate): Promise<AdminUserDetail> {
+  const r = await request('/admin/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!r.ok) throw await responseError(r, `adminCreateUser: ${r.status}`)
+  return r.json()
+}
+
+export async function adminGetUser(id: number): Promise<AdminUserDetail> {
+  const r = await request(`/admin/users/${id}`)
+  if (!r.ok) throw await responseError(r, `adminGetUser: ${r.status}`)
+  return r.json()
+}
+
+export async function adminUpdateUser(id: number, payload: AdminUserUpdate): Promise<AdminUserDetail> {
+  const r = await request(`/admin/users/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!r.ok) throw await responseError(r, `adminUpdateUser: ${r.status}`)
+  return r.json()
+}
+
+export async function adminDeleteUser(id: number): Promise<void> {
+  const r = await request(`/admin/users/${id}`, { method: 'DELETE' })
+  if (!r.ok) throw await responseError(r, `adminDeleteUser: ${r.status}`)
 }
 
 export async function adminListDeliveries(
   params: AdminListParams & { user_id?: number } = {},
 ): Promise<Paged<AdminDeliveryListItem>> {
   const r = await request(`/admin/deliverables${buildQuery(params)}`)
-  if (!r.ok) throw new Error(`adminListDeliveries: ${r.status}`)
+  if (!r.ok) throw await responseError(r, `adminListDeliveries: ${r.status}`)
   return r.json()
 }
 
 export async function adminGetDelivery(id: number): Promise<AdminDeliveryDetail> {
   const r = await request(`/admin/deliverables/${id}`)
-  if (!r.ok) throw new Error(`adminGetDelivery: ${r.status}`)
+  if (!r.ok) throw await responseError(r, `adminGetDelivery: ${r.status}`)
   return r.json()
+}
+
+export async function adminUpdateDelivery(
+  id: number,
+  payload: Pick<AdminDeliveryDetail, 'customer_name' | 'markdown'>,
+): Promise<AdminDeliveryDetail> {
+  const r = await request(`/admin/deliverables/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!r.ok) throw await responseError(r, `adminUpdateDelivery: ${r.status}`)
+  return r.json()
+}
+
+export async function adminDeleteDelivery(id: number): Promise<void> {
+  const r = await request(`/admin/deliverables/${id}`, { method: 'DELETE' })
+  if (!r.ok) throw await responseError(r, `adminDeleteDelivery: ${r.status}`)
 }

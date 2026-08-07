@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { AdminListParams, Paged } from '../api/client'
 
-interface UseAdminListArgs<T> {
+interface UseAdminListArgs<T, TPage extends Paged<T>> {
   /** 取数函数（参数变化时重新调用） */
-  fetcher: (params: AdminListParams) => Promise<Paged<T>>
+  fetcher: (params: AdminListParams) => Promise<TPage>
   /** 初始排序 */
   initialSort?: { sort_by: string; order: 'asc' | 'desc' }
   /** 初始每页大小 */
@@ -14,19 +14,21 @@ interface UseAdminListArgs<T> {
  * admin 列表通用状态：data/loading/error + search/sort/page/size。
  * search 变化时回到第 1 页；fetcher 抛错只影响自身（不连累别的请求）。
  */
-export function useAdminList<T>({
+export function useAdminList<T, TPage extends Paged<T> = Paged<T>>({
   fetcher,
   initialSort = { sort_by: 'id', order: 'desc' },
   initialSize = 10,
-}: UseAdminListArgs<T>) {
+}: UseAdminListArgs<T, TPage>) {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState(initialSort)
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(initialSize)
 
-  const [data, setData] = useState<Paged<T> | null>(null)
+  const [data, setData] = useState<TPage | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [refreshToken, setRefreshToken] = useState(0)
+  const refresh = useCallback(() => setRefreshToken((current) => current + 1), [])
 
   const params: AdminListParams = {
     search: search || undefined,
@@ -54,7 +56,7 @@ export function useAdminList<T>({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, sort.sort_by, sort.order, page, size])
+  }, [search, sort.sort_by, sort.order, page, size, refreshToken])
 
   const onSearch = useCallback((v: string) => {
     setSearch(v)
@@ -77,6 +79,7 @@ export function useAdminList<T>({
     onSearch,
     onSortChange,
     onPageChange: setPage,
+    refresh,
     onSizeChange: (s: number) => {
       setSize(s)
       setPage(1)

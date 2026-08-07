@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { ArrowDown } from 'lucide-react'
 import { useFormState } from '../../state/FormContext'
 import { SECTIONS } from '../../data/sections'
 import { filledCount } from '../../utils/summary'
 import { generateUrl } from '../../api/client'
 
+const WordPreviewModal = lazy(() => import('./WordPreviewModal'))
 
 const DELIVERABLES = [
   { type: 'markdown', label: '场景设计说明', desc: 'Markdown 格式，含完整需求清单', icon: 'pdf' },
@@ -37,6 +38,7 @@ export default function DeliverableSlot({ onSendOrder }: DeliverableSlotProps) {
   const [downloading, setDownloading] = useState<string | null>(null)
   const [hoveredType, setHoveredType] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [wordPreviewOpen, setWordPreviewOpen] = useState(false)
 
   // 计算总进度
   let filled = 0, total = 0
@@ -82,6 +84,16 @@ export default function DeliverableSlot({ onSendOrder }: DeliverableSlotProps) {
     }
   }
 
+  function handleWordPreview() {
+    const sessionId = sessionStorage.getItem('ics_session_id')
+    if (!sessionId) {
+      setError('未找到会话，请先在对话框开始对话')
+      return
+    }
+    setError('')
+    setWordPreviewOpen(true)
+  }
+
   return (
     <section className="workbench-slot deliverable-slot">
       <div className="delivery-panel-scroll flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
@@ -99,14 +111,14 @@ export default function DeliverableSlot({ onSendOrder }: DeliverableSlotProps) {
               <button
                 key={type}
                 type="button"
-                onClick={() => handleDownload(type)}
+                onClick={() => type === 'word' ? handleWordPreview() : handleDownload(type)}
                 onMouseEnter={() => setHoveredType(type)}
                 onMouseLeave={() => setHoveredType(null)}
                 onFocus={() => setHoveredType(type)}
                 onBlur={() => setHoveredType(null)}
-                disabled={!canGenerate || downloading !== null}
+                disabled={type === 'word' ? downloading !== null : !canGenerate || downloading !== null}
                 className="deliverable-file-row"
-                aria-label={`${label}，${desc}`}
+                aria-label={type === 'word' ? `${label}，打开实验预览` : `${label}，${desc}`}
               >
                 <span className={`deliverable-file-icon${hoveredType === type ? ' is-hovered' : ''}`} data-testid={hoveredType === type ? `download-icon-${type}` : undefined}>
                   <FileTypeIcon type={icon} hovered={hoveredType === type} />
@@ -127,6 +139,14 @@ export default function DeliverableSlot({ onSendOrder }: DeliverableSlotProps) {
       >
         发送订单
       </button>
+      {wordPreviewOpen && (
+        <Suspense fallback={null}>
+          <WordPreviewModal
+            sessionId={sessionStorage.getItem('ics_session_id')!}
+            onClose={() => setWordPreviewOpen(false)}
+          />
+        </Suspense>
+      )}
     </section>
   )
 }

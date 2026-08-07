@@ -4,6 +4,8 @@ import {
   adminListDeliveries,
   adminListUsers,
   adminGetDelivery,
+  adminUpdateDelivery,
+  adminDeleteDelivery,
   type AdminDeliveryListItem,
   type AdminUser,
   type AdminDeliveryDetail,
@@ -39,11 +41,13 @@ const COLUMNS: Column<AdminDeliveryListItem>[] = [
 
 interface DeliveriesTabProps {
   onUnsupportedDocument: () => void
+  selectedUserId?: number
+  onFilterUserIdChange?: (userId: number | '') => void
 }
 
-export default function DeliveriesTab({ onUnsupportedDocument }: DeliveriesTabProps) {
+export default function DeliveriesTab({ onUnsupportedDocument, selectedUserId, onFilterUserIdChange }: DeliveriesTabProps) {
   const [users, setUsers] = useState<AdminUser[]>([])
-  const [filterUserId, setFilterUserId] = useState<number | ''>('')
+  const [filterUserId, setFilterUserId] = useState<number | ''>(selectedUserId ?? '')
 
   const [previewDetail, setPreviewDetail] = useState<AdminDeliveryDetail | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -55,6 +59,7 @@ export default function DeliveriesTab({ onUnsupportedDocument }: DeliveriesTabPr
     initialSort: { sort_by: 'id', order: 'desc' },
     initialSize: 30,
   })
+  const { onPageChange, refresh } = list
 
   // 单独拉用户列表填充筛选下拉，失败不影响交付物（修复原 Promise.all 一败俱败）
   useEffect(() => {
@@ -62,6 +67,13 @@ export default function DeliveriesTab({ onUnsupportedDocument }: DeliveriesTabPr
       .then((d) => setUsers(d.items))
       .catch(() => setUsers([]))
   }, [])
+
+  useEffect(() => {
+    setFilterUserId(selectedUserId ?? '')
+    if (selectedUserId === undefined) return
+    onPageChange(1)
+    refresh()
+  }, [selectedUserId, onPageChange, refresh])
 
   async function openPreview(row: AdminDeliveryListItem) {
     setPreviewLoading(true)
@@ -96,7 +108,9 @@ export default function DeliveriesTab({ onUnsupportedDocument }: DeliveriesTabPr
             value={filterUserId}
             onChange={(userId) => {
               setFilterUserId(userId)
+              onFilterUserIdChange?.(userId)
               list.onPageChange(1)
+              list.refresh()
             }}
           />
         </div>
@@ -130,6 +144,18 @@ export default function DeliveriesTab({ onUnsupportedDocument }: DeliveriesTabPr
           loading={previewLoading}
           error={previewError}
           onUnsupportedDocument={onUnsupportedDocument}
+          onUpdated={async (detail) => {
+            const updated = await adminUpdateDelivery(detail.id, { customer_name: detail.customer_name, markdown: detail.markdown })
+            setPreviewDetail(updated)
+            list.refresh()
+          }}
+          onDeleted={async () => {
+            if (!previewDetail) return
+            await adminDeleteDelivery(previewDetail.id)
+            setPreviewDetail(null)
+            setPreviewError('')
+            list.refresh()
+          }}
           onClose={() => {
             setPreviewDetail(null)
             setPreviewError('')

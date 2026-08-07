@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import TopBar from '../components/TopBar'
 import AdminEntryButton from '../components/AdminEntryButton'
 import ChatPanel from '../components/ChatPanel/ChatPanel'
@@ -6,7 +6,6 @@ import ProgressCard from '../components/ProgressCard/ProgressCard'
 import CenterCard from '../components/CenterCard/CenterCard'
 import FormPreviewSlot from '../components/DeliveryPanel/FormPreviewSlot'
 import DeliverableSlot from '../components/DeliveryPanel/DeliverableSlot'
-import FormPreviewModal from '../components/DeliveryPanel/FormPreviewModal'
 import OrderConfirmationModal from '../components/DeliveryPanel/OrderConfirmationModal'
 import GridBackground from '../components/GridBackground'
 import { ZStackProvider } from '../hooks/useZStack'
@@ -14,12 +13,14 @@ import { FormProvider } from '../state/FormContext'
 import { useTheme } from '../state/theme'
 import { useAuth } from '../state/AuthContext'
 
+const WordPreviewModal = lazy(() => import('../components/DeliveryPanel/WordPreviewModal'))
+
 export default function Workbench() {
   const { user, logout } = useAuth()
   const [resetKey, setResetKey] = useState(0)
   const [progressVisible, setProgressVisible] = useState(true)
   const [centerExpanded, setCenterExpanded] = useState(false)
-  const [formPreviewOpen, setFormPreviewOpen] = useState(false)
+  const [wordPreviewSessionId, setWordPreviewSessionId] = useState<string | null>(null)
   const [orderModalOpen, setOrderModalOpen] = useState(false)
   const { theme, toggleTheme } = useTheme()
 
@@ -27,6 +28,11 @@ export default function Workbench() {
     setResetKey((k) => k + 1)
     setProgressVisible(true)
     setCenterExpanded(false)
+  }
+
+  function handleDeliverablePreview() {
+    const sessionId = sessionStorage.getItem('ics_session_id')
+    if (sessionId) setWordPreviewSessionId(sessionId)
   }
 
   return (
@@ -57,12 +63,19 @@ export default function Workbench() {
             </section>
             <aside className="workbench-slots" aria-hidden={centerExpanded} inert={centerExpanded}>
               <section className="form-preview-slot">
-                <FormPreviewSlot onPreview={() => setFormPreviewOpen(true)} />
+                <FormPreviewSlot onPreview={handleDeliverablePreview} />
               </section>
               <DeliverableSlot onSendOrder={() => setOrderModalOpen(true)} />
             </aside>
           </main>
-          {formPreviewOpen && <FormPreviewModal onClose={() => setFormPreviewOpen(false)} />}
+          {wordPreviewSessionId && (
+            <Suspense fallback={null}>
+              <WordPreviewModal
+                sessionId={wordPreviewSessionId}
+                onClose={() => setWordPreviewSessionId(null)}
+              />
+            </Suspense>
+          )}
           {orderModalOpen && <OrderConfirmationModal onClose={() => setOrderModalOpen(false)} />}
         </div>
       </FormProvider>
