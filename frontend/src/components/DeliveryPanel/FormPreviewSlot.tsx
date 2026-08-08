@@ -50,6 +50,7 @@ export default function FormPreviewSlot({ onPreview }: FormPreviewSlotProps) {
         </div>
         <div className="Description">
           <span className="Description-title">客户需求表</span>
+          <span className="Description-hint">实时更新 · 点击查看</span>
           <div className="Description-bars" aria-hidden="true">
             <span className="Description-bar Description-bar--top" />
             <span className="Description-bar Description-bar--short" />
@@ -78,6 +79,13 @@ const StyledWrapper = styled.div`
   min-height: 0;
   place-items: center;
 
+  .Description-hint {
+    color: rgb(96, 165, 250);
+    font-size: 11px;
+    line-height: 16px;
+    transform: translateY(-15px);
+  }
+  
   .card {
     width: 190px;
     height: 254px;

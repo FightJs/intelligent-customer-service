@@ -310,7 +310,12 @@ def _build_system_prompt(state: StudioFormState,history_summary: str = '',) -> s
         mark = '✓' if p['complete'] else f"{p['filled']}/{p['total']}"
         progress_lines.append(f"  {p['title']} {mark}")
 
-    next_hint = '所有必填信息已采集完毕，请总结确认。'
+    next_hint = (
+        '所有必填信息已采集完毕。'
+        '请告知用户：右上角客户需求表会实时展示当前信息，'
+        '确认内容无误后，可点击右侧“发送订单”。'
+        '不要再询问用户需要生成哪种文件。'
+    )
     if nxt:
         sec_id, field = nxt
         next_hint = f'下一个该问：【{SECTION_BY_ID[sec_id].title}】{field.label}'
@@ -322,13 +327,15 @@ def _build_system_prompt(state: StudioFormState,history_summary: str = '',) -> s
 - skip_section：用户不具备某条件时跳过章节（如"没有直播间"→skip status）
 - get_progress：查看采集进度和下一个该问的字段
 - set_current_section：用户跳着回答或回头改时切换章节
-- generate_deliverable：采集完成或用户要求时生成交付物
 
 工作方式：
 1. 用户消息含信息时，调 fill_fields 填入
 2. 需要知道下一步问什么时，调 get_progress
 3. 信息足够时，自然地确认并问下一个问题
-4. 所有必填信息齐了，告知用户可生成交付物
+4. 所有必填信息齐了，提醒用户查看右上角客户需求表，确认无误后点击“发送订单”
+5. 信息采集完成不代表会话关闭；用户仍可以继续补充或修改信息
+6. 禁止询问用户需要 Markdown、Excel 或 Word 中的哪一种
+7. 禁止声称订单已经发送；只有用户点击“发送订单”才算发送
 
 {AGENT_GUIDE}
 
@@ -498,11 +505,6 @@ def run_agent(
                     ))
             elif tb.name == 'skip_section':
                 events.append(ToolEvent(kind='skip', section_id=tb.input['section_id']))
-            elif tb.name == 'generate_deliverable':
-                events.append(ToolEvent(
-                    kind='deliverable', section_id='',
-                    value=tb.input.get('doc_type'),
-                ))
             tool_results.append({
                 'type': 'tool_result',
                 'tool_use_id': tb.id,

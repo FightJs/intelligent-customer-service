@@ -47,20 +47,24 @@ def test_set_current_section():
     execute_tool('set_current_section', {'section_id': 'venue'}, state)
     assert state.current_section_id == 'venue'
 
-def test_generate_deliverable_markdown():
-    state = create_initial_state()
-    state.sections['customer'].fields['brand'].value = '云裳'
-    result = execute_tool('generate_deliverable', {'doc_type': 'markdown'}, state)
-    assert 'markdown' in result.lower() or 'md' in result
 
 def test_unknown_tool_returns_error():
     state = create_initial_state()
     result = execute_tool('nonexistent', {}, state)
     assert 'error' in result.lower() or 'unknown' in result.lower()
 
-def test_tool_defs_has_five_tools():
-    names = [t['name'] for t in TOOL_DEFS]
-    assert names == ['fill_fields', 'skip_section', 'get_progress', 'set_current_section', 'generate_deliverable']
+def test_tool_defs_has_four_tools():
+    names = [
+        tool['name']
+        for tool in TOOL_DEFS
+    ]
+
+    assert names == [
+        'fill_fields',
+        'skip_section',
+        'get_progress',
+        'set_current_section',
+    ]
 
 
 def test_fill_fields_returns_failure_details():

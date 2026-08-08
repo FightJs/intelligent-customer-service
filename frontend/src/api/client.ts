@@ -157,6 +157,36 @@ export async function chat(
   return r.json()
 }
 
+export interface OrderResult {
+  delivery_id: number
+  sent: boolean
+  message: string
+}
+
+/** 确认需求并发送订单。发送成功后管理员后台才会出现记录。 */
+export async function sendOrder(
+  sessionId: string,
+): Promise<OrderResult> {
+  const response = await request('/orders', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      session_id: sessionId,
+    }),
+  })
+
+  if (!response.ok) {
+    throw await responseError(
+      response,
+      `sendOrder: ${response.status}`,
+    )
+  }
+
+  return response.json()
+}
+
 /** 生成交付物下载（文件流）。调用方自取 blob。 */
 export async function generateUrl(docType: 'markdown' | 'excel' | 'word', sessionId: string): Promise<Response> {
   return request(`/generate/${docType}?session_id=${sessionId}`, { method: 'POST' })

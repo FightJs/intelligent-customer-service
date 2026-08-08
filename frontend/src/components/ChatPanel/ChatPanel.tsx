@@ -44,11 +44,8 @@ export function suggestionMatchesReply(suggestion: Suggestion, reply: string | u
   return mentioned.length >= 2
 }
 
-interface ChatPanelProps {
-  onComplete?: () => void
-}
 
-export default function ChatPanel({ onComplete }: ChatPanelProps) {
+export default function ChatPanel() {
   const { dispatch } = useFormState()
   const [sessionId, setSessionId] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -110,10 +107,7 @@ export default function ChatPanel({ onComplete }: ChatPanelProps) {
       setMessages((prev) => [...prev, { id: newId(), role: 'ai', text: result.reply }])
       dispatch({ type: 'replace_state', state: result.form_state })
       setSuggestions(result.suggestions || [])
-      if (result.form_complete) {
-        setFinished(true)
-        onComplete?.()
-      }
+            setFinished(result.form_complete)
     } catch (err) {
       setMessages((prev) => [...prev, {
         id: newId(), role: 'ai', text: `（出错：${(err as Error).message}）`,
@@ -122,7 +116,7 @@ export default function ChatPanel({ onComplete }: ChatPanelProps) {
       sendingRef.current = false
       setSending(false)
     }
-  }, [sessionId, messages, dispatch, onComplete])
+  }, [sessionId, messages, dispatch])
 
   const send = useCallback(() => {
     sendMessage(draft.trim())
@@ -165,7 +159,7 @@ export default function ChatPanel({ onComplete }: ChatPanelProps) {
           )}
           {finished && (
             <div className="text-done text-xs text-center mt-2">
-              ✓ 信息采集完成，可在右侧查看交付物
+              ✓ 必填信息已采集完成，请查看右上角客户需求表，确认后发送订单
             </div>
           )}
         </div>
@@ -173,7 +167,7 @@ export default function ChatPanel({ onComplete }: ChatPanelProps) {
           <QuickChips
             options={quickOptions}
             onPick={pickQuickOption}
-            disabled={sending || loading || finished}
+            disabled={sending || loading}
           />
           <div className="flex items-end gap-2">
             <div className="relative min-w-0 flex-1">
@@ -184,7 +178,7 @@ export default function ChatPanel({ onComplete }: ChatPanelProps) {
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
                 placeholder={sending ? '顾问回复中…' : '输入您的回答…'}
-                disabled={sending || loading || finished}
+                disabled={sending || loading}
                 className="chat-input block w-full resize-none rounded-bubble py-2.5 pl-3.5 pr-11 text-sm leading-5 text-primary placeholder:text-muted outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
               />
               {draft && (
@@ -205,7 +199,7 @@ export default function ChatPanel({ onComplete }: ChatPanelProps) {
               type="button"
               onClick={send}
               className="grid h-10 w-10 shrink-0 place-items-center rounded-bubble bg-accent text-white disabled:opacity-40"
-              disabled={sending || loading || finished || draft.trim() === ''}
+              disabled={sending|| loading|| draft.trim() === ''}
               aria-label="发送"
               title="发送"
             >

@@ -1,152 +1,135 @@
-import { lazy, Suspense, useState } from 'react'
-import { ArrowDown } from 'lucide-react'
+import {
+  CheckCircle2,
+  FileSpreadsheet,
+  FileText,
+  FileType2,
+  Send,
+} from 'lucide-react'
 import { useFormState } from '../../state/FormContext'
 import { SECTIONS } from '../../data/sections'
 import { filledCount } from '../../utils/summary'
-import { generateUrl } from '../../api/client'
 
-const WordPreviewModal = lazy(() => import('./WordPreviewModal'))
-
-const DELIVERABLES = [
-  { type: 'markdown', label: '场景设计说明', desc: 'Markdown 格式，含完整需求清单', icon: 'pdf' },
-  { type: 'excel', label: '设备参数清单', desc: 'Excel 格式，现有 + 推荐设备', icon: 'excel' },
-  { type: 'word', label: '需求确认书', desc: 'Word 格式，可签字确认', icon: 'word' },
+const STRUCTURED_CONTENT = [
+  {
+    label: '场景设计说明',
+    description: '直播场景与空间设计结构',
+    icon: FileText,
+    color: '#ef4444',
+  },
+  {
+    label: '设备参数清单',
+    description: '现有设备与推荐设备结构',
+    icon: FileSpreadsheet,
+    color: '#22c55e',
+  },
+  {
+    label: '需求确认书',
+    description: '客户完整需求确认结构',
+    icon: FileType2,
+    color: '#3b82f6',
+  },
 ] as const
 
-function FileTypeIcon({ type, hovered }: { type: (typeof DELIVERABLES)[number]['icon']; hovered: boolean }) {
-  const color = type === 'excel' ? '#22c55e' : type === 'word' ? '#3b82f6' : '#ef4444'
-
-  if (hovered) return <ArrowDown size={18} aria-hidden="true" />
-
-  return (
-    <svg width="19" height="21" viewBox="0 0 20 22" fill="none" aria-hidden="true">
-      <path d="M4 1.5h8l4 4V20a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 4 20V2a.5.5 0 0 1 .5-.5Z" stroke={color} strokeWidth="1.5" />
-      <path d="M12 1.5V6h4" stroke={color} strokeWidth="1.5" />
-      {type === 'excel' && <><path d="M6.5 10h7M6.5 13h7M6.5 16h7" stroke={color} strokeWidth="1.35" /><path d="M9.5 9v8M12 9v8" stroke={color} strokeWidth="1.35" /></>}
-      {type === 'word' && <><path d="M6.5 10h7M6.5 13h7M6.5 16h4.5" stroke={color} strokeWidth="1.6" strokeLinecap="round" /></>}
-      {type === 'pdf' && <><path d="M6.5 15.5c1.5-2.5 2.5-4.8 3-7 .7 2.3 1.6 4.2 4 5.4-2.8-.4-4.7.4-7 1.6Z" stroke={color} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /><path d="M6.5 18h7" stroke={color} strokeWidth="1.5" strokeLinecap="round" /></>}
-    </svg>
-  )
-}
-
 interface DeliverableSlotProps {
+  orderSent?: boolean
   onSendOrder?: () => void
 }
 
-export default function DeliverableSlot({ onSendOrder }: DeliverableSlotProps) {
+export default function DeliverableSlot({
+  orderSent = false,
+  onSendOrder,
+}: DeliverableSlotProps) {
   const { state } = useFormState()
-  const [downloading, setDownloading] = useState<string | null>(null)
-  const [hoveredType, setHoveredType] = useState<string | null>(null)
-  const [error, setError] = useState('')
-  const [wordPreviewOpen, setWordPreviewOpen] = useState(false)
 
-  // 计算总进度
-  let filled = 0, total = 0
-  for (const def of SECTIONS) {
-    const r = filledCount(state.sections[def.id], def)
-    filled += r.filled
-    total += r.total
-  }
-  const canGenerate = filled > 0
+  let filled = 0
+  let total = 0
 
-  async function handleDownload(type: string) {
-    setError('')
-    const sessionId = sessionStorage.getItem('ics_session_id')
-    if (!sessionId) {
-      setError('未找到会话，请先在对话框开始对话')
-      return
-    }
-    setDownloading(type)
-    try {
-      const r = await generateUrl(
-         type as 'markdown' | 'excel' | 'word',
-         sessionId,
-      )
-      if (!r.ok) throw new Error(`生成失败：${r.status}`)
-      const blob = await r.blob()
-      // 从 Content-Disposition 取文件名
-      const cd = r.headers.get('content-disposition') || ''
-      const match = cd.match(/filename\*=UTF-8''(.+)/)
-      const filename = match ? decodeURIComponent(match[1]) : `交付物.${type === 'markdown' ? 'md' : type === 'excel' ? 'xlsx' : 'docx'}`
-      // 触发下载
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setDownloading(null)
-    }
+  for (const definition of SECTIONS) {
+    const progress = filledCount(
+      state.sections[definition.id],
+      definition,
+    )
+
+    filled += progress.filled
+    total += progress.total
   }
 
-  function handleWordPreview() {
-    const sessionId = sessionStorage.getItem('ics_session_id')
-    if (!sessionId) {
-      setError('未找到会话，请先在对话框开始对话')
-      return
-    }
-    setError('')
-    setWordPreviewOpen(true)
-  }
+  const canSend = (
+    total > 0
+    && filled === total
+  )
 
   return (
     <section className="workbench-slot deliverable-slot">
       <div className="delivery-panel-scroll flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
         <section>
           <h3 className="text-secondary text-xs mb-2">
-            交付物生成（{filled}/{total}）
+            AI 结构化内容（{filled}/{total}）
           </h3>
-          {!canGenerate && (
-            <div className="text-muted text-[11px] mb-2">
-            文件已就绪，可单独下载
-            </div>
-          )}
+
+          <p className="mb-3 text-[11px] leading-5 text-muted">
+            以下内容由系统根据客户需求表统一整理，无需单独操作。
+          </p>
+
           <div className="deliverable-file-grid">
-            {DELIVERABLES.map(({ type, label, desc, icon }) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => type === 'word' ? handleWordPreview() : handleDownload(type)}
-                onMouseEnter={() => setHoveredType(type)}
-                onMouseLeave={() => setHoveredType(null)}
-                onFocus={() => setHoveredType(type)}
-                onBlur={() => setHoveredType(null)}
-                disabled={type === 'word' ? downloading !== null : !canGenerate || downloading !== null}
-                className="deliverable-file-row"
-                aria-label={type === 'word' ? `${label}，打开实验预览` : `${label}，${desc}`}
+            {STRUCTURED_CONTENT.map(({
+              label,
+              description,
+              icon: Icon,
+              color,
+            }) => (
+              <div
+                key={label}
+                className="deliverable-file-row pointer-events-none select-none"
+                aria-label={`${label}，由系统统一整理`}
               >
-                <span className={`deliverable-file-icon${hoveredType === type ? ' is-hovered' : ''}`} data-testid={hoveredType === type ? `download-icon-${type}` : undefined}>
-                  <FileTypeIcon type={icon} hovered={hoveredType === type} />
+                <span className="deliverable-file-icon">
+                  <Icon
+                    size={19}
+                    color={color}
+                    aria-hidden="true"
+                  />
                 </span>
-                <span className="deliverable-file-label">{downloading === type ? '下载中…' : label}</span>
-              </button>
+
+                <span className="min-w-0 flex-1">
+                  <span className="deliverable-file-label block">
+                    {label}
+                  </span>
+
+                  <span className="block truncate text-[10px] text-muted">
+                    {description}
+                  </span>
+                </span>
+              </div>
             ))}
           </div>
-          {error && (
-            <div className="text-red-400 text-[11px] mt-2">{error}</div>
-          )}
+
+          <p className="mt-3 text-[11px] leading-5 text-muted">
+            {canSend
+              ? '请先查看右上角客户需求表，确认无误后发送订单。'
+              : '完成全部必填信息后即可发送订单。'}
+          </p>
         </section>
       </div>
+
       <button
         type="button"
         className="delivery-order-button"
         onClick={onSendOrder}
+        disabled={!canSend || orderSent}
       >
-        发送订单
+        {orderSent ? (
+          <>
+            <CheckCircle2 size={15} />
+            订单已发送
+          </>
+        ) : (
+          <>
+            <Send size={15} />
+            发送订单
+          </>
+        )}
       </button>
-      {wordPreviewOpen && (
-        <Suspense fallback={null}>
-          <WordPreviewModal
-            sessionId={sessionStorage.getItem('ics_session_id')!}
-            onClose={() => setWordPreviewOpen(false)}
-          />
-        </Suspense>
-      )}
     </section>
   )
 }

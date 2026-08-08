@@ -288,8 +288,10 @@ html.theme-transition #root * {
 
 .order-modal,
 .form-preview-modal {
+  display: flex;
   width: min(100%, 460px);
   max-height: min(680px, calc(100dvh - 48px));
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid rgb(var(--color-idle));
   border-radius: 12px;
@@ -314,7 +316,13 @@ html.theme-transition #root * {
 
 .order-modal-close { display: grid; place-items: center; padding: 0; border: 0; color: rgb(var(--color-muted)); background: transparent; cursor: pointer; }
 .order-modal-close:hover, .order-modal-close:focus-visible { color: rgb(var(--color-primary)); }
-.order-modal-body, .form-preview-modal-body { padding: 18px 20px 20px; overflow-y: auto; }
+.order-modal-body,
+.form-preview-modal-body {
+  min-height: 0;
+  flex: 1;
+  padding: 18px 20px 20px;
+  overflow-y: auto;
+}
 .order-modal-steps { display: flex; align-items: center; gap: 7px; color: rgb(var(--color-muted)); font-size: 11px; }
 .order-modal-step-group { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
 .order-modal-step { display: grid; width: 22px; height: 22px; place-items: center; border: 1px solid rgb(var(--color-idle)); border-radius: 50%; color: rgb(var(--color-secondary)); background: rgb(var(--color-active-surface)); }

@@ -445,6 +445,34 @@ def create_delivery(
         return int(cur.lastrowid)
 
 
+def get_delivery_by_session(
+    session_id: str,
+) -> dict[str, Any] | None:
+    """获取会话已经发送的最新一条交付记录。"""
+    with _connect() as conn:
+        row = conn.execute(
+            '''
+            SELECT
+                d.id,
+                d.session_id,
+                d.user_id,
+                d.customer_name,
+                d.markdown,
+                d.created_at,
+                u.username AS owner_username
+            FROM deliveries d
+            LEFT JOIN users u
+                ON d.user_id = u.id
+            WHERE d.session_id = ?
+            ORDER BY d.id DESC
+            LIMIT 1
+            ''',
+            (session_id,),
+        ).fetchone()
+
+    return dict(row) if row else None
+
+
 # deliveries 列表允许排序的字段白名单（防 SQL 注入：列名不能参数化）。
 # JOIN users 后需带表名前缀避免歧义。
 _DELIVERY_SORT_COLUMNS = {'id': 'd.id', 'customer_name': 'd.customer_name', 'created_at': 'd.created_at'}

@@ -36,6 +36,7 @@ from agent.auth import (
     verify_password,
 )
 from agent.gather import initial_greeting
+from agent.flow import form_complete
 from agent.loop import run_agent
 from agent.tools import apply_updates, ToolEvent
 from delivery.markdown import generate_markdown
@@ -113,6 +114,16 @@ class ChatResponse(BaseModel):
     form_state: dict
     form_complete: bool
     suggestions: list[dict] = []
+
+
+class OrderRequest(BaseModel):
+    session_id: str
+
+
+class OrderResponse(BaseModel):
+    delivery_id: int
+    sent: bool
+    message: str
 
 
 # ── Auth 端点 ─────────────────────────────────────────────────
@@ -262,13 +273,93 @@ def chat(req: ChatRequest, current: dict = Depends(get_current_user)) -> ChatRes
     )
 
 
+@app.post(
+    '/api/orders',
+    response_model=OrderResponse,
+)
+def submit_order(
+    req: OrderRequest,
+    current: dict = Depends(get_current_user),
+) -> OrderResponse:
+    """确认当前需求并发送订单。
+
+    只有发送成功后才写入 deliveries，
+    管理员后台才会看到该会话。
+    """
+    rec = db.get_session(req.session_id)
+
+    if rec is None:
+        raise HTTPException(
+            status_code=404,
+            detail='session not found',
+        )
+
+    if (
+        rec['user_id'] != current['id']
+        and current['role'] != 'admin'
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail='无权发送该会话的订单',
+        )
+
+    state = from_dict(rec['form_state'])
+
+    if not form_complete(state):
+        raise HTTPException(
+            status_code=409,
+            detail='必填信息尚未采集完成',
+        )
+
+    # 防止重复点击产生多条相同订单。
+    existing = db.get_delivery_by_session(
+        req.session_id
+    )
+
+    if existing is not None:
+        return OrderResponse(
+            delivery_id=existing['id'],
+            sent=True,
+            message='订单已经发送，请勿重复提交',
+        )
+
+    customer = state.sections.get('customer')
+    customer_name = None
+
+    if customer is not None:
+        brand_field = customer.fields.get('brand')
+
+        if (
+            brand_field is not None
+            and brand_field.type == 'text'
+            and brand_field.value
+        ):
+            customer_name = brand_field.value
+
+    # 后台的一条记录保存完整综合需求。
+    markdown = generate_markdown(state)
+
+    delivery_id = db.create_delivery(
+        req.session_id,
+        rec['user_id'],
+        customer_name,
+        markdown,
+    )
+
+    return OrderResponse(
+        delivery_id=delivery_id,
+        sent=True,
+        message='订单发送成功',
+    )
+
+
 @app.post('/api/generate/{doc_type}')
 def generate(
     doc_type: Literal['markdown', 'excel', 'word'],
     session_id: str,
     current: dict = Depends(get_current_user),
 ) -> Response:
-    """生成交付物，返回文件流下载。markdown 同步落库到 deliveries。
+    """临时生成文件流，不写入管理员交付物列表。
 
     - markdown: text/markdown
     - excel:   application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
@@ -295,8 +386,6 @@ def generate(
         content = md_text.encode('utf-8')
         media_type = 'text/markdown; charset=utf-8'
         suffix = 'md'
-        # 仅 markdown 落库（excel/word 实时重算，不存二进制）
-        db.create_delivery(session_id, rec['user_id'], brand_name or None, md_text)
     elif doc_type == 'excel':
         content = generate_excel(state)
         media_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

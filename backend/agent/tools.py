@@ -1,7 +1,7 @@
-"""Agent tools 定义 + 执行函数。
+"""Agent tools 定义与执行函数。
 
-5 个 tool 覆盖采集 → 进度控制 → 交付物生成。
-每个执行函数操作 StudioFormState，返回结果字符串（给模型看）。
+4 个工具负责信息采集和进度控制。
+订单发送由用户在前端明确确认，不由 LLM 工具完成。
 """
 from __future__ import annotations
 
@@ -109,17 +109,6 @@ TOOL_DEFS: list[dict] = [
                 'section_id': {'type': 'string'},
             },
             'required': ['section_id'],
-        },
-    },
-    {
-        'name': 'generate_deliverable',
-        'description': '当采集完成或用户要求时，生成交付物文档。',
-        'input_schema': {
-            'type': 'object',
-            'properties': {
-                'doc_type': {'type': 'string', 'enum': ['markdown', 'excel', 'word']},
-            },
-            'required': ['doc_type'],
         },
     },
 ]
@@ -398,11 +387,5 @@ def execute_tool(name: str, tool_input: dict, state: StudioFormState) -> str:
             return f'已切换到章节 {SECTION_BY_ID[sid].title}。'
         return f'[error] 未知章节 {sid}'
 
-    if name == 'generate_deliverable':
-        doc_type = tool_input['doc_type']
-        # 实际生成（验证文件能产出），返回文件信息
-        # 前端通过 /api/generate/{type} 端点下载
-        suffix = {'markdown': 'md', 'excel': 'xlsx', 'word': 'docx'}[doc_type]
-        return f'已生成 {doc_type} 交付物（.{suffix}），用户可在右侧面板下载。'
 
     return f'[error] 未知 tool {name}'

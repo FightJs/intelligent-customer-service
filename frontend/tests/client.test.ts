@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { generateUrl, setAuth } from '../src/api/client'
+import {
+  generateUrl,
+  sendOrder,
+  setAuth,
+} from '../src/api/client'
 
 describe('generateUrl', () => {
   beforeEach(() => {
@@ -18,6 +22,51 @@ describe('generateUrl', () => {
       {
         method: 'POST',
         headers: { Authorization: 'Bearer token-123' },
+      },
+    )
+  })
+})
+
+describe('sendOrder', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('携带 token 和 session_id 发送订单', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve({
+        delivery_id: 7,
+        sent: true,
+        message: '订单发送成功',
+      }),
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    setAuth(
+      'token-123',
+      {
+        id: 1,
+        username: 'user-a',
+        role: 'user',
+      },
+    )
+
+    await sendOrder('session-1')
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:8000/api/orders',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer token-123',
+        },
+        body: JSON.stringify({
+          session_id: 'session-1',
+        }),
       },
     )
   })

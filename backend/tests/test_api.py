@@ -254,15 +254,120 @@ def test_generate_missing_session_404(client, auth_headers):
     assert r.status_code == 404
 
 
-def test_generate_markdown_persists_delivery(client, auth_headers, admin_headers):
-    """生成 markdown 后，admin 能在交付物列表看到这条记录。"""
-    sid = client.post('/api/session', headers=auth_headers).json()['session_id']
-    client.post(f'/api/generate/markdown?session_id={sid}', headers=auth_headers)
+def test_generate_markdown_does_not_persist_delivery(
+    client,
+    auth_headers,
+    admin_headers,
+):
+    """普通生成接口不能让订单提前出现在后台。"""
+    session_id = client.post(
+        '/api/session',
+        headers=auth_headers,
+    ).json()['session_id']
 
-    r = client.get('/api/admin/deliverables', headers=admin_headers)
-    assert r.status_code == 200
-    items = r.json()['items']
-    assert any(d['session_id'] == sid for d in items)
+    generated = client.post(
+        (
+            '/api/generate/markdown'
+            f'?session_id={session_id}'
+        ),
+        headers=auth_headers,
+    )
+
+    assert generated.status_code == 200
+
+    result = client.get(
+        '/api/admin/deliverables',
+        headers=admin_headers,
+    )
+
+    assert result.status_code == 200
+    assert not any(
+        item['session_id'] == session_id
+        for item in result.json()['items']
+    )
+
+
+def test_submit_order_rejects_incomplete_form(
+    client,
+    auth_headers,
+):
+    """必填信息未完成时不能发送订单。"""
+    session_id = client.post(
+        '/api/session',
+        headers=auth_headers,
+    ).json()['session_id']
+
+    response = client.post(
+        '/api/orders',
+        json={
+            'session_id': session_id,
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 409
+    assert (
+        response.json()['detail']
+        == '必填信息尚未采集完成'
+    )
+
+
+def test_submit_order_persists_once(
+    client,
+    auth_headers,
+    admin_headers,
+):
+    """订单发送后进入后台，重复发送不会新增记录。"""
+    session_id = client.post(
+        '/api/session',
+        headers=auth_headers,
+    ).json()['session_id']
+
+    with patch(
+        'api.app.form_complete',
+        return_value=True,
+    ):
+        first = client.post(
+            '/api/orders',
+            json={
+                'session_id': session_id,
+            },
+            headers=auth_headers,
+        )
+
+        second = client.post(
+            '/api/orders',
+            json={
+                'session_id': session_id,
+            },
+            headers=auth_headers,
+        )
+
+    assert first.status_code == 200
+    assert first.json()['sent'] is True
+    assert (
+        first.json()['message']
+        == '订单发送成功'
+    )
+
+    assert second.status_code == 200
+    assert (
+        second.json()['delivery_id']
+        == first.json()['delivery_id']
+    )
+
+    result = client.get(
+        '/api/admin/deliverables',
+        headers=admin_headers,
+    )
+
+    matching = [
+        item
+        for item in result.json()['items']
+        if item['session_id'] == session_id
+    ]
+
+    assert len(matching) == 1
 
 
 # ── Admin 端点测试 ────────────────────────────────────────────
@@ -313,7 +418,19 @@ def test_admin_deliverables_list(client, admin_headers):
 def test_admin_deliverables_search_and_filter(client, auth_headers, admin_headers):
     """deliveries 端点支持 search 与 user_id 筛选。"""
     sid = client.post('/api/session', headers=auth_headers).json()['session_id']
-    client.post(f'/api/generate/markdown?session_id={sid}', headers=auth_headers)
+    with patch(
+        'api.app.form_complete',
+        return_value=True,
+    ):
+        response = client.post(
+            '/api/orders',
+            json={
+                'session_id': sid,
+            },
+            headers=auth_headers,
+        )
+
+    assert response.status_code == 200
 
     # search 匹配 owner（admin 用户的交付物）
     r = client.get('/api/admin/deliverables', headers=admin_headers)
@@ -331,7 +448,19 @@ def test_admin_deliverables_search_and_filter(client, auth_headers, admin_header
 def test_admin_get_deliverable_detail(client, admin_headers, auth_headers):
     """取单条交付物详情，含 markdown 正文。"""
     sid = client.post('/api/session', headers=auth_headers).json()['session_id']
-    client.post(f'/api/generate/markdown?session_id={sid}', headers=auth_headers)
+    with patch(
+        'api.app.form_complete',
+        return_value=True,
+    ):
+        response = client.post(
+            '/api/orders',
+            json={
+                'session_id': sid,
+            },
+            headers=auth_headers,
+        )
+
+    assert response.status_code == 200
     list_item = client.get('/api/admin/deliverables', headers=admin_headers).json()['items'][0]
 
     r = client.get(f"/api/admin/deliverables/{list_item['id']}", headers=admin_headers)

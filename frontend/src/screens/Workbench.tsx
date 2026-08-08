@@ -1,10 +1,11 @@
-import { lazy, Suspense, useState } from 'react'
+import { useState } from 'react'
 import TopBar from '../components/TopBar'
 import AdminEntryButton from '../components/AdminEntryButton'
 import ChatPanel from '../components/ChatPanel/ChatPanel'
 import ProgressCard from '../components/ProgressCard/ProgressCard'
 import CenterCard from '../components/CenterCard/CenterCard'
 import FormPreviewSlot from '../components/DeliveryPanel/FormPreviewSlot'
+import FormPreviewModal from '../components/DeliveryPanel/FormPreviewModal'
 import DeliverableSlot from '../components/DeliveryPanel/DeliverableSlot'
 import OrderConfirmationModal from '../components/DeliveryPanel/OrderConfirmationModal'
 import GridBackground from '../components/GridBackground'
@@ -13,26 +14,23 @@ import { FormProvider } from '../state/FormContext'
 import { useTheme } from '../state/theme'
 import { useAuth } from '../state/AuthContext'
 
-const WordPreviewModal = lazy(() => import('../components/DeliveryPanel/WordPreviewModal'))
-
 export default function Workbench() {
   const { user, logout } = useAuth()
   const [resetKey, setResetKey] = useState(0)
   const [progressVisible, setProgressVisible] = useState(true)
   const [centerExpanded, setCenterExpanded] = useState(false)
-  const [wordPreviewSessionId, setWordPreviewSessionId] = useState<string | null>(null)
+  const [formPreviewOpen, setFormPreviewOpen] = useState(false)
   const [orderModalOpen, setOrderModalOpen] = useState(false)
+  const [orderSent, setOrderSent] = useState(false)
   const { theme, toggleTheme } = useTheme()
 
   function handleReset() {
-    setResetKey((k) => k + 1)
+    setResetKey((key) => key + 1)
     setProgressVisible(true)
     setCenterExpanded(false)
-  }
-
-  function handleDeliverablePreview() {
-    const sessionId = sessionStorage.getItem('ics_session_id')
-    if (sessionId) setWordPreviewSessionId(sessionId)
+    setFormPreviewOpen(false)
+    setOrderModalOpen(false)
+    setOrderSent(false)
   }
 
   return (
@@ -47,36 +45,84 @@ export default function Workbench() {
             role={user?.role}
             progressVisible={progressVisible}
             deliveryOpen={centerExpanded}
-            onToggleProgress={() => setProgressVisible((v) => !v)}
-            onToggleDelivery={() => setCenterExpanded((v) => !v)}
+            onToggleProgress={() => {
+              setProgressVisible((visible) => !visible)
+            }}
+            onToggleDelivery={() => {
+              setCenterExpanded((expanded) => !expanded)
+            }}
           />
-          {user?.role === 'admin' && <AdminEntryButton />}
-          <main className={`workbench-stage${centerExpanded ? ' is-center-expanded' : ''}`}>
+
+          {user?.role === 'admin' && (
+            <AdminEntryButton />
+          )}
+
+          <main
+            className={
+              `workbench-stage${
+                centerExpanded
+                  ? ' is-center-expanded'
+                  : ''
+              }`
+            }
+          >
             <GridBackground />
+
             <section className="workbench-progress-zone">
               <ProgressCard visible={progressVisible} />
             </section>
+
             <section className="workbench-center-zone">
-              <CenterCard expanded={centerExpanded} onToggleExpand={() => setCenterExpanded((v) => !v)}>
-                <ChatPanel onComplete={() => setCenterExpanded(true)} />
+              <CenterCard
+                expanded={centerExpanded}
+                onToggleExpand={() => {
+                  setCenterExpanded((expanded) => !expanded)
+                }}
+              >
+                <ChatPanel />
               </CenterCard>
             </section>
-            <aside className="workbench-slots" aria-hidden={centerExpanded} inert={centerExpanded}>
+
+            <aside
+              className="workbench-slots"
+              aria-hidden={centerExpanded}
+              inert={centerExpanded}
+            >
               <section className="form-preview-slot">
-                <FormPreviewSlot onPreview={handleDeliverablePreview} />
+                <FormPreviewSlot
+                  onPreview={() => {
+                    setFormPreviewOpen(true)
+                  }}
+                />
               </section>
-              <DeliverableSlot onSendOrder={() => setOrderModalOpen(true)} />
+
+              <DeliverableSlot
+                orderSent={orderSent}
+                onSendOrder={() => {
+                  setOrderModalOpen(true)
+                }}
+              />
             </aside>
           </main>
-          {wordPreviewSessionId && (
-            <Suspense fallback={null}>
-              <WordPreviewModal
-                sessionId={wordPreviewSessionId}
-                onClose={() => setWordPreviewSessionId(null)}
-              />
-            </Suspense>
+
+          {formPreviewOpen && (
+            <FormPreviewModal
+              onClose={() => {
+                setFormPreviewOpen(false)
+              }}
+            />
           )}
-          {orderModalOpen && <OrderConfirmationModal onClose={() => setOrderModalOpen(false)} />}
+
+          {orderModalOpen && (
+            <OrderConfirmationModal
+              onClose={() => {
+                setOrderModalOpen(false)
+              }}
+              onSent={() => {
+                setOrderSent(true)
+              }}
+            />
+          )}
         </div>
       </FormProvider>
     </ZStackProvider>

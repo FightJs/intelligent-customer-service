@@ -1,13 +1,10 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
-import { useEffect } from 'react'
 import {
   fireEvent,
   render,
   screen,
-  waitFor,
 } from '@testing-library/react'
 import {
-  beforeEach,
   describe,
   expect,
   it,
@@ -15,21 +12,10 @@ import {
 } from 'vitest'
 import FormPreviewSlot from '../src/components/DeliveryPanel/FormPreviewSlot'
 import DeliverableSlot from '../src/components/DeliveryPanel/DeliverableSlot'
-import {
-  FormProvider,
-  useFormState,
-} from '../src/state/FormContext'
-
-const { generateUrlMock } = vi.hoisted(() => ({
-  generateUrlMock: vi.fn(),
-}))
-
-vi.mock('../src/api/client', () => ({
-  generateUrl: generateUrlMock,
-}))
+import { FormProvider } from '../src/state/FormContext'
 
 describe('FormPreviewSlot', () => {
-  it('渲染需求表文件夹卡片', () => {
+  it('渲染实时客户需求表入口', () => {
     const { container } = render(
       <FormProvider>
         <FormPreviewSlot />
@@ -37,74 +23,51 @@ describe('FormPreviewSlot', () => {
     )
 
     expect(
-      screen.getByRole('button', { name: '预览需求表' }),
+      screen.getByRole(
+        'button',
+        {
+          name: '预览需求表',
+        },
+      ),
     ).toBeInTheDocument()
-    expect(container.querySelector('.folder-card')).toBeInTheDocument()
-    expect(screen.getByText('客户需求表')).toBeInTheDocument()
-    expect(container.querySelector('.Usericon svg')).toBeInTheDocument()
-  })
-
-  it('不再渲染外部淡蓝色流光线条', () => {
-    const { container } = render(
-      <FormProvider>
-        <FormPreviewSlot />
-      </FormProvider>,
-    )
 
     expect(
-      container.querySelectorAll('.trace-flow'),
-    ).toHaveLength(0)
+      screen.getByText('客户需求表'),
+    ).toBeInTheDocument()
+
+    expect(
+      screen.getByText('实时更新 · 点击查看'),
+    ).toBeInTheDocument()
+
+    expect(
+      container.querySelector('.folder-card'),
+    ).toBeInTheDocument()
   })
 
-  it('点击需求表卡片触发完整预览', () => {
+  it('点击需求表触发预览', () => {
     const onPreview = vi.fn()
+
     render(
       <FormProvider>
         <FormPreviewSlot onPreview={onPreview} />
       </FormProvider>,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: '预览需求表' }))
+    fireEvent.click(
+      screen.getByRole(
+        'button',
+        {
+          name: '预览需求表',
+        },
+      ),
+    )
 
     expect(onPreview).toHaveBeenCalledTimes(1)
   })
-
-  it('渲染四条文档摘要暗条', () => {
-    const { container } = render(
-      <FormProvider>
-        <FormPreviewSlot />
-      </FormProvider>,
-    )
-
-    expect(container.querySelectorAll('.Description-bar')).toHaveLength(4)
-  })
 })
 
-function FilledDeliverableSlot() {
-  const { dispatch } = useFormState()
-
-  useEffect(() => {
-    dispatch({
-      type: 'update_field',
-      sectionId: 'customer',
-      fieldId: 'brand',
-      value: {
-        type: 'text',
-        value: '测试品牌',
-      },
-    })
-  }, [dispatch])
-
-  return <DeliverableSlot />
-}
-
 describe('DeliverableSlot', () => {
-  beforeEach(() => {
-    generateUrlMock.mockReset()
-    sessionStorage.clear()
-  })
-
-  it('渲染交付物标题', () => {
+  it('三类结构化内容不可交互', () => {
     render(
       <FormProvider>
         <DeliverableSlot />
@@ -112,79 +75,84 @@ describe('DeliverableSlot', () => {
     )
 
     expect(
-      screen.getAllByText(/交付物/).length,
-    ).toBeGreaterThan(0)
-    expect(screen.getByRole('button', { name: '发送订单' })).toBeInTheDocument()
+      screen.getByText('场景设计说明'),
+    ).toBeInTheDocument()
+
+    expect(
+      screen.getByText('设备参数清单'),
+    ).toBeInTheDocument()
+
+    expect(
+      screen.getByText('需求确认书'),
+    ).toBeInTheDocument()
+
+    expect(
+      screen.queryByRole(
+        'button',
+        {
+          name: /场景设计说明/,
+        },
+      ),
+    ).not.toBeInTheDocument()
+
+    expect(
+      screen.queryByRole(
+        'button',
+        {
+          name: /设备参数清单/,
+        },
+      ),
+    ).not.toBeInTheDocument()
+
+    expect(
+      screen.queryByRole(
+        'button',
+        {
+          name: /需求确认书/,
+        },
+      ),
+    ).not.toBeInTheDocument()
   })
 
-  it('点击发送订单按钮触发确认弹窗入口', () => {
+  it('信息未完成时禁止发送订单', () => {
     const onSendOrder = vi.fn()
-    render(
-      <FormProvider>
-        <DeliverableSlot onSendOrder={onSendOrder} />
-      </FormProvider>,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: '发送订单' }))
-
-    expect(onSendOrder).toHaveBeenCalledTimes(1)
-  })
-
-  it('通过统一 API client 下载交付物', async () => {
-    sessionStorage.setItem(
-      'ics_session_id',
-      'session-1',
-    )
-
-    generateUrlMock.mockResolvedValue({
-      ok: false,
-      status: 500,
-    } as Response)
 
     render(
       <FormProvider>
-        <FilledDeliverableSlot />
+        <DeliverableSlot
+          onSendOrder={onSendOrder}
+        />
       </FormProvider>,
     )
 
     const button = screen.getByRole(
       'button',
       {
-        name: /场景设计说明/,
+        name: /发送订单/,
       },
     )
 
-    await waitFor(() => {
-      expect(button).toBeEnabled()
-    })
+    expect(button).toBeDisabled()
 
     fireEvent.click(button)
 
-    await waitFor(() => {
-      expect(
-        generateUrlMock,
-      ).toHaveBeenCalledWith(
-        'markdown',
-        'session-1',
-      )
-    })
+    expect(onSendOrder).not.toHaveBeenCalled()
   })
 
-  it('交付物列表默认显示文件图标，悬浮后切换为下载图标', async () => {
+  it('已发送后显示订单已发送', () => {
     render(
       <FormProvider>
-        <FilledDeliverableSlot />
+        <DeliverableSlot orderSent />
       </FormProvider>,
     )
 
-    const button = screen.getByRole('button', { name: /场景设计说明/ })
-
-    expect(screen.queryByTestId('download-icon-markdown')).not.toBeInTheDocument()
-
-    fireEvent.mouseEnter(button)
-
-    await waitFor(() => {
-      expect(screen.getByTestId('download-icon-markdown')).toBeInTheDocument()
-    })
+    expect(
+      screen.getByRole(
+        'button',
+        {
+          name: /订单已发送/,
+        },
+      ),
+    ).toBeDisabled()
   })
 })
