@@ -1,5 +1,11 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import ChatPanel, { suggestionMatchesReply, toolEventStatus } from '../src/components/ChatPanel/ChatPanel'
 import { FormProvider } from '../src/state/FormContext'
@@ -16,8 +22,8 @@ vi.mock('../src/api/client', () => ({
 }))
 
 vi.mock('../src/api/chatStream', () => ({
-  ChatStreamHttpError: class ChatStreamHttpError extends Error {},
-  ChatStreamInterruptedError: class ChatStreamInterruptedError extends Error {},
+  ChatStreamHttpError: class ChatStreamHttpError extends Error { },
+  ChatStreamInterruptedError: class ChatStreamInterruptedError extends Error { },
   streamChat: vi.fn(),
 }))
 
@@ -58,6 +64,131 @@ describe('ChatPanel 输入框', () => {
         form_complete: false,
         suggestions: [],
         assistant_message_id: 1,
+      })
+      it('开始和停止语音并写入识别文字', async () => {
+        type MockSpeechResultEvent = {
+          results: {
+            length: number
+            [index: number]: {
+              length: number
+              isFinal: boolean
+              [index: number]: {
+                transcript: string
+              }
+            }
+          }
+        }
+
+        let recognition!: MockSpeechRecognition
+
+        class MockSpeechRecognition {
+          lang = ''
+          continuous = false
+          interimResults = false
+          maxAlternatives = 1
+
+          onresult:
+            | ((
+              event: MockSpeechResultEvent,
+            ) => void)
+            | null = null
+
+          onerror:
+            | ((
+              event: { error: string },
+            ) => void)
+            | null = null
+
+          onend: (() => void) | null = null
+
+          start = vi.fn()
+
+          stop = vi.fn(() => {
+            this.onend?.()
+          })
+
+          abort = vi.fn()
+
+          constructor() {
+            recognition = this
+          }
+        }
+
+        const speechWindow =
+          window as typeof window & {
+            webkitSpeechRecognition?:
+            new () => MockSpeechRecognition
+          }
+
+        speechWindow.webkitSpeechRecognition =
+          MockSpeechRecognition
+
+        render(
+          <FormProvider>
+            <ChatPanel />
+          </FormProvider>,
+        )
+
+        const input =
+          await screen.findByPlaceholderText(
+            '输入您的回答…',
+          )
+
+        fireEvent.click(
+          screen.getByRole('button', {
+            name: '开始语音输入',
+          }),
+        )
+
+        expect(
+          recognition.start,
+        ).toHaveBeenCalledTimes(1)
+
+        expect(
+          screen.getByText(
+            '正在聆听，再次点击麦克风结束',
+          ),
+        ).toBeInTheDocument()
+
+        act(() => {
+          recognition.onresult?.({
+            results: {
+              0: {
+                0: {
+                  transcript:
+                    '我需要搭建女装直播间',
+                },
+                length: 1,
+                isFinal: true,
+              },
+              length: 1,
+            },
+          })
+        })
+
+        expect(input).toHaveValue(
+          '我需要搭建女装直播间',
+        )
+
+        fireEvent.click(
+          screen.getByRole('button', {
+            name: '停止语音输入',
+          }),
+        )
+
+        expect(
+          recognition.stop,
+        ).toHaveBeenCalledTimes(1)
+
+        expect(
+          screen.getByRole('button', {
+            name: '开始语音输入',
+          }),
+        ).toBeInTheDocument()
+
+        delete (
+          speechWindow.webkitSpeechRecognition
+        )
       })
     })
 

@@ -1,7 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowUp, Square } from 'lucide-react'
+import {
+  ArrowUp,
+  Mic,
+  MicOff,
+  Square,
+} from 'lucide-react'
+import {
+  useSpeechRecognition,
+} from '../../hooks/useSpeechRecognition'
 import { useFormState } from '../../state/FormContext'
 import { createSession, chat } from '../../api/client'
 import type { FieldUpdate, Suggestion, SuggestionOption } from '../../api/client'
@@ -18,6 +26,7 @@ import type {
 import { SECTIONS } from '../../data/sections'
 import MessageBubble from './MessageBubble'
 import QuickChips from './QuickChips'
+
 
 const MAX_INPUT_HEIGHT = 136
 
@@ -42,8 +51,8 @@ function newRequestId(): string {
 const STREAMING_ENABLED = import.meta.env.VITE_CHAT_STREAMING_ENABLED !== 'false'
 
 export // 字段 label 的常见中文前缀。匹配回复时去掉这些前缀，用剩余"实义"部分作为关键词，
-// 避免"客户"、"场地"这类泛词误匹配。改 data/sections.ts 字段 label 时需同步复核此处。
-const FIELD_PREFIXES = ['目标客群', '客户', '商品', '品牌', '直播间', '场地', '预算', '现有', '需求与']
+  // 避免"客户"、"场地"这类泛词误匹配。改 data/sections.ts 字段 label 时需同步复核此处。
+  const FIELD_PREFIXES = ['目标客群', '客户', '商品', '品牌', '直播间', '场地', '预算', '现有', '需求与']
 const GENERIC_WORDS = ['目标', '客户', '商品', '品牌', '场地', '预算', '现有', '需求']
 
 export function suggestionMatchesReply(suggestion: Suggestion, reply: string | undefined): boolean {
@@ -82,11 +91,34 @@ export default function ChatPanel() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const [streamError, setStreamError] = useState<StreamErrorEvent | null>(null)
+  const [speechError, setSpeechError] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const draftRef = useRef<HTMLTextAreaElement>(null)
   const sendingRef = useRef(false)
   const controllerRef = useRef<AbortController | null>(null)
   const retryRef = useRef<{ request: ChatStreamRequest; messageId: string } | null>(null)
+  const speechBaseRef = useRef('')
+
+    const {
+    supported: speechSupported,
+    listening,
+    startListening,
+    stopListening,
+  } = useSpeechRecognition({
+    language: 'zh-CN',
+
+    onTranscript: (transcript) => {
+      const base = speechBaseRef.current
+
+      setDraft(
+        base
+          ? `${base} ${transcript}`.trimEnd()
+          : transcript,
+      )
+    },
+
+    onError: setSpeechError,
+  })
 
   useEffect(() => {
     let cancelled = false
@@ -268,6 +300,24 @@ export default function ChatPanel() {
     sendMessage(draft.trim())
   }, [draft, sendMessage])
 
+  const toggleSpeechInput = useCallback(() => {
+    setSpeechError('')
+
+    if (listening) {
+      stopListening()
+      draftRef.current?.focus()
+      return
+    }
+
+    speechBaseRef.current = draft.trimEnd()
+    startListening()
+  }, [
+    draft,
+    listening,
+    startListening,
+    stopListening,
+  ])
+
   const latestReply = messages.at(-1)?.role === 'ai' ? messages.at(-1)?.text : undefined
   const suggestion = suggestions[0]
   const quickOptions = suggestion && suggestionMatchesReply(suggestion, latestReply)
@@ -320,21 +370,45 @@ export default function ChatPanel() {
           <QuickChips
             options={quickOptions}
             onPick={pickQuickOption}
-            disabled={sending || loading}
+            disabled={sending || loading || listening}
           />
+
           <div className="flex items-end gap-2">
             <div className="relative min-w-0 flex-1">
               <textarea
                 ref={draftRef}
                 rows={1}
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-                placeholder={sending ? '顾问回复中…' : '输入您的回答…'}
+                onChange={(event) => {
+                  setDraft(event.target.value)
+
+                  if (speechError) {
+                    setSpeechError('')
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (
+                    event.key === 'Enter'
+                    && !event.shiftKey
+                    && !listening
+                  ) {
+                    event.preventDefault()
+                    send()
+                  }
+                }}
+                placeholder={
+                  listening
+                    ? '正在聆听，请再次点击麦克风结束…'
+                    : sending
+                      ? '顾问回复中…'
+                      : '输入您的回答…'
+                }
                 disabled={sending || loading}
+                readOnly={listening}
                 className="chat-input block w-full resize-none rounded-bubble py-2.5 pl-3.5 pr-11 text-sm leading-5 text-primary placeholder:text-muted outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
               />
-              {draft && (
+
+              {draft && !listening && (
                 <button
                   type="button"
                   onClick={() => setDraft('')}
@@ -342,23 +416,116 @@ export default function ChatPanel() {
                   aria-label="清空输入"
                   title="清空输入"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    aria-hidden="true"
+                  >
                     <path d="m7 7 10 10M17 7 7 17" />
                   </svg>
                 </button>
               )}
             </div>
+
             <button
               type="button"
-              onClick={sending ? stopStreaming : send}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-bubble bg-accent text-white disabled:opacity-40"
-              disabled={loading || (!sending && draft.trim() === '')}
-              aria-label={sending ? '停止生成' : '发送'}
-              title={sending ? '停止生成' : '发送'}
+              onClick={toggleSpeechInput}
+              disabled={
+                loading
+                || sending
+                || !speechSupported
+              }
+              className={
+                `voice-input-button${listening ? ' is-listening' : ''
+                }`
+              }
+              aria-label={
+                listening
+                  ? '停止语音输入'
+                  : '开始语音输入'
+              }
+              aria-pressed={listening}
+              title={
+                !speechSupported
+                  ? '当前浏览器不支持语音输入'
+                  : listening
+                    ? '停止语音输入'
+                    : '开始语音输入'
+              }
             >
-              {sending ? <Square size={16} fill="currentColor" aria-hidden="true" /> : <ArrowUp size={18} aria-hidden="true" />}
+              {listening ? (
+                <MicOff
+                  size={18}
+                  aria-hidden="true"
+                />
+              ) : (
+                <Mic
+                  size={18}
+                  aria-hidden="true"
+                />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={
+                sending
+                  ? stopStreaming
+                  : send
+              }
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-bubble bg-accent text-white disabled:opacity-40"
+              disabled={
+                loading
+                || listening
+                || (
+                  !sending
+                  && draft.trim() === ''
+                )
+              }
+              aria-label={
+                sending ? '停止生成' : '发送'
+              }
+              title={
+                sending ? '停止生成' : '发送'
+              }
+            >
+              {sending ? (
+                <Square
+                  size={16}
+                  fill="currentColor"
+                  aria-hidden="true"
+                />
+              ) : (
+                <ArrowUp
+                  size={18}
+                  aria-hidden="true"
+                />
+              )}
             </button>
           </div>
+
+          {listening && (
+            <p
+              className="voice-input-status"
+              aria-live="polite"
+            >
+              正在聆听，再次点击麦克风结束
+            </p>
+          )}
+
+          {speechError && (
+            <p
+              role="alert"
+              className="voice-input-error"
+            >
+              {speechError}
+            </p>
+          )}
         </div>
       </div>
     </div>
