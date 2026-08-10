@@ -12,11 +12,22 @@ const PATHS: Record<SectionStatus, { wrap?: string; body: JSX.Element; color: st
     color: 'text-idle',
   },
   active: {
-    wrap: 'animate-pulse',
     body: (
       <>
-        <path d="M7 2 a5 5 0 0 1 0 10 z" fill="currentColor" />
-        <circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        {/* 底环:静止,极淡 */}
+        <circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.25" opacity="0.25" />
+        {/* 细弧:缓慢绕环旋转,不做明暗变化 */}
+        <circle
+          className="status-active-arc"
+          cx="7"
+          cy="7"
+          r="5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.25"
+          strokeLinecap="round"
+          strokeDasharray="8 23.4"
+        />
       </>
     ),
     color: 'text-accent',

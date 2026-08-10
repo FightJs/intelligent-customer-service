@@ -32,13 +32,14 @@ describe('SectionRow', () => {
     expect(getByText(/0\/\d+/)).toBeTruthy()
   })
 
-  it('active 章节加 bg-active-surface/50', () => {
+  it('active 章节通过图标区分,不再加行底色', () => {
     const section = makeSection(customerDef, 'active')
     const { container } = render(
       <SectionRow def={customerDef} section={section} expanded={false} onToggle={() => {}} />
     )
     const row = container.querySelector('[data-section-row]')
-    expect(row?.className).toContain('bg-active-surface/50')
+    expect(row?.className).not.toContain('bg-active-surface')
+    expect(container.querySelector('[data-status="active"]')).toBeTruthy()
   })
 
   it('点击行触发 onToggle', () => {

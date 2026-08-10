@@ -363,10 +363,9 @@ html.theme-transition #root * {
   filter: drop-shadow(0 7px 12px rgb(15 23 42 / .16));
 }
 
-.light .form-preview-slot .folder-back,
-.light .form-preview-slot .folder-front {
-  color: #2563c9;
-}
+/* 后层更深:露出的部分与前层形成层次 */
+.light .form-preview-slot .folder-back { color: #1a4899; }
+.light .form-preview-slot .folder-front { color: #2563c9; }
 
 .light .form-preview-slot .file {
   box-shadow: inset 0 1px 1px rgb(255 255 255 / .5), 0 4px 10px rgb(15 23 42 / .16);
@@ -632,6 +631,16 @@ html.theme-transition #root * {
 
 .progress-card.is-expanded [data-card-handle] { cursor: default; }
 .progress-card.is-expanded > div:last-child { flex: 1; min-height: 0; }
+
+/* 进行中状态:细弧绕环匀速慢转,无明暗闪烁 */
+.status-active-arc {
+  transform-origin: 7px 7px;
+  animation: status-arc-spin 3s linear infinite;
+}
+
+@keyframes status-arc-spin {
+  to { transform: rotate(360deg); }
+}
 
 .chat-surface {
   background: rgb(var(--color-chat));
@@ -1096,6 +1105,8 @@ html.theme-transition #root * {
 
 @media (prefers-reduced-motion: reduce) {
   .workbench-stage, .workbench-slots, .center-card, .floating-card, .message-copy, .breathing-content, .breathing-glow, .top-bar-icon-button svg, .admin-entry-button svg { animation: none; transition: none; }
+  /* 细弧停转后停在起始角度,仍能看出是进行中状态 */
+  .status-active-arc { animation: none; }
 }
 
 .hide-scrollbar {

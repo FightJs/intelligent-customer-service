@@ -12,12 +12,11 @@ interface Props {
 
 export default function SectionRow({ def, section, expanded, onToggle }: Props) {
   const { filled, total } = filledCount(section, def)
-  const isActive = section.status === 'active'
   return (
     <div
       data-section-row
       onClick={onToggle}
-      className={`rounded-md cursor-pointer ${isActive ? 'bg-active-surface/50' : ''}`}
+      className="rounded-md cursor-pointer"
     >
       <div className="w-full text-left px-3 py-2 rounded-md hover:bg-base/50 transition-colors flex items-center gap-2">
         <StatusIcon status={section.status} />

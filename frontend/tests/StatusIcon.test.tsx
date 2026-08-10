@@ -10,10 +10,11 @@ describe('StatusIcon', () => {
     expect(svg?.getAttribute('data-status')).toBe('pending')
   })
 
-  it('active 渲染半圆带 animate-pulse class', () => {
+  it('active 渲染细弧旋转,不再整体闪烁', () => {
     const { container } = render(<StatusIcon status="active" />)
     const wrapper = container.querySelector('[data-status="active"]')
-    expect(wrapper?.className).toContain('animate-pulse')
+    expect(wrapper?.className).not.toContain('animate-pulse')
+    expect(container.querySelector('.status-active-arc')).not.toBeNull()
   })
 
   it('complete 渲染对勾', () => {

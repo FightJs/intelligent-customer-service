@@ -130,6 +130,9 @@ const StyledWrapper = styled.div`
     perspective: 1200px;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+    /* 内部标题/徽章/文件卡片均为绝对定位像素值,整体等比缩放而非逐一改值 */
+    transform: scale(.82);
+    transform-origin: center;
   }
 
   .folder-card:focus-visible {
@@ -197,12 +200,29 @@ const StyledWrapper = styled.div`
     position: absolute;
     left: 0;
     width: 100%;
-    color: #1458b8;
     filter: drop-shadow(0 8px 13px rgb(0 0 0 / .34));
   }
 
-  .folder-back { bottom: 0; }
-  .folder-front { bottom: 0; height: 100%; }
+  /* 后层更深:露出的部分与前层形成层次 */
+  .folder-back { bottom: 0; color: #0b3574; }
+
+  /* 前层半透明玻璃盖板:透出内部文件卡片,标题与徽章保持不透明(兄弟元素不受影响) */
+  .folder-front {
+    bottom: 0;
+    height: 100%;
+    color: #1458b8;
+    opacity: .55;
+    backdrop-filter: blur(1px);
+  }
+
+  .folder-front-wrapper::after {
+    position: absolute;
+    inset: 0 0 -4px;
+    border-radius: 8px;
+    box-shadow: inset 0 1px 1px rgb(255 255 255 / .35);
+    content: '';
+    pointer-events: none;
+  }
 
   .folder-front-wrapper {
     position: absolute;
