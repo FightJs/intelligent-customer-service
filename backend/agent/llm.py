@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 
-from anthropic import Anthropic
+from anthropic import Anthropic, AsyncAnthropic
 from dotenv import load_dotenv
 import httpx
 
@@ -28,6 +28,19 @@ def get_client() -> Anthropic:
         timeout=httpx.Timeout(60.0, connect=10.0),
     )
     return Anthropic(
+        api_key=LLM_API_KEY,
+        base_url=LLM_BASE_URL,
+        http_client=http_client,
+    )
+
+
+def get_async_client() -> AsyncAnthropic:
+    """创建单次流式请求使用的异步 client。"""
+    http_client = httpx.AsyncClient(
+        trust_env=False,
+        timeout=httpx.Timeout(60.0, connect=10.0),
+    )
+    return AsyncAnthropic(
         api_key=LLM_API_KEY,
         base_url=LLM_BASE_URL,
         http_client=http_client,

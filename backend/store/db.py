@@ -69,6 +69,23 @@ def init_db() -> None:
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
             CREATE INDEX IF NOT EXISTS idx_deliveries_user ON deliveries(user_id);
+
+            CREATE TABLE IF NOT EXISTS chat_requests (
+                request_id       TEXT PRIMARY KEY,
+                session_id       TEXT NOT NULL,
+                user_id          INTEGER NOT NULL,
+                message          TEXT NOT NULL,
+                updates_json     TEXT,
+                status           TEXT NOT NULL,
+                final_payload    TEXT,
+                error_code       TEXT,
+                created_at       TEXT NOT NULL,
+                updated_at       TEXT NOT NULL,
+                FOREIGN KEY (session_id) REFERENCES sessions(session_id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_chat_requests_session
+                ON chat_requests(session_id);
         ''')
 
         # sessions 表：检测老结构（无 user_id），DROP 重建
@@ -139,15 +156,16 @@ def add_message(
     role: str,
     content: str,
     tool_events: list[dict[str, Any]] | None = None,
-) -> None:
-    """追加一条对话消息。"""
+) -> int:
+    """追加一条对话消息，返回消息 id。"""
     now = _now()
     events_json = json.dumps(tool_events, ensure_ascii=False) if tool_events else None
     with _connect() as conn:
-        conn.execute(
+        cursor = conn.execute(
             'INSERT INTO messages (session_id, role, content, tool_events, created_at) VALUES (?, ?, ?, ?, ?)',
             (session_id, role, content, events_json, now),
         )
+    return int(cursor.lastrowid)
 
 
 def get_messages(
@@ -169,6 +187,116 @@ def get_messages(
             msg['tool_events'] = json.loads(r['tool_events'])
         result.append(msg)
     return result
+
+
+# ── Stream chat requests ──────────────────────────────────────
+
+def begin_chat_request(
+    request_id: str,
+    session_id: str,
+    user_id: int,
+    message: str,
+    updates: list[dict[str, Any]] | None,
+) -> tuple[str, dict[str, Any] | None]:
+    """创建或取得流式请求。返回 new/completed/running/conflict。"""
+    now = _now()
+    updates_json = json.dumps(updates, ensure_ascii=False) if updates is not None else None
+
+    with _connect() as conn:
+        row = conn.execute(
+            '''SELECT session_id, user_id, message, updates_json, status, final_payload
+               FROM chat_requests WHERE request_id = ?''',
+            (request_id,),
+        ).fetchone()
+
+        if row is None:
+            conn.execute(
+                '''INSERT INTO chat_requests
+                   (request_id, session_id, user_id, message, updates_json, status, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, 'running', ?, ?)''',
+                (request_id, session_id, user_id, message, updates_json, now, now),
+            )
+            return 'new', None
+
+        if (
+            row['session_id'] != session_id
+            or row['user_id'] != user_id
+            or row['message'] != message
+            or row['updates_json'] != updates_json
+        ):
+            return 'conflict', None
+
+        if row['status'] == 'completed' and row['final_payload']:
+            return 'completed', json.loads(row['final_payload'])
+
+        if row['status'] == 'running':
+            return 'running', None
+
+        conn.execute(
+            '''UPDATE chat_requests
+               SET status = 'running', error_code = NULL, updated_at = ?
+               WHERE request_id = ?''',
+            (now, request_id),
+        )
+        return 'new', None
+
+
+def fail_chat_request(request_id: str, error_code: str) -> None:
+    """标记未完成流式请求为失败，使其可使用同一 request_id 重试。"""
+    with _connect() as conn:
+        conn.execute(
+            '''UPDATE chat_requests
+               SET status = 'failed', error_code = ?, updated_at = ?
+               WHERE request_id = ? AND status = 'running' ''',
+            (error_code, _now(), request_id),
+        )
+
+
+def persist_chat_completion(
+    request_id: str,
+    session_id: str,
+    form_state: dict[str, Any],
+    user_message: str,
+    assistant_reply: str,
+    tool_events: list[dict[str, Any]],
+    done_payload: dict[str, Any],
+) -> int:
+    """原子保存聊天最终状态并完成幂等请求。"""
+    now = _now()
+    with _connect() as conn:
+        conn.execute(
+            'UPDATE sessions SET form_state = ?, updated_at = ? WHERE session_id = ?',
+            (json.dumps(form_state, ensure_ascii=False), now, session_id),
+        )
+        conn.execute(
+            'INSERT INTO messages (session_id, role, content, tool_events, created_at) VALUES (?, ?, ?, ?, ?)',
+            (session_id, 'user', user_message, None, now),
+        )
+        cursor = conn.execute(
+            'INSERT INTO messages (session_id, role, content, tool_events, created_at) VALUES (?, ?, ?, ?, ?)',
+            (
+                session_id,
+                'assistant',
+                assistant_reply,
+                json.dumps(tool_events, ensure_ascii=False) if tool_events else None,
+                now,
+            ),
+        )
+        assistant_message_id = int(cursor.lastrowid)
+        final_payload = {
+            **done_payload,
+            'assistant_message_id': assistant_message_id,
+        }
+        updated = conn.execute(
+            '''UPDATE chat_requests
+               SET status = 'completed', final_payload = ?, error_code = NULL, updated_at = ?
+               WHERE request_id = ? AND status = 'running' ''',
+            (json.dumps(final_payload, ensure_ascii=False), now, request_id),
+        )
+        if updated.rowcount != 1:
+            raise RuntimeError('chat request is not running')
+
+    return assistant_message_id
 
 
 # ── Users ──────────────────────────────────────────────────────

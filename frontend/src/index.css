@@ -202,6 +202,10 @@ html.theme-transition #root * {
 }
 
 .delivery-order-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   flex: 0 0 auto;
   width: 100%;
   margin-top: 12px;
@@ -212,6 +216,7 @@ html.theme-transition #root * {
   background: rgb(var(--color-accent));
   font-size: 12px;
   font-weight: 600;
+  line-height: 1.2;
   cursor: pointer;
   transition: background-color .16s ease-out, border-color .16s ease-out;
 }
@@ -354,42 +359,22 @@ html.theme-transition #root * {
 .form-preview-section strong { color: rgb(var(--color-primary)); font-weight: 500; }
 
 /* 预览入口与预览弹窗的日间主题 */
-.light .form-preview-slot .card {
-  background: #f8fafc;
-  box-shadow: 7px 5px 10px rgb(15 23 42 / .16);
+.light .form-preview-slot .folder-card {
+  filter: drop-shadow(0 7px 12px rgb(15 23 42 / .16));
 }
 
-.light .form-preview-slot .imge .Usericon {
-  background: #dbe4f2;
+.light .form-preview-slot .folder-back,
+.light .form-preview-slot .folder-front {
+  color: #2563c9;
 }
 
-.light .form-preview-slot .imge .Usericon svg {
-  fill: rgb(142, 143, 144);
+.light .form-preview-slot .file {
+  box-shadow: inset 0 1px 1px rgb(255 255 255 / .5), 0 4px 10px rgb(15 23 42 / .16);
 }
 
-.light .form-preview-slot .imge .UserName,
-.light .form-preview-slot .imge .Id {
-  border-color: #f8fafc;
-  background: #cbd5e1;
-  color: #f8fafc;
-}
-
-.light .form-preview-slot .Description {
-  border-color: #cbd5e1;
-  background: rgb(239, 243, 250);
-}
-
-.light .form-preview-slot .Description-title {
-  color: rgb(142, 143, 144);
-}
-
-.light .form-preview-slot .Description-bar {
-  background: rgb(142, 143, 144);
-  box-shadow: none;
-}
-
-.light .form-preview-slot .social-media::before {
-  background: #cbd5e1;
+.light .form-preview-slot .counter {
+  color: #172554;
+  background: #bfdbfe;
 }
 
 .light .form-preview-modal-backdrop {

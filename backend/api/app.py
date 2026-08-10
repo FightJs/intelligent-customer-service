@@ -14,19 +14,22 @@
 """
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import os
 import sqlite3
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from typing import Literal
+from uuid import UUID
 
 from dotenv import load_dotenv
-from anthropic import APIStatusError
+from anthropic import APIConnectionError, APIStatusError
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
-from pydantic import BaseModel
+from fastapi.responses import Response, StreamingResponse
+from pydantic import BaseModel, field_validator
 
 from agent.auth import (
     create_token,
@@ -37,7 +40,14 @@ from agent.auth import (
 )
 from agent.gather import initial_greeting
 from agent.flow import form_complete
-from agent.loop import run_agent
+from agent.loop import (
+    AgentStreamDelta,
+    AgentStreamResult,
+    AgentStreamStatus,
+    AgentStreamToolEvent,
+    run_agent,
+    run_agent_stream,
+)
 from agent.tools import apply_updates, ToolEvent
 from delivery.markdown import generate_markdown
 from delivery.excel import generate_excel
@@ -49,6 +59,7 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 LLM_BALANCE_ERROR = 'LLM 服务余额不足，请联系管理员充值后重试。'
+LLM_CONNECTION_ERROR = 'LLM 服务暂时无法连接，请检查网络或联系管理员。'
 
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
 ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123456')  # 仅测试期默认，生产必改 env
@@ -114,6 +125,24 @@ class ChatResponse(BaseModel):
     form_state: dict
     form_complete: bool
     suggestions: list[dict] = []
+
+
+class ChatStreamRequest(BaseModel):
+    request_id: UUID
+    session_id: str
+    message: str
+    history: list[dict] | None = None
+    updates: list[dict] | None = None
+
+    @field_validator('message')
+    @classmethod
+    def validate_message(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError('message 不能为空')
+        if len(value) > 8000:
+            raise ValueError('message 不能超过 8000 个字符')
+        return value
 
 
 class OrderRequest(BaseModel):
@@ -255,6 +284,9 @@ def chat(req: ChatRequest, current: dict = Depends(get_current_user)) -> ChatRes
             raise
         logger.warning('LLM chat unavailable because the account balance is insufficient')
         raise HTTPException(status_code=503, detail=LLM_BALANCE_ERROR) from exc
+    except APIConnectionError as exc:
+        logger.warning('LLM chat unavailable because the service cannot be reached')
+        raise HTTPException(status_code=503, detail=LLM_CONNECTION_ERROR) from exc
 
     # tool_events 转 dict（updates 事件 + agent 事件）
     events_dict = [asdict(e) for e in (update_events + result.tool_events)]
@@ -270,6 +302,182 @@ def chat(req: ChatRequest, current: dict = Depends(get_current_user)) -> ChatRes
         form_state=to_dict(result.state),
         form_complete=result.form_complete,
         suggestions=result.suggestions,
+    )
+
+
+def _encode_sse(
+    request_id: str,
+    sequence: int,
+    event: str,
+    data: dict,
+) -> str:
+    payload = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
+    return (
+        f'id: {request_id}:{sequence}\n'
+        f'event: {event}\n'
+        f'data: {payload}\n\n'
+    )
+
+
+@app.post('/api/chat/stream')
+async def chat_stream(
+    req: ChatStreamRequest,
+    current: dict = Depends(get_current_user),
+) -> StreamingResponse:
+    """真实 LLM stream 的 SSE 聊天接口，支持 request_id 幂等回放。"""
+    rec = db.get_session(req.session_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail='session not found')
+    if rec['user_id'] != current['id'] and current['role'] != 'admin':
+        raise HTTPException(status_code=403, detail='无权操作该会话')
+
+    request_id = str(req.request_id)
+    request_status, saved_payload = db.begin_chat_request(
+        request_id=request_id,
+        session_id=req.session_id,
+        user_id=current['id'],
+        message=req.message,
+        updates=req.updates,
+    )
+    if request_status == 'running':
+        raise HTTPException(status_code=409, detail='request_in_progress')
+    if request_status == 'conflict':
+        raise HTTPException(status_code=409, detail='request_conflict')
+
+    async def event_generator():
+        sequence = 0
+
+        def event(name: str, data: dict) -> str:
+            nonlocal sequence
+            encoded = _encode_sse(request_id, sequence, name, data)
+            sequence += 1
+            return encoded
+
+        yield event('start', {'request_id': request_id, 'status': 'started'})
+
+        if request_status == 'completed':
+            yield event('done', saved_payload or {})
+            return
+
+        state = from_dict(rec['form_state'])
+        update_events: list[ToolEvent] = []
+        if req.updates:
+            apply_updates(state, req.updates)
+            for update in req.updates:
+                update_events.append(ToolEvent(
+                    kind='fill',
+                    section_id=update['section_id'],
+                    field_id=update['field_id'].split('.')[-1],
+                    value=update.get('value'),
+                ))
+        for update_event in update_events:
+            yield event('tool_event', asdict(update_event))
+        history = db.get_messages(req.session_id, limit=50) or req.history
+        phase = 'generating'
+        try:
+            result: AgentStreamResult | None = None
+            async for item in run_agent_stream(state, req.message, history):
+                if item is None:
+                    yield ': heartbeat\n\n'
+                elif isinstance(item, AgentStreamDelta):
+                    yield event('delta', {'text': item.text})
+                elif isinstance(item, AgentStreamStatus):
+                    phase = item.phase
+                    yield event('status', {
+                        'phase': item.phase,
+                        'message': item.message,
+                    })
+                elif isinstance(item, AgentStreamToolEvent):
+                    yield event('tool_event', asdict(item.event))
+                elif isinstance(item, AgentStreamResult):
+                    result = item
+
+            if result is None:
+                raise RuntimeError('agent stream ended without result')
+
+            all_events = [*update_events, *result.tool_events]
+            events_dict = [asdict(item) for item in all_events]
+            done_payload = {
+                'request_id': request_id,
+                'reply': result.reply,
+                'tool_events': events_dict,
+                'form_state': to_dict(result.state),
+                'form_complete': result.form_complete,
+                'suggestions': result.suggestions,
+            }
+            yield event('status', {
+                'phase': 'persisting',
+                'message': '正在保存会话',
+            })
+            assistant_message_id = db.persist_chat_completion(
+                request_id=request_id,
+                session_id=req.session_id,
+                form_state=done_payload['form_state'],
+                user_message=req.message,
+                assistant_reply=result.reply,
+                tool_events=events_dict,
+                done_payload=done_payload,
+            )
+            yield event('done', {
+                **done_payload,
+                'assistant_message_id': assistant_message_id,
+            })
+        except asyncio.CancelledError:
+            db.fail_chat_request(request_id, 'stream_interrupted')
+            raise
+        except APIStatusError as exc:
+            if exc.status_code == 402:
+                code = 'llm_balance_insufficient'
+                message = LLM_BALANCE_ERROR
+                retryable = False
+            else:
+                code = 'llm_unavailable'
+                message = '顾问暂时无法回复，请稍后重试。'
+                retryable = True
+            logger.warning('stream chat failed: request_id=%s code=%s', request_id, code)
+            db.fail_chat_request(request_id, code)
+            yield event('error', {
+                'request_id': request_id,
+                'code': code,
+                'message': message,
+                'retryable': retryable,
+                'phase': phase,
+            })
+        except APIConnectionError:
+            logger.warning('stream chat connection failed: request_id=%s', request_id)
+            db.fail_chat_request(request_id, 'llm_unavailable')
+            yield event('error', {
+                'request_id': request_id,
+                'code': 'llm_unavailable',
+                'message': '顾问暂时无法回复，请稍后重试。',
+                'retryable': True,
+                'phase': phase,
+            })
+        except Exception:
+            code = 'tool_failed' if phase == 'tool_call' else 'persistence_failed'
+            message = (
+                '表单更新失败，请重试本轮回答。'
+                if code == 'tool_failed'
+                else '回复生成完成，但保存失败，请重试。'
+            )
+            logger.exception('stream chat failed: request_id=%s code=%s', request_id, code)
+            db.fail_chat_request(request_id, code)
+            yield event('error', {
+                'request_id': request_id,
+                'code': code,
+                'message': message,
+                'retryable': True,
+                'phase': phase,
+            })
+
+    return StreamingResponse(
+        event_generator(),
+        media_type='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache, no-transform',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no',
+        },
     )
 
 

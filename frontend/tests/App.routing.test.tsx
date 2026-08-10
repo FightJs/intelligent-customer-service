@@ -61,22 +61,30 @@ describe('App 路由同步', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/workbench')
   })
 
-  it('已登录访问 /breathing 可通过入场跳转到 /workbench', () => {
+  it('未登录访问 /login 可通过加载页跳转到 /breathing 登录页', () => {
     vi.useFakeTimers()
-    renderAt('/breathing')
+    authState.user = null
+    renderAt('/login')
 
     fireEvent.click(screen.getByRole('button', { name: '进入呼吸页' }))
     act(() => vi.advanceTimersByTime(440))
 
-    expect(screen.getByText('工作台')).toBeInTheDocument()
-    expect(screen.getByTestId('location')).toHaveTextContent('/workbench')
+    expect(screen.getByText('登录页')).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('/breathing')
   })
 
   it('未登录访问受保护路由会回到 /login', () => {
     authState.user = null
     renderAt('/workbench')
 
-    expect(screen.getByText('登录页')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '进入呼吸页' })).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/login')
+  })
+
+  it('已登录访问登录页会回到工作台', () => {
+    renderAt('/breathing')
+
+    expect(screen.getByText('工作台')).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('/workbench')
   })
 })

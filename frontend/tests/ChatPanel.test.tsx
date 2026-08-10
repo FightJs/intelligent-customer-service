@@ -1,9 +1,10 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import ChatPanel, { suggestionMatchesReply } from '../src/components/ChatPanel/ChatPanel'
+import ChatPanel, { suggestionMatchesReply, toolEventStatus } from '../src/components/ChatPanel/ChatPanel'
 import { FormProvider } from '../src/state/FormContext'
 import { SECTIONS } from '../src/data/sections'
+import { streamChat } from '../src/api/chatStream'
 
 vi.mock('../src/api/client', () => ({
   createSession: () => Promise.resolve({
@@ -12,6 +13,12 @@ vi.mock('../src/api/client', () => ({
     greeting: '你好',
   }),
   chat: vi.fn(),
+}))
+
+vi.mock('../src/api/chatStream', () => ({
+  ChatStreamHttpError: class ChatStreamHttpError extends Error {},
+  ChatStreamInterruptedError: class ChatStreamInterruptedError extends Error {},
+  streamChat: vi.fn(),
 }))
 
 Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
@@ -36,6 +43,37 @@ describe('ChatPanel 输入框', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '清空输入' }))
     expect(input).toHaveValue('')
+  })
+
+  it('将流式 delta 汇聚到一个 AI 气泡，并由 done 覆盖最终文本', async () => {
+    vi.mocked(streamChat).mockImplementation(async (_request, handlers) => {
+      handlers.onStart({ request_id: 'request-1', status: 'started' })
+      handlers.onStatus({ phase: 'generating', message: '正在生成回复' })
+      handlers.onDelta({ text: '临时' })
+      handlers.onDone({
+        request_id: 'request-1',
+        reply: '最终回复',
+        tool_events: [],
+        form_state: { sections: {}, currentSectionId: 'customer', completed: false } as any,
+        form_complete: false,
+        suggestions: [],
+        assistant_message_id: 1,
+      })
+    })
+
+    render(
+      <FormProvider>
+        <ChatPanel />
+      </FormProvider>,
+    )
+
+    const input = await screen.findByPlaceholderText('输入您的回答…')
+    fireEvent.change(input, { target: { value: '品牌名是云裳' } })
+    fireEvent.click(screen.getByRole('button', { name: '发送' }))
+
+    await waitFor(() => expect(screen.getByText('最终回复')).toBeInTheDocument())
+    expect(screen.queryByText('临时')).not.toBeInTheDocument()
+    expect(screen.getAllByText('最终回复')).toHaveLength(1)
   })
 })
 
@@ -62,5 +100,13 @@ describe('suggestionMatchesReply', () => {
     const s = { ...suggestion, options: [{ label: '选项甲', value: 'a' }, { label: '选项乙', value: 'b' }] }
     expect(suggestionMatchesReply(s as any, '我想要选项甲和选项乙')).toBe(true)
     expect(suggestionMatchesReply(s as any, '只要选项甲')).toBe(false)
+  })
+})
+
+describe('toolEventStatus', () => {
+  it('仅为工具事件显示安全的阶段提示', () => {
+    expect(toolEventStatus('fill')).toBe('正在更新表单')
+    expect(toolEventStatus('skip')).toBe('正在整理需求')
+    expect(toolEventStatus('deliverable')).toBe('正在生成交付物')
   })
 })

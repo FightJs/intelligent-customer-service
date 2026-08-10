@@ -23,7 +23,7 @@ export default function AuthScreen() {
       } else {
         await register(username, password)
       }
-      navigate('/breathing')
+      navigate('/workbench')
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败')
     } finally {

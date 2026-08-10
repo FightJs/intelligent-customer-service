@@ -1,71 +1,112 @@
+import { useEffect, useState, type KeyboardEvent } from 'react'
 import styled from 'styled-components'
+import { SECTIONS } from '../../data/sections'
 
 interface FormPreviewSlotProps {
+  isPreviewOpen?: boolean
   onPreview?: () => void
 }
 
-const SOCIAL_ICONS = [
-  {
-    viewBox: '0 0 512 512',
-    d: 'M459.37 151.716c.325 4.548.325 9.097.325 13.645 0 138.72-105.583 298.558-298.558 298.558-59.452 0-114.68-17.219-161.137-47.106 8.447.974 16.568 1.299 25.34 1.299 49.055 0 94.213-16.568 130.274-44.832-46.132-.975-84.792-31.188-98.112-72.772 6.498.974 12.995 1.624 19.818 1.624 9.421 0 18.843-1.3 27.614-3.573-48.081-9.747-84.143-51.98-84.143-102.985v-1.299c13.969 7.797 30.214 12.67 47.431 13.319-28.264-18.843-46.781-51.005-46.781-87.391 0-19.492 5.197-37.36 14.294-52.954 51.655 63.675 129.3 105.258 216.365 109.807-1.624-7.797-2.599-15.918-2.599-24.04 0-57.828 46.782-104.934 104.934-104.934 30.213 0 57.502 12.67 76.67 33.137 23.715-4.548 46.456-13.32 66.599-25.34-7.798 24.366-24.366 44.833-46.132 57.827 21.117-2.273 41.584-8.122 60.426-16.243-14.292 20.791-32.161 39.308-52.628 54.253z',
-  },
-  {
-    viewBox: '0 0 448 512',
-    d: 'M224.1 141c-63.6 0-114.9 51.3-114.9 114.9s51.3 114.9 114.9 114.9S339 319.5 339 255.9 287.7 141 224.1 141zm0 189.6c-41.1 0-74.7-33.5-74.7-74.7s33.5-74.7 74.7-74.7 74.7 33.5 74.7 74.7-33.6 74.7-74.7 74.7zm146.4-194.3c0 14.9-12 26.8-26.8 26.8-14.9 0-26.8-12-26.8-26.8s12-26.8 26.8-26.8 26.8 12 26.8 26.8zm76.1 27.2c-1.7-35.9-9.9-67.7-36.2-93.9-26.2-26.2-58-34.4-93.9-36.2-37-2.1-147.9-2.1-184.9 0-35.8 1.7-67.6 9.9-93.9 36.1s-34.4 58-36.2 93.9c-2.1 37-2.1 147.9 0 184.9 1.7 35.9 9.9 67.7 36.2 93.9s58 34.4 93.9 36.2c37 2.1 147.9 2.1 184.9 0 35.9-1.7 67.7-9.9 93.9-36.2 26.2-26.2 34.4-58 36.2-93.9 2.1-37 2.1-147.8 0-184.8zM398.8 388c-7.8 19.6-22.9 34.7-42.6 42.6-29.5 11.7-99.5 9-132.1 9s-102.7 2.6-132.1-9c-19.6-7.8-34.7-22.9-42.6-42.6-11.7-29.5-9-99.5-9-132.1s-2.6-102.7 9-132.1c7.8-19.6 22.9-34.7 42.6-42.6 29.5-11.7 99.5-9 132.1-9s102.7-2.6 132.1 9c19.6 7.8 34.7 22.9 42.6 42.6 11.7 29.5 9 99.5 9 132.1s2.7 102.7-9 132.1z',
-  },
-  {
-    viewBox: '0 0 512 512',
-    d: 'M504 256C504 119 393 8 256 8S8 119 8 256c0 123.78 90.69 226.38 209.25 245V327.69h-63V256h63v-54.64c0-62.15 37-96.48 93.67-96.48 27.14 0 55.52 4.84 55.52 4.84v61h-31.28c-30.8 0-40.41 19.12-40.41 38.73V256h68.78l-11 71.69h-57.78V501C413.31 482.38 504 379.78 504 256z',
-  },
-  {
-    viewBox: '0 0 448 512',
-    d: 'M100.28 448H7.4V148.9h92.88zM53.79 108.1C24.09 108.1 0 83.5 0 53.8a53.79 53.79 0 0 1 107.58 0c0 29.7-24.09 54.3-53.79 54.3zM447.9 448h-92.68V302.4c0-34.7-.7-79.2-48.29-79.2-48.29 0-55.69 37.7-55.69 76.7V448h-92.78V148.9h89.08v40.8h1.3c12.4-23.5 42.69-48.3 87.88-48.3 94 0 111.28 61.9 111.28 142.3V448z',
-  },
+const FOLDER_FILES = [
+  { className: 'file-5', label: '需求总览', tag: '实时更新' },
+  { className: 'file-4', label: '场景设计说明', tag: '设计结构' },
+  { className: 'file-3', label: '设备参数清单', tag: '设备结构' },
+  { className: 'file-2', label: '需求确认书', tag: '确认内容' },
+  { className: 'file-1', label: '品牌与商品', tag: '采集信息' },
 ] as const
 
-export default function FormPreviewSlot({ onPreview }: FormPreviewSlotProps) {
+export default function FormPreviewSlot({ isPreviewOpen = false, onPreview }: FormPreviewSlotProps) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    setIsOpen(isPreviewOpen)
+  }, [isPreviewOpen])
+
+  function openPreview() {
+    setIsOpen(true)
+    onPreview?.()
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      openPreview()
+    }
+  }
+
   return (
     <StyledWrapper>
       <div
-        className="card folder-card"
+        className="folder-card"
         role="button"
         tabIndex={0}
         aria-label="预览需求表"
-        onClick={onPreview}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault()
-            onPreview?.()
-          }
-        }}
+        onClickCapture={openPreview}
+        onKeyDown={handleKeyDown}
       >
-        <div className="imge">
-          <div className="Usericon" aria-hidden="true">
-            <svg viewBox="0 0 40 40" focusable="false">
-              <path d="M2.5 5.5h7l4 18.2 4-18.2h6l4 18.2 4-18.2h7l-6.5 29h-7l-4-17.5-4 17.5h-7z" />
-            </svg>
-          </div>
-          <p className="UserName" />
-          <p className="Id" />
+        <input
+          className="folder-toggle"
+          type="checkbox"
+          checked={isOpen}
+          readOnly
+          tabIndex={-1}
+          aria-hidden="true"
+        />
+
+        <div className="hint-wrapper" aria-hidden="true">
+          <span className="hint-text">点击查看</span>
+          <svg className="hint-arrow" viewBox="0 0 40 40" fill="none">
+            <path
+              d="M35 5C35 5 15 5 10 25M10 25 3 18M10 25l8-3"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </div>
-        <div className="Description">
-          <span className="Description-title">客户需求表</span>
-          <span className="Description-hint">实时更新 · 点击查看</span>
-          <div className="Description-bars" aria-hidden="true">
-            <span className="Description-bar Description-bar--top" />
-            <span className="Description-bar Description-bar--short" />
-            <span className="Description-bar Description-bar--long" />
-            <span className="Description-bar Description-bar--medium" />
-          </div>
-        </div>
-        <div className="social-media" aria-hidden="true">
-          {SOCIAL_ICONS.map((icon, index) => (
-            <span className="social-link" key={index}>
-              <svg viewBox={icon.viewBox} xmlns="http://www.w3.org/2000/svg">
-                <path d={icon.d} />
+
+        <div className="folder-container" aria-hidden="true">
+          <svg className="folder-back" viewBox="0 0 50 40" fill="none">
+            <path
+              d="M0 4C0 1.79 1.79 0 4 0h12.5c1.2 0 2.32.54 3.05 1.47l2.85 3.6c.73.93 1.85 1.47 3.05 1.47H46c2.21 0 4 1.79 4 4v25.46c0 2.21-1.79 4-4 4H4c-2.21 0-4-1.79-4-4V4Z"
+              fill="currentColor"
+            />
+          </svg>
+
+          {FOLDER_FILES.map(({ className, label, tag }) => (
+            <div className={`file ${className}`} key={className}>
+              <div className="shine" />
+              <svg className="file-icon" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M6 3h8l4 4v14H6V3Zm8 0v5h4M9 13h6M9 17h6"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
-            </span>
+              <div className="file-text">{label}</div>
+              <div className="file-tag">{tag}</div>
+            </div>
           ))}
+
+          <div className="folder-front-wrapper">
+            <svg className="folder-front" viewBox="0 0 50 34" fill="none">
+              <path
+                d="M0 4C0 1.79 1.79 0 4 0h42c2.21 0 4 1.79 4 4v26c0 2.21-1.79 4-4 4H4c-2.21 0-4-1.79-4-4V4Z"
+                fill="currentColor"
+              />
+            </svg>
+            <div className="folder-label" />
+            <div className="folder-title">客户需求表</div>
+            <div className="folder-hint">实时更新 · 点击查看</div>
+            <div className="counter">
+              <span className="status-dot" />
+              <span className="counter-label">SECTIONS</span>
+              <span className="counter-number">{String(SECTIONS.length).padStart(2, '0')}</span>
+            </div>
+          </div>
         </div>
       </div>
     </StyledWrapper>
@@ -79,144 +120,283 @@ const StyledWrapper = styled.div`
   min-height: 0;
   place-items: center;
 
-  .Description-hint {
-    color: rgb(96, 165, 250);
-    font-size: 11px;
-    line-height: 16px;
-    transform: translateY(-15px);
-  }
-  
-  .card {
+  .folder-card {
+    position: relative;
+    display: flex;
     width: 190px;
-    height: 254px;
-    overflow: hidden;
-    border-radius: 10px;
-    background: rgb(38, 38, 38);
-    box-shadow: 7px 5px 10px rgb(0 0 0 / .333);
+    height: 154px;
+    align-items: center;
+    justify-content: center;
+    perspective: 1200px;
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  .card:focus-visible {
+  .folder-card:focus-visible {
     outline: 2px solid rgb(var(--color-accent));
-    outline-offset: 4px;
+    outline-offset: 5px;
+    border-radius: 8px;
   }
 
-  .imge {
-    height: 70px;
-    background-color: rgb(45, 82, 168);
+  .folder-toggle {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
   }
 
-  .imge .Usericon {
-    display: grid;
-    place-items: center;
-    background-color: rgb(38, 40, 44);
-    transform: translateX(10px) translateY(10px);
-    width: 50px;
-    height: 50px;
-    border-radius: 10px;
+  .hint-wrapper {
+    position: absolute;
+    top: -8px;
+    right: -10px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    color: #60a5fa;
+    pointer-events: none;
+    transform: rotate(4deg);
+    transition: opacity .3s ease, transform .3s ease;
   }
 
-  .imge .Usericon svg {
-    width: 32px;
-    height: 32px;
-    fill: #fff;
-  }
-
-  .imge .UserName {
-    background-color: #414141;
-    width: 60px;
-    height: 15px;
-    border-width: 10px;
-    border-radius: 5px;
-    border-color: #262626;
-    color: #262626;
-    font-size: 15px;
-    font-weight: bold;
-    transform: translateX(70px) translateY(-38px);
-  }
-
-  .imge .Id {
-    background-color: #414141;
-    width: 100px;
-    height: 15px;
-    border-width: 10px;
-    border-radius: 5px;
-    border-color: #262626;
-    color: #262626;
-    font-size: 15px;
-    font-weight: bold;
-    transform: translateX(70px) translateY(-28px);
-  }
-
-  .Description {
-    display: grid;
-    align-items: start;
-    justify-items: center;
-    box-sizing: border-box;
-    padding-top: 24px;
-    border-color: #141414;
-    background-color: #414141;
-    transform: translate(5px, 6px);
-    width: 180px;
-    height: 130px;
-    border-radius: 5px;
-  }
-
-  .Description-title {
-    color: rgb(148, 148, 148);
-    font-size: 15px;
-    font-weight: 700;
+  .hint-text {
+    font-size: 10px;
+    font-weight: 800;
     letter-spacing: .04em;
-    text-align: center;
-    transform: translateY(-14px);
+    white-space: nowrap;
   }
 
-  .Description-bars {
-    display: grid;
-    justify-items: start;
-    gap: 9px;
-    box-sizing: border-box;
+  .hint-arrow {
+    width: 28px;
+    height: 28px;
+  }
+
+  .folder-toggle:checked ~ .hint-wrapper {
+    opacity: 0;
+    transform: translateY(-8px) rotate(4deg);
+  }
+
+  .folder-container {
+    position: relative;
     width: 100%;
-    padding-left: 18px;
-    margin-top: 18px;
-    transform: translateY(-14px);
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform .6s cubic-bezier(.23, 1, .32, 1);
+    backface-visibility: hidden;
+    will-change: transform;
   }
 
-  .Description-bar {
-    display: block;
-    height: 11px;
-    background: #1f1f1f;
-    border-radius: 3px;
-    box-shadow: 0 0 12px rgb(255 255 255 / .18);
+  .folder-toggle:checked ~ .folder-container {
+    transform: rotateX(10deg) rotateY(-5deg);
   }
 
-  .Description-bar--top { width: 104px; }
-  .Description-bar--short { width: 120px; }
-  .Description-bar--long { width: 159px; }
-  .Description-bar--medium { width: 140px; }
-
-  .social-media::before {
-    content: ' ';
-    display: block;
+  .folder-back,
+  .folder-front {
+    position: absolute;
+    left: 0;
     width: 100%;
-    height: 2px;
-    transform: translateY(10px);
-    background: #414141;
+    color: #1458b8;
+    filter: drop-shadow(0 8px 13px rgb(0 0 0 / .34));
   }
 
-  .social-link {
-    display: inline-block;
-    margin-right: 15px;
-    color: inherit;
-    text-decoration: none;
+  .folder-back { bottom: 0; }
+  .folder-front { bottom: 0; height: 100%; }
+
+  .folder-front-wrapper {
+    position: absolute;
+    bottom: -4px;
+    z-index: 90;
+    width: 100%;
+    height: 129px;
+    transform-origin: bottom;
+    transition: transform .5s cubic-bezier(.175, .885, .32, 1.275);
   }
 
-  .social-link:last-child { margin-right: 0; }
+  .folder-toggle:checked ~ .folder-container .folder-front-wrapper {
+    transform: rotateX(-50deg);
+  }
 
-  .social-link svg {
-    color: rgb(56, 110, 236);
-    transform: translateX(25px) translateY(20px);
-    width: 20px;
-    fill: currentColor;
+  .folder-label {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    width: 34px;
+    height: 4px;
+    border-radius: 10px;
+    background: rgb(255 255 255 / .56);
+  }
+
+  .folder-title,
+  .folder-hint {
+    position: absolute;
+    left: 50%;
+    width: max-content;
+    transform: translateX(-50%);
+    color: #fff;
+    text-shadow: 0 1px 3px rgb(0 0 0 / .25);
+  }
+
+  .folder-title {
+    top: 18px;
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .folder-hint {
+    top: 36px;
+    font-size: 9px;
+    font-weight: 600;
+    opacity: .8;
+  }
+
+  .counter {
+    position: absolute;
+    top: -12px;
+    right: -10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 7px;
+    border-radius: 50px;
+    color: #0b1220;
+    background: #a9c7ff;
+    box-shadow: 0 7px 14px rgb(0 0 0 / .22), inset 0 1px 1px rgb(255 255 255 / .3);
+    transform: scale(0) translateY(20px);
+    opacity: 0;
+    transition: transform .5s cubic-bezier(.34, 1.56, .64, 1), opacity .5s ease;
+  }
+
+  .folder-toggle:checked ~ .folder-container .counter {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+    transition-delay: .2s;
+  }
+
+  .status-dot {
+    position: relative;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #34d399;
+    box-shadow: 0 0 8px #34d399;
+  }
+
+  .status-dot::after {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: #34d399;
+    content: '';
+    animation: pulse 2s infinite;
+  }
+
+  .counter-label { font-size: 7px; font-weight: 800; }
+  .counter-number { color: #fff; font-size: 11px; font-weight: 900; }
+
+  .file {
+    position: absolute;
+    bottom: 5px;
+    left: 10%;
+    z-index: 0;
+    width: 80%;
+    height: 98px;
+    overflow: hidden;
+    border-radius: 6px;
+    box-shadow: inset 0 1px 1px rgb(255 255 255 / .3), 0 4px 12px rgb(0 0 0 / .3);
+    transition: transform .6s cubic-bezier(.68, -.55, .265, 1.55), filter .25s ease;
+  }
+
+  .file-1 { z-index: 25; background: #2563eb; transition-delay: .15s; }
+  .file-2 { z-index: 24; background: #3b82f6; transition-delay: .1s; }
+  .file-3 { z-index: 23; background: #4facfe; transition-delay: .05s; }
+  .file-4 { z-index: 22; background: #1678d3; transition-delay: .02s; }
+  .file-5 { z-index: 21; background: #1458b8; }
+
+  .folder-toggle:checked ~ .folder-container .file-1 { transform: translateY(-78px) rotate(-10deg) translateX(-15px) translateZ(20px); }
+  .folder-toggle:checked ~ .folder-container .file-2 { transform: translateY(-61px) rotate(8deg) translateX(18px) translateZ(10px); }
+  .folder-toggle:checked ~ .folder-container .file-3 { transform: translateY(-45px) rotate(-15deg) translateX(-8px); }
+  .folder-toggle:checked ~ .folder-container .file-4 { transform: translateY(-29px) rotate(12deg) translateX(12px); }
+  .folder-toggle:checked ~ .folder-container .file-5 { transform: translateY(-12px) rotate(-5deg); }
+
+  .shine {
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / .35), transparent);
+    transform: skewX(-20deg);
+  }
+
+  .folder-toggle:checked ~ .folder-container .shine {
+    left: 150%;
+    transition: left .8s ease-in-out;
+    transition-delay: .3s;
+  }
+
+  .file-icon {
+    position: absolute;
+    top: 9px;
+    right: 9px;
+    width: 15px;
+    height: 15px;
+    color: rgb(255 255 255 / .52);
+  }
+
+  .file-text {
+    padding: 12px;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    text-shadow: 0 1px 3px rgb(0 0 0 / .2);
+    opacity: 0;
+    transform: translateY(5px);
+    transition: opacity .3s ease .4s, transform .3s ease .4s;
+  }
+
+  .folder-toggle:checked ~ .folder-container .file-text {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .file-tag {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    color: rgb(255 255 255 / .9);
+    background: rgb(0 0 0 / .38);
+    font-size: 7px;
+    font-weight: 700;
+    opacity: 0;
+    transform: translateX(10px);
+    transition: opacity .3s ease .4s, transform .3s ease .4s;
+  }
+
+  .folder-toggle:checked ~ .folder-container .file-tag {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  @keyframes pulse {
+    from { transform: scale(1); opacity: 1; }
+    to { transform: scale(3); opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .folder-container,
+    .folder-front-wrapper,
+    .file,
+    .counter,
+    .file-text,
+    .file-tag,
+    .shine,
+    .hint-wrapper {
+      animation: none;
+      transition: none;
+    }
   }
 `

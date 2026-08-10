@@ -22,7 +22,7 @@ function GuestOnly({ children }: { children: React.ReactNode }) {
   if (loading) {
     return <div className="h-full flex items-center justify-center bg-base text-muted text-sm">加载中…</div>
   }
-  if (user) return <Navigate to="/breathing" replace />
+  if (user) return <Navigate to="/workbench" replace />
   return <>{children}</>
 }
 
@@ -35,30 +35,26 @@ function BreathingRoute() {
     if (timerRef.current !== null) window.clearTimeout(timerRef.current)
   }, [])
 
-  function enterWorkbench() {
+  function enterLogin() {
     if (leaving) return
     setLeaving(true)
-    timerRef.current = window.setTimeout(() => navigate('/workbench'), 440)
+    timerRef.current = window.setTimeout(() => navigate('/breathing'), 440)
   }
 
-  return <BreathingScreen onEnter={enterWorkbench} leaving={leaving} />
+  return <BreathingScreen onEnter={enterLogin} leaving={leaving} />
 }
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<GuestOnly><AuthScreen /></GuestOnly>} />
+      <Route path="/login" element={<BreathingRoute />} />
       <Route
         path="/"
-        element={<Navigate to="/workbench" replace />}
+        element={<Navigate to="/login" replace />}
       />
       <Route
         path="/breathing"
-        element={
-          <Protected>
-            <BreathingRoute />
-          </Protected>
-        }
+        element={<GuestOnly><AuthScreen /></GuestOnly>}
       />
       <Route
         path="/workbench"
@@ -76,7 +72,7 @@ export default function App() {
           </Protected>
         }
       />
-      <Route path="*" element={<Navigate to="/workbench" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   )
 }

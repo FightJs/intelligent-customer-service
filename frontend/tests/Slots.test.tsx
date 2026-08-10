@@ -64,6 +64,19 @@ describe('FormPreviewSlot', () => {
 
     expect(onPreview).toHaveBeenCalledTimes(1)
   })
+
+  it('点击外层文件夹也触发预览', () => {
+    const onPreview = vi.fn()
+    const { container } = render(
+      <FormProvider>
+        <FormPreviewSlot onPreview={onPreview} />
+      </FormProvider>,
+    )
+
+    fireEvent.click(container.querySelector('.folder-back') as Element)
+
+    expect(onPreview).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('DeliverableSlot', () => {

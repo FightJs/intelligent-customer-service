@@ -6,12 +6,15 @@
 """
 from __future__ import annotations
 
+import asyncio
 import json
 from dataclasses import dataclass, field
+from typing import AsyncIterator, Literal
 
-from anthropic import Anthropic
+from anthropic import Anthropic, AsyncAnthropic
 from agent.llm import (
     get_client,
+    get_async_client,
     LLM_MODEL,
     LLM_TEMPERATURE,
 )
@@ -61,6 +64,31 @@ FILL_FIELDS_TOOL = next(
 
 @dataclass
 class AgentResult:
+    reply: str
+    tool_events: list[ToolEvent]
+    state: StudioFormState
+    form_complete: bool
+    suggestions: list[dict] = field(default_factory=list)
+
+
+@dataclass
+class AgentStreamDelta:
+    text: str
+
+
+@dataclass
+class AgentStreamStatus:
+    phase: Literal['generating', 'tool_call']
+    message: str
+
+
+@dataclass
+class AgentStreamToolEvent:
+    event: ToolEvent
+
+
+@dataclass
+class AgentStreamResult:
     reply: str
     tool_events: list[ToolEvent]
     state: StudioFormState
@@ -124,6 +152,43 @@ def _summarize_history(
     ]
 
     return ''.join(text_parts).strip()
+
+
+async def _summarize_history_async(
+    client: AsyncAnthropic,
+    history: list[dict],
+) -> str:
+    """异步压缩较早历史，避免阻塞流式事件循环。"""
+    if not history:
+        return ''
+
+    history_lines = []
+    for message in history:
+        content = message.get('content')
+        if isinstance(content, str):
+            speaker = '客户' if message.get('role') == 'user' else '客服'
+            history_lines.append(f'{speaker}：{content}')
+
+    if not history_lines:
+        return ''
+
+    response = await client.messages.create(
+        model=LLM_MODEL,
+        max_tokens=300,
+        temperature=LLM_TEMPERATURE,
+        thinking={'type': 'disabled'},
+        system=(
+            '你是对话记忆整理器。'
+            '请总结客户已经明确提供的信息、客户对旧答案的修改、'
+            '仍未解决的问题和重要上下文。不要补充或猜测。摘要控制在 300 字以内。'
+        ),
+        messages=[{'role': 'user', 'content': '\n'.join(history_lines)}],
+    )
+    return ''.join(
+        block.text
+        for block in response.content
+        if block.type == 'text'
+    ).strip()
 
 
 def _suggestion_matches_reply(
@@ -525,3 +590,159 @@ def run_agent(
         form_complete=flow.form_complete(state),
         suggestions=_build_suggestions(state,reply,),
     )
+
+
+def _tool_events_for_block(
+    name: str,
+    tool_input: dict,
+    state: StudioFormState,
+) -> list[ToolEvent]:
+    if name == 'fill_fields':
+        events = []
+        for update in tool_input.get('updates', []):
+            section_id = update.get('section_id', '')
+            field_id = update.get('field_id', '').split('.')[-1]
+            section = state.sections.get(section_id)
+            if section is None or field_id not in section.fields:
+                continue
+            events.append(ToolEvent(
+                kind='fill',
+                section_id=section_id,
+                field_id=field_id,
+                value=section.fields[field_id].value,
+            ))
+        return events
+    if name == 'skip_section':
+        return [ToolEvent(kind='skip', section_id=tool_input['section_id'])]
+    return []
+
+
+async def _stream_response(
+    client: AsyncAnthropic,
+    **kwargs,
+) -> AsyncIterator[object]:
+    """转发 SDK 文本 delta，并在空闲时发送内部 heartbeat 标记。"""
+    async with client.messages.stream(**kwargs) as stream:
+        iterator = stream.__aiter__()
+        pending: asyncio.Task | None = None
+        while True:
+            if pending is None:
+                pending = asyncio.create_task(anext(iterator))
+            done, _ = await asyncio.wait({pending}, timeout=15)
+            if not done:
+                yield None
+                continue
+            try:
+                event = pending.result()
+            except StopAsyncIteration:
+                break
+            finally:
+                pending = None
+
+            if (
+                getattr(event, 'type', None) == 'content_block_delta'
+                and getattr(getattr(event, 'delta', None), 'type', None) == 'text_delta'
+            ):
+                text = getattr(event.delta, 'text', '')
+                if text:
+                    yield AgentStreamDelta(text)
+
+        yield await stream.get_final_message()
+
+
+async def run_agent_stream(
+    state: StudioFormState,
+    user_message: str,
+    history: list[dict] | None = None,
+) -> AsyncIterator[
+    AgentStreamDelta | AgentStreamStatus | AgentStreamToolEvent | AgentStreamResult | None
+]:
+    """运行真实 SDK stream，并产出安全的内部流式事件。"""
+    client = get_async_client()
+    events: list[ToolEvent] = []
+    try:
+        full_history = history or []
+        older_history = full_history[:-RECENT_MESSAGE_LIMIT]
+        recent_history = full_history[-RECENT_MESSAGE_LIMIT:]
+        history_summary = await _summarize_history_async(client, older_history)
+
+        messages = list(recent_history)
+        while messages and messages[0].get('role') != 'user':
+            messages.pop(0)
+        messages.append({'role': 'user', 'content': user_message})
+
+        reply = ''
+        for iteration in range(MAX_ITERATIONS):
+            capture_turn = iteration == 0
+            request_tools = [FILL_FIELDS_TOOL] if capture_turn else TOOL_DEFS
+            tool_choice = (
+                {'type': 'tool', 'name': 'fill_fields'}
+                if capture_turn
+                else {'type': 'auto'}
+            )
+            yield AgentStreamStatus(phase='generating', message='正在生成回复')
+            response = None
+            async for item in _stream_response(
+                client,
+                model=LLM_MODEL,
+                max_tokens=800,
+                temperature=LLM_TEMPERATURE,
+                thinking={'type': 'disabled'},
+                system=_build_system_prompt(state, history_summary),
+                tools=request_tools,
+                tool_choice=tool_choice,
+                messages=messages,
+            ):
+                if item is None:
+                    yield None
+                elif isinstance(item, AgentStreamDelta):
+                    yield item
+                else:
+                    response = item
+
+            if response is None:
+                raise RuntimeError('LLM stream ended without final response')
+
+            tool_blocks = [
+                block for block in response.content
+                if block.type == 'tool_use'
+            ]
+            if capture_turn and not any(
+                block.name == 'fill_fields' for block in tool_blocks
+            ):
+                continue
+
+            if response.stop_reason != 'tool_use' or not tool_blocks:
+                reply = ''.join(
+                    block.text for block in response.content if block.type == 'text'
+                ).strip()
+                break
+
+            yield AgentStreamStatus(phase='tool_call', message='正在更新表单')
+            messages.append({'role': 'assistant', 'content': response.content})
+            tool_results = []
+            for block in tool_blocks:
+                result = execute_tool(block.name, block.input, state)
+                block_events = _tool_events_for_block(block.name, block.input, state)
+                events.extend(block_events)
+                for event in block_events:
+                    yield AgentStreamToolEvent(event)
+                tool_results.append({
+                    'type': 'tool_result',
+                    'tool_use_id': block.id,
+                    'content': result,
+                })
+            messages.append({'role': 'user', 'content': tool_results})
+        else:
+            reply = '信息已记录，还有什么需要补充的吗？'
+
+        flow.recompute_section_status(state)
+        yield AgentStreamResult(
+            reply=reply,
+            tool_events=events,
+            state=state,
+            form_complete=flow.form_complete(state),
+            suggestions=_build_suggestions(state, reply),
+        )
+    finally:
+        await client.close()

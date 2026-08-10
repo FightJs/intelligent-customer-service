@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 
-from anthropic import APIStatusError
+from anthropic import APIConnectionError, APIStatusError
 
 from agent.llm import get_client, LLM_MODEL
 from survey.models import StudioFormState
@@ -30,6 +30,9 @@ def initial_greeting(state: StudioFormState) -> str:
                 '（1 句话），然后问第一个问题：客户品牌名。保持亲切自然。'
             ),
         )
+    except APIConnectionError:
+        logger.warning('LLM greeting unavailable because the service cannot be reached')
+        return FALLBACK_GREETING
     except APIStatusError as exc:
         if exc.status_code != 402:
             raise

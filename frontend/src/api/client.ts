@@ -6,7 +6,7 @@
  */
 import type { StudioFormState, SectionId } from '../types/schema'
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/api'
+export const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/api'
 
 const TOKEN_KEY = 'ics_token'
 const USER_KEY = 'ics_user'

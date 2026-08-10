@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import httpx
 import pytest
-from anthropic import APIStatusError
+from anthropic import APIConnectionError, APIStatusError
 from fastapi.testclient import TestClient
 
 from api.app import app
@@ -24,6 +24,12 @@ def _insufficient_balance_error() -> APIStatusError:
         'Insufficient Balance',
         response=response,
         body={'error': {'message': 'Insufficient Balance'}},
+    )
+
+
+def _llm_connection_error() -> APIConnectionError:
+    return APIConnectionError(
+        request=httpx.Request('POST', 'https://api.deepseek.com/anthropic/v1/messages'),
     )
 
 
@@ -165,6 +171,19 @@ def test_create_session_falls_back_when_llm_balance_is_insufficient(client, auth
     assert r.json()['greeting'] == '您好！我是直播间搭建顾问，请问您的品牌名是？'
 
 
+def test_create_session_falls_back_when_llm_cannot_connect(client, auth_headers):
+    from agent.gather import initial_greeting
+
+    with patch('api.app.initial_greeting', new=initial_greeting):
+        with patch('agent.gather.get_client') as get_client:
+            get_client.return_value.messages.create.side_effect = _llm_connection_error()
+            with TestClient(app, raise_server_exceptions=False) as degraded_client:
+                r = degraded_client.post('/api/session', headers=auth_headers)
+
+    assert r.status_code == 200
+    assert r.json()['greeting'] == '您好！我是直播间搭建顾问，请问您的品牌名是？'
+
+
 def test_get_session_recovers_state(client, auth_headers):
     sid = client.post('/api/session', headers=auth_headers).json()['session_id']
     r = client.get(f'/api/session/{sid}', headers=auth_headers)
@@ -222,6 +241,20 @@ def test_chat_returns_clear_503_when_llm_balance_is_insufficient(client, auth_he
 
     assert r.status_code == 503
     assert r.json()['detail'] == 'LLM 服务余额不足，请联系管理员充值后重试。'
+
+
+def test_chat_returns_clear_503_when_llm_cannot_connect(client, auth_headers):
+    sid = client.post('/api/session', headers=auth_headers).json()['session_id']
+    with patch('api.app.run_agent', side_effect=_llm_connection_error()):
+        with TestClient(app, raise_server_exceptions=False) as degraded_client:
+            r = degraded_client.post(
+                '/api/chat',
+                json={'session_id': sid, 'message': '你好'},
+                headers=auth_headers,
+            )
+
+    assert r.status_code == 503
+    assert r.json()['detail'] == 'LLM 服务暂时无法连接，请检查网络或联系管理员。'
 
 
 def test_chat_missing_session_404(client, auth_headers):

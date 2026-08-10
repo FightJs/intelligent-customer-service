@@ -90,6 +90,7 @@ export default function Workbench() {
             >
               <section className="form-preview-slot">
                 <FormPreviewSlot
+                  isPreviewOpen={formPreviewOpen}
                   onPreview={() => {
                     setFormPreviewOpen(true)
                   }}
