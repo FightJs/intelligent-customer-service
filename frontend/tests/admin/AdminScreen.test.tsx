@@ -166,6 +166,9 @@ describe('AdminScreen', () => {
     await waitFor(() => expect(screen.getByText('这是交付物正文')).toBeInTheDocument())
 
     fireEvent.click(screen.getByRole('button', { name: documentLabel }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: documentLabel })).toHaveAttribute('aria-pressed', 'true')
+    })
     vi.useFakeTimers()
     try {
       fireEvent.click(screen.getByRole('button', { name: downloadLabel }))

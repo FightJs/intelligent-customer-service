@@ -61,7 +61,7 @@ export default function DeliverableSlot({
 
   return (
     <section className="workbench-slot deliverable-slot">
-      <div className="delivery-panel-scroll flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
+      <div className="delivery-panel-scroll flex-1 min-h-0 space-y-4 pr-1">
         <section>
           <h3 className="text-secondary text-xs mb-2">
             AI 结构化内容（{filled}/{total}）
@@ -104,11 +104,6 @@ export default function DeliverableSlot({
             ))}
           </div>
 
-          <p className="mt-3 text-[11px] leading-5 text-muted">
-            {canSend
-              ? '请先查看右上角客户需求表，确认无误后发送订单。'
-              : '完成全部必填信息后即可发送订单。'}
-          </p>
         </section>
       </div>
 

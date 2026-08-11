@@ -4,7 +4,6 @@ import remarkGfm from 'remark-gfm'
 import {
   ArrowUp,
   Mic,
-  MicOff,
   Square,
 } from 'lucide-react'
 import {
@@ -29,6 +28,8 @@ import QuickChips from './QuickChips'
 
 
 const MAX_INPUT_HEIGHT = 136
+
+const VOICE_WAVE_BARS = [8, 15, 11, 16]
 
 interface ChatMessage {
   id: string
@@ -430,6 +431,7 @@ export default function ChatPanel() {
                   </svg>
                 </button>
               )}
+
             </div>
 
             <button
@@ -459,10 +461,22 @@ export default function ChatPanel() {
               }
             >
               {listening ? (
-                <MicOff
-                  size={18}
+                <span
+                  className="voice-listening-indicator"
+                  data-testid="voice-listening-indicator"
                   aria-hidden="true"
-                />
+                >
+                  {VOICE_WAVE_BARS.map((height, index) => (
+                    <span
+                      key={height}
+                      className="voice-listening-bar"
+                      style={{
+                        height: `${height}px`,
+                        animationDelay: `${index * 0.1}s`,
+                      }}
+                    />
+                  ))}
+                </span>
               ) : (
                 <Mic
                   size={18}
@@ -514,7 +528,7 @@ export default function ChatPanel() {
               className="voice-input-status"
               aria-live="polite"
             >
-              正在聆听，再次点击麦克风结束
+              正在收音，再次点击结束
             </p>
           )}
 

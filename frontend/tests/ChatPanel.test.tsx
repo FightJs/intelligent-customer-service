@@ -208,6 +208,55 @@ describe('ChatPanel 输入框', () => {
   })
 })
 
+describe('ChatPanel 语音输入', () => {
+  it('收音时在按钮内显示动态声波图标', async () => {
+    let recognition!: MockSpeechRecognition
+
+    class MockSpeechRecognition {
+      lang = ''
+      continuous = false
+      interimResults = false
+      maxAlternatives = 1
+      onresult = null
+      onerror = null
+      onend: (() => void) | null = null
+      start = vi.fn()
+      stop = vi.fn()
+      abort = vi.fn()
+
+      constructor() {
+        recognition = this
+      }
+    }
+
+    const speechWindow = window as typeof window & {
+      webkitSpeechRecognition?: new () => MockSpeechRecognition
+    }
+    speechWindow.webkitSpeechRecognition = MockSpeechRecognition
+
+    render(
+      <FormProvider>
+        <ChatPanel />
+      </FormProvider>,
+    )
+
+    await screen.findByPlaceholderText('输入您的回答…')
+    fireEvent.click(screen.getByRole('button', {
+      name: '开始语音输入',
+    }))
+
+    expect(recognition.start).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', {
+      name: '停止语音输入',
+    })).toContainElement(
+      screen.getByTestId('voice-listening-indicator'),
+    )
+    expect(screen.queryByTestId('voice-input-wave')).not.toBeInTheDocument()
+
+    delete speechWindow.webkitSpeechRecognition
+  })
+})
+
 describe('suggestionMatchesReply', () => {
   // 取真实字段构造 suggestion：customer.brand（label "品牌名称"）
   const suggestion = {

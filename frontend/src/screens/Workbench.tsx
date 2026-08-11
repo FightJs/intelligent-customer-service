@@ -5,7 +5,7 @@ import ChatPanel from '../components/ChatPanel/ChatPanel'
 import ProgressCard from '../components/ProgressCard/ProgressCard'
 import CenterCard from '../components/CenterCard/CenterCard'
 import FormPreviewSlot from '../components/DeliveryPanel/FormPreviewSlot'
-import FormPreviewModal from '../components/DeliveryPanel/FormPreviewModal'
+import WordPreviewModal from '../components/DeliveryPanel/WordPreviewModal'
 import DeliverableSlot from '../components/DeliveryPanel/DeliverableSlot'
 import OrderConfirmationModal from '../components/DeliveryPanel/OrderConfirmationModal'
 import GridBackground from '../components/GridBackground'
@@ -107,7 +107,8 @@ export default function Workbench() {
           </main>
 
           {formPreviewOpen && (
-            <FormPreviewModal
+            <WordPreviewModal
+              sessionId={sessionStorage.getItem('ics_session_id') ?? ''}
               onClose={() => {
                 setFormPreviewOpen(false)
               }}

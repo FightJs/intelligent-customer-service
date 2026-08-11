@@ -12,7 +12,7 @@ interface WordPreviewModalProps {
 function getFilename(response: Response): string {
   const contentDisposition = response.headers.get('content-disposition') || ''
   const match = contentDisposition.match(/filename\*=UTF-8''(.+)/)
-  return match ? decodeURIComponent(match[1]) : '需求确认书.docx'
+  return match ? decodeURIComponent(match[1]) : '客户需求表.docx'
 }
 
 /** 实验性 DOCX 预览：直接渲染当前会话生成的文件流，不向第三方发送文档。 */
@@ -20,7 +20,7 @@ export default function WordPreviewModal({ sessionId, onClose }: WordPreviewModa
   const documentRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [filename, setFilename] = useState('需求确认书.docx')
+  const [filename, setFilename] = useState('客户需求表.docx')
   const [downloading, setDownloading] = useState(false)
   const [isScrolling, setIsScrolling] = useState(false)
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -34,6 +34,12 @@ export default function WordPreviewModal({ sessionId, onClose }: WordPreviewModa
       setLoading(true)
       setError('')
       container.replaceChildren()
+
+      if (!sessionId) {
+        setError('当前会话尚未建立，无法预览 Word 文档')
+        setLoading(false)
+        return
+      }
 
       try {
         const response = await generateUrl('word', sessionId)
@@ -116,7 +122,7 @@ export default function WordPreviewModal({ sessionId, onClose }: WordPreviewModa
           <div className="word-preview-title">
             <span className="word-preview-file-icon" aria-hidden="true"><FileType size={18} /></span>
             <div className="min-w-0">
-              <h2 id="word-preview-title">需求确认书</h2>
+              <h2 id="word-preview-title">客户需求表</h2>
               <p>{filename} <span>实验预览</span></p>
             </div>
           </div>
@@ -125,7 +131,7 @@ export default function WordPreviewModal({ sessionId, onClose }: WordPreviewModa
               type="button"
               className="word-preview-download"
               onClick={() => void handleDownload()}
-              disabled={loading || downloading}
+              disabled={!sessionId || loading || downloading}
             >
               {downloading ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
               下载

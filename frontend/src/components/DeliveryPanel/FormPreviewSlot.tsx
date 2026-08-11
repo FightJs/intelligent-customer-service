@@ -1,4 +1,10 @@
-import { useEffect, useState, type KeyboardEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+} from 'react'
 import styled from 'styled-components'
 import { SECTIONS } from '../../data/sections'
 
@@ -15,8 +21,16 @@ const FOLDER_FILES = [
   { className: 'file-1', label: '品牌与商品', tag: '采集信息' },
 ] as const
 
+const MAX_HORIZONTAL_OFFSET = 120
+const DRAG_THRESHOLD = 4
+
 export default function FormPreviewSlot({ isPreviewOpen = false, onPreview }: FormPreviewSlotProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [dragging, setDragging] = useState(false)
+  const boundaryRef = useRef<HTMLDivElement>(null)
+  const folderRef = useRef<HTMLDivElement>(null)
+  const suppressPreviewRef = useRef(false)
 
   useEffect(() => {
     setIsOpen(isPreviewOpen)
@@ -34,15 +48,86 @@ export default function FormPreviewSlot({ isPreviewOpen = false, onPreview }: Fo
     }
   }
 
+  function handleDragStart(event: ReactMouseEvent<HTMLDivElement>) {
+    if (event.button !== 0) return
+
+    const start = {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      offsetX: dragOffset.x,
+      offsetY: dragOffset.y,
+      dragged: false,
+    }
+
+    function handleDragMove(moveEvent: MouseEvent) {
+      const deltaX = moveEvent.clientX - start.clientX
+      const deltaY = moveEvent.clientY - start.clientY
+
+      if (!start.dragged && Math.hypot(deltaX, deltaY) >= DRAG_THRESHOLD) {
+        start.dragged = true
+        setDragging(true)
+        document.body.style.cursor = 'grabbing'
+        document.body.style.userSelect = 'none'
+      }
+
+      if (!start.dragged) return
+
+      const boundaryRect = boundaryRef.current?.getBoundingClientRect()
+      const folderRect = folderRef.current?.getBoundingClientRect()
+      const maxX = boundaryRect && folderRect
+        ? Math.min(MAX_HORIZONTAL_OFFSET, Math.max(0, (boundaryRect.width - folderRect.width) / 2))
+        : MAX_HORIZONTAL_OFFSET
+      const maxY = boundaryRect && folderRect
+        ? Math.max(0, (boundaryRect.height - folderRect.height) / 2)
+        : MAX_HORIZONTAL_OFFSET
+
+      setDragOffset({
+        x: Math.max(-maxX, Math.min(maxX, start.offsetX + deltaX)),
+        y: Math.max(-maxY, Math.min(maxY, start.offsetY + deltaY)),
+      })
+    }
+
+    function handleDragEnd() {
+      if (start.dragged) {
+        suppressPreviewRef.current = true
+        setDragging(false)
+      }
+
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      document.removeEventListener('mousemove', handleDragMove)
+      document.removeEventListener('mouseup', handleDragEnd)
+    }
+
+    document.addEventListener('mousemove', handleDragMove)
+    document.addEventListener('mouseup', handleDragEnd)
+  }
+
+  function handlePreview(event: ReactMouseEvent<HTMLDivElement>) {
+    if (suppressPreviewRef.current) {
+      event.preventDefault()
+      event.stopPropagation()
+      suppressPreviewRef.current = false
+      return
+    }
+
+    openPreview()
+  }
+
   return (
-    <StyledWrapper>
+    <StyledWrapper ref={boundaryRef}>
       <div
-        className="folder-card"
+        ref={folderRef}
+        className={`folder-card${dragging ? ' is-dragging' : ''}`}
         role="button"
         tabIndex={0}
         aria-label="预览需求表"
-        onClickCapture={openPreview}
+        onMouseDown={handleDragStart}
+        onClickCapture={handlePreview}
         onKeyDown={handleKeyDown}
+        style={{
+          transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) scale(.82)`,
+        }}
       >
         <input
           className="folder-toggle"
@@ -131,9 +216,10 @@ const StyledWrapper = styled.div`
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     /* 内部标题/徽章/文件卡片均为绝对定位像素值,整体等比缩放而非逐一改值 */
-    transform: scale(.82);
     transform-origin: center;
   }
+
+  .folder-card.is-dragging { cursor: grabbing; }
 
   .folder-card:focus-visible {
     outline: 2px solid rgb(var(--color-accent));
@@ -259,13 +345,13 @@ const StyledWrapper = styled.div`
   }
 
   .folder-title {
-    top: 18px;
+    top: 48px;
     font-size: 13px;
     font-weight: 800;
   }
 
   .folder-hint {
-    top: 36px;
+    top: 66px;
     font-size: 9px;
     font-weight: 600;
     opacity: .8;
@@ -328,11 +414,11 @@ const StyledWrapper = styled.div`
     transition: transform .6s cubic-bezier(.68, -.55, .265, 1.55), filter .25s ease;
   }
 
-  .file-1 { z-index: 25; background: #2563eb; transition-delay: .15s; }
-  .file-2 { z-index: 24; background: #3b82f6; transition-delay: .1s; }
-  .file-3 { z-index: 23; background: #4facfe; transition-delay: .05s; }
-  .file-4 { z-index: 22; background: #1678d3; transition-delay: .02s; }
-  .file-5 { z-index: 21; background: #1458b8; }
+  .file-1 { z-index: 25; background: #0f9fa8; transition-delay: .15s; }
+  .file-2 { z-index: 24; background: #1a9b77; transition-delay: .1s; }
+  .file-3 { z-index: 23; background: #2187c9; transition-delay: .05s; }
+  .file-4 { z-index: 22; background: #1d639f; transition-delay: .02s; }
+  .file-5 { z-index: 21; background: #164782; }
 
   .folder-toggle:checked ~ .folder-container .file-1 { transform: translateY(-78px) rotate(-10deg) translateX(-15px) translateZ(20px); }
   .folder-toggle:checked ~ .folder-container .file-2 { transform: translateY(-61px) rotate(8deg) translateX(18px) translateZ(10px); }

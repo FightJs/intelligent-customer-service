@@ -77,6 +77,39 @@ describe('FormPreviewSlot', () => {
 
     expect(onPreview).toHaveBeenCalledTimes(1)
   })
+
+  it('拖拽需求表时将横向偏移限制在 240px 范围内', () => {
+    const onPreview = vi.fn()
+
+    render(
+      <FormProvider>
+        <FormPreviewSlot onPreview={onPreview} />
+      </FormProvider>,
+    )
+
+    const folder = screen.getByRole('button', {
+      name: '预览需求表',
+    })
+    const boundary = folder.parentElement as HTMLElement
+
+    vi.spyOn(boundary, 'getBoundingClientRect').mockReturnValue({
+      width: 240,
+      height: 240,
+    } as DOMRect)
+    vi.spyOn(folder, 'getBoundingClientRect').mockReturnValue({
+      width: 156,
+      height: 126,
+    } as DOMRect)
+
+    fireEvent.mouseDown(folder, { clientX: 0, clientY: 0 })
+    fireEvent.mouseMove(document, { clientX: 500, clientY: 42 })
+    fireEvent.mouseUp(document)
+
+    expect(folder).toHaveStyle({
+      transform: 'translate3d(42px, 42px, 0) scale(.82)',
+    })
+    expect(onPreview).not.toHaveBeenCalled()
+  })
 })
 
 describe('DeliverableSlot', () => {
