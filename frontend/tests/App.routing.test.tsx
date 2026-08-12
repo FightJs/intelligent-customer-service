@@ -31,6 +31,10 @@ vi.mock('../src/components/BreathingScreen', () => ({
   ),
 }))
 
+vi.mock('../src/screens/MarketingScreen', () => ({
+  default: () => <div>介绍页</div>,
+}))
+
 function LocationProbe() {
   return <output data-testid="location"><LocationText /></output>
 }
@@ -61,30 +65,45 @@ describe('App 路由同步', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/workbench')
   })
 
-  it('未登录访问 /login 可通过加载页跳转到 /breathing 登录页', () => {
+  it('未登录访问 /welcome 可通过呼吸页跳转到 /login 登录页', () => {
     vi.useFakeTimers()
     authState.user = null
-    renderAt('/login')
+    renderAt('/welcome')
 
     fireEvent.click(screen.getByRole('button', { name: '进入呼吸页' }))
     act(() => vi.advanceTimersByTime(440))
 
     expect(screen.getByText('登录页')).toBeInTheDocument()
-    expect(screen.getByTestId('location')).toHaveTextContent('/breathing')
+    expect(screen.getByTestId('location')).toHaveTextContent('/login')
   })
 
   it('未登录访问受保护路由会回到 /login', () => {
     authState.user = null
     renderAt('/workbench')
 
-    expect(screen.getByRole('button', { name: '进入呼吸页' })).toBeInTheDocument()
+    expect(screen.getByText('登录页')).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/login')
   })
 
   it('已登录访问登录页会回到工作台', () => {
-    renderAt('/breathing')
+    renderAt('/login')
 
     expect(screen.getByText('工作台')).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/workbench')
+  })
+
+  it('首页展示公开介绍页', () => {
+    renderAt('/')
+
+    expect(screen.getByText('介绍页')).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('/')
+  })
+
+  it('旧 breathing 路径重定向到登录页', () => {
+    authState.user = null
+    renderAt('/breathing')
+
+    expect(screen.getByText('登录页')).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('/login')
   })
 })

@@ -5,6 +5,7 @@ import AuthScreen from './screens/AuthScreen'
 import Workbench from './screens/Workbench'
 import AdminScreen from './screens/AdminScreen'
 import BreathingScreen from './components/BreathingScreen'
+import MarketingScreen from './screens/MarketingScreen'
 
 /** 受保护路由：未登录跳 /login，loading 时显示占位 */
 function Protected({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
@@ -38,7 +39,7 @@ function BreathingRoute() {
   function enterLogin() {
     if (leaving) return
     setLeaving(true)
-    timerRef.current = window.setTimeout(() => navigate('/breathing'), 440)
+    timerRef.current = window.setTimeout(() => navigate('/login'), 440)
   }
 
   return <BreathingScreen onEnter={enterLogin} leaving={leaving} />
@@ -47,15 +48,16 @@ function BreathingRoute() {
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<BreathingRoute />} />
+      <Route path="/welcome" element={<BreathingRoute />} />
       <Route
         path="/"
-        element={<Navigate to="/login" replace />}
+        element={<MarketingScreen />}
       />
       <Route
-        path="/breathing"
+        path="/login"
         element={<GuestOnly><AuthScreen /></GuestOnly>}
       />
+      <Route path="/breathing" element={<Navigate to="/login" replace />} />
       <Route
         path="/workbench"
         element={
@@ -72,7 +74,7 @@ export default function App() {
           </Protected>
         }
       />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/welcome" replace />} />
     </Routes>
   )
 }
