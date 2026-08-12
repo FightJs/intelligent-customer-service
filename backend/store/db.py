@@ -163,16 +163,20 @@ def save_session(session_id: str, form_state: dict[str, Any]) -> None:
 def add_message(
     session_id: str,
     role: str,
-    content: str,
+    content: str | list[dict[str, Any]],
     tool_events: list[dict[str, Any]] | None = None,
 ) -> int:
-    """追加一条对话消息，返回消息 id。"""
+    """追加一条对话消息，返回消息 id。
+
+    content 为纯字符串时存原值（兼容旧数据），为 list 时 JSON 序列化（图片 content block 数组）。
+    """
     now = _now()
     events_json = json.dumps(tool_events, ensure_ascii=False) if tool_events else None
+    content_str = json.dumps(content, ensure_ascii=False) if isinstance(content, list) else content
     with _connect() as conn:
         cursor = conn.execute(
             'INSERT INTO messages (session_id, role, content, tool_events, created_at) VALUES (?, ?, ?, ?, ?)',
-            (session_id, role, content, events_json, now),
+            (session_id, role, content_str, events_json, now),
         )
     return int(cursor.lastrowid)
 
@@ -191,7 +195,13 @@ def get_messages(
     rows.reverse()
     result = []
     for r in rows:
-        msg: dict[str, Any] = {'role': r['role'], 'content': r['content']}
+        raw = r['content']
+        try:
+            parsed = json.loads(raw)
+            content: str | list[dict[str, Any]] = parsed if isinstance(parsed, list) else raw
+        except (json.JSONDecodeError, TypeError):
+            content = raw
+        msg: dict[str, Any] = {'role': r['role'], 'content': content}
         if r['tool_events']:
             msg['tool_events'] = json.loads(r['tool_events'])
         result.append(msg)
@@ -206,12 +216,15 @@ def begin_chat_request(
     user_id: int,
     message: str,
     updates: list[dict[str, Any]] | None,
+    images: list[str] | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
     """创建或取得流式请求。返回 new/completed/running/conflict。"""
     now = _now()
     updates_json = json.dumps(updates, ensure_ascii=False) if updates is not None else None
 
     with _connect() as conn:
+        images_json = json.dumps(images, ensure_ascii=False) if images else None
+
         row = conn.execute(
             '''SELECT session_id, user_id, message, updates_json, status, final_payload
                FROM chat_requests WHERE request_id = ?''',
@@ -269,9 +282,23 @@ def persist_chat_completion(
     assistant_reply: str,
     tool_events: list[dict[str, Any]],
     done_payload: dict[str, Any],
+    images: list[str] | None = None,
 ) -> int:
     """原子保存聊天最终状态并完成幂等请求。"""
     now = _now()
+    # 用户消息：有图片时存 content block 数组的 JSON
+    user_content: str | list[dict[str, Any]] = user_message
+    if images:
+        user_content = [{'type': 'text', 'text': user_message or '请分析这张图片'}]
+        for uri in images:
+            try:
+                header, data_str = uri.split(',', 1)
+                mime = header.split(':')[1].split(';')[0]
+            except (IndexError, ValueError):
+                mime = 'image/png'
+                data_str = uri
+            user_content.append({'type': 'image', 'source': {'type': 'base64', 'media_type': mime, 'data': data_str}})
+    user_content_str = json.dumps(user_content, ensure_ascii=False) if isinstance(user_content, list) else user_content
     with _connect() as conn:
         conn.execute(
             'UPDATE sessions SET form_state = ?, updated_at = ? WHERE session_id = ?',
@@ -279,7 +306,7 @@ def persist_chat_completion(
         )
         conn.execute(
             'INSERT INTO messages (session_id, role, content, tool_events, created_at) VALUES (?, ?, ?, ?, ?)',
-            (session_id, 'user', user_message, None, now),
+            (session_id, 'user', user_content_str, None, now),
         )
         cursor = conn.execute(
             'INSERT INTO messages (session_id, role, content, tool_events, created_at) VALUES (?, ?, ?, ?, ?)',

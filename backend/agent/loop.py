@@ -96,6 +96,36 @@ class AgentStreamResult:
     suggestions: list[dict] = field(default_factory=list)
 
 
+def _extract_text(content: str | list[dict]) -> str:
+    """从 content（字符串或数组）中提取纯文本。图片用 [图片] 占位。"""
+    if isinstance(content, str):
+        return content
+    parts = []
+    for block in content:
+        if isinstance(block, dict):
+            if block.get('type') == 'text':
+                parts.append(block.get('text', ''))
+            elif block.get('type') == 'image':
+                parts.append('[图片]')
+    return ''.join(parts)
+
+
+def _build_user_content(message: str, images: list[str] | None) -> str | list[dict]:
+    """构造 user message 的 content。无图片返回字符串,有图片返回 content block 数组。"""
+    if not images:
+        return message or ''
+    content: list[dict] = [{'type': 'text', 'text': message or '请分析这张图片'}]
+    for uri in images:
+        try:
+            header, data_str = uri.split(',', 1)
+            mime = header.split(':')[1].split(';')[0]
+        except (IndexError, ValueError):
+            mime = 'image/png'
+            data_str = uri
+        content.append({'type': 'image', 'source': {'type': 'base64', 'media_type': mime, 'data': data_str}})
+    return content
+
+
 def _summarize_history(
     client: Anthropic,
     history: list[dict],
@@ -108,8 +138,8 @@ def _summarize_history(
 
     for message in history:
         content = message.get('content')
-
-        if not isinstance(content, str):
+        text = _extract_text(content) if content else ''
+        if not text or text == '[图片]':
             continue
 
         speaker = (
@@ -119,7 +149,7 @@ def _summarize_history(
         )
 
         history_lines.append(
-            f'{speaker}：{content}'
+            f'{speaker}：{text}'
         )
 
     transcript = '\n'.join(history_lines)
@@ -165,9 +195,11 @@ async def _summarize_history_async(
     history_lines = []
     for message in history:
         content = message.get('content')
-        if isinstance(content, str):
-            speaker = '客户' if message.get('role') == 'user' else '客服'
-            history_lines.append(f'{speaker}：{content}')
+        text = _extract_text(content) if content else ''
+        if not text or text == '[图片]':
+            continue
+        speaker = '客户' if message.get('role') == 'user' else '客服'
+        history_lines.append(f'{speaker}：{text}')
 
     if not history_lines:
         return ''
@@ -509,8 +541,9 @@ def run_agent(
     state: StudioFormState,
     user_message: str,
     history: list[dict] | None = None,
+    images: list[str] | None = None,
 ) -> AgentResult:
-    """跑 agent loop。"""
+    """跑 agent loop。images 为 base64 data URI 列表,有图片时送多模态模型。"""
     client = get_client()
     events: list[ToolEvent] = []
 
@@ -542,7 +575,7 @@ def run_agent(
     messages.extend(trimmed)
     messages.append({
         'role': 'user',
-        'content': user_message,
+        'content': _build_user_content(user_message, images),
     })
 
     for iteration in range(MAX_ITERATIONS):
@@ -723,10 +756,11 @@ async def run_agent_stream(
     state: StudioFormState,
     user_message: str,
     history: list[dict] | None = None,
+    images: list[str] | None = None,
 ) -> AsyncIterator[
     AgentStreamDelta | AgentStreamStatus | AgentStreamToolEvent | AgentStreamResult | None
 ]:
-    """运行真实 SDK stream，并产出安全的内部流式事件。"""
+    """运行真实 SDK stream，并产出安全的内部流式事件。images 为图片 data URI 列表。"""
     client = get_async_client()
     events: list[ToolEvent] = []
     try:
@@ -738,7 +772,7 @@ async def run_agent_stream(
         messages = list(recent_history)
         while messages and messages[0].get('role') != 'user':
             messages.pop(0)
-        messages.append({'role': 'user', 'content': user_message})
+        messages.append({'role': 'user', 'content': _build_user_content(user_message, images)})
 
         reply = ''
         for iteration in range(MAX_ITERATIONS):

@@ -12,6 +12,7 @@ export interface ChatStreamRequest {
   message: string
   history?: { role: string; content: string }[]
   updates?: FieldUpdate[]
+  images?: string[]
 }
 
 export type StreamPhase = 'generating' | 'tool_call' | 'persisting'

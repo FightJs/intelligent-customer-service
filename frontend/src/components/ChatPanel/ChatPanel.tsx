@@ -3,8 +3,10 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
   ArrowUp,
+  ImagePlus,
   Mic,
   Square,
+  X,
 } from 'lucide-react'
 import {
   useSpeechRecognition,
@@ -35,6 +37,7 @@ interface ChatMessage {
   id: string
   role: 'ai' | 'user'
   text: string
+  images?: string[]
   partial?: boolean
   interrupted?: boolean
 }
@@ -92,9 +95,11 @@ export default function ChatPanel() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const [streamError, setStreamError] = useState<StreamErrorEvent | null>(null)
+  const [images, setImages] = useState<string[]>([])
   const [speechError, setSpeechError] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const draftRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const sendingRef = useRef(false)
   const controllerRef = useRef<AbortController | null>(null)
   const retryRef = useRef<{ request: ChatStreamRequest; messageId: string } | null>(null)
@@ -165,7 +170,7 @@ export default function ChatPanel() {
     setStreamError(null)
     setStreamStatus('正在连接顾问')
     setSuggestions([])
-    if (options.addUser) setMessages((prev) => [...prev, { id: newId(), role: 'user', text: request.message }])
+    if (options.addUser) setMessages((prev) => [...prev, { id: newId(), role: 'user', text: request.message, images: request.images }])
 
     const controller = new AbortController()
     controllerRef.current = controller
@@ -195,7 +200,7 @@ export default function ChatPanel() {
 
     try {
       if (!STREAMING_ENABLED) {
-        applyDone(await chat(request.session_id, request.message, request.history, request.updates))
+        applyDone(await chat(request.session_id, request.message, request.history, request.updates, request.images))
         return
       }
 
@@ -232,7 +237,7 @@ export default function ChatPanel() {
       if (controller.signal.aborted) return
       if (error instanceof ChatStreamHttpError && (error.status === 404 || error.status === 405)) {
         try {
-          applyDone(await chat(request.session_id, request.message, request.history, request.updates))
+          applyDone(await chat(request.session_id, request.message, request.history, request.updates, request.images))
           return
         } catch (fallbackError) {
           error = fallbackError
@@ -263,19 +268,21 @@ export default function ChatPanel() {
     }
   }, [dispatch])
 
-  const sendMessage = useCallback((text: string, updates?: FieldUpdate[]) => {
-    if (!text || !sessionId || sendingRef.current) return
+  const sendMessage = useCallback((text: string, updates?: FieldUpdate[], msgImages?: string[]) => {
+    if ((!text && !msgImages?.length) || !sessionId || sendingRef.current) return
     const history = messages
       .filter((message) => message.text && !message.interrupted)
       .slice(-6)
       .map((message) => ({ role: message.role === 'ai' ? 'assistant' : 'user', content: message.text }))
     setDraft('')
+    setImages([])
     void runRequest({
       request_id: newRequestId(),
       session_id: sessionId,
       message: text,
       history,
       updates,
+      images: msgImages,
     }, { addUser: true })
   }, [sessionId, messages, runRequest])
 
@@ -299,8 +306,33 @@ export default function ChatPanel() {
   }, [runRequest])
 
   const send = useCallback(() => {
-    sendMessage(draft.trim())
-  }, [draft, sendMessage])
+    sendMessage(draft.trim(), undefined, images)
+  }, [draft, images, sendMessage])
+
+  const handleFiles = useCallback((files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const newImages: string[] = []
+    let loaded = 0
+    const total = Math.min(files.length, 5)
+    for (let i = 0; i < total; i++) {
+      const file = files[i]
+      if (!file.type.startsWith('image/')) continue
+      if (file.size > 10 * 1024 * 1024) continue // 单张 ≤10MB
+      const reader = new FileReader()
+      reader.onload = () => {
+        newImages.push(reader.result as string)
+        loaded++
+        if (loaded === total || loaded === newImages.length) {
+          setImages((prev) => [...prev, ...newImages].slice(0, 5))
+        }
+      }
+      reader.readAsDataURL(file)
+    }
+  }, [])
+
+  const removeImage = useCallback((index: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== index))
+  }, [])
 
   const toggleSpeechInput = useCallback(() => {
     setSpeechError('')
@@ -331,7 +363,7 @@ export default function ChatPanel() {
       section_id: suggestion.section_id,
       field_id: suggestion.field_id,
       value: option.value,
-    }])
+    }], undefined)
   }, [sendMessage, suggestion])
 
   return (
@@ -347,7 +379,16 @@ export default function ChatPanel() {
                   {m.interrupted && <p className="mt-2 text-xs text-muted">回复未完成</p>}
                 </div>
               ) : (
-                <div>{m.text}</div>
+                <div>
+                  {m.images && m.images.length > 0 && (
+                    <div className="flex gap-1.5 flex-wrap mb-1">
+                      {m.images.map((uri, i) => (
+                        <img key={i} src={uri} alt="" className="h-20 max-w-[160px] rounded-lg object-cover border border-white/10" />
+                      ))}
+                    </div>
+                  )}
+                  {m.text && <div>{m.text}</div>}
+                </div>
               )}
             </MessageBubble>
           ))}
@@ -375,8 +416,34 @@ export default function ChatPanel() {
             disabled={sending || loading || listening}
           />
 
+          {images.length > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              {images.map((uri, i) => (
+                <div key={i} className="relative group flex-shrink-0">
+                  <img src={uri} alt="" className="h-10 w-10 rounded-lg object-cover border border-white/10" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(i)}
+                    className="absolute -top-1.5 -right-1.5 grid h-4 w-4 place-items-center rounded-full bg-neutral-700 text-white/80 opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label="移除图片"
+                  >
+                    <X size={10} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="flex items-end gap-2">
             <div className="relative min-w-0 flex-1">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                multiple
+                className="hidden"
+                onChange={(e) => { handleFiles(e.target.files); e.target.value = '' }}
+              />
               <textarea
                 ref={draftRef}
                 rows={1}
@@ -434,6 +501,17 @@ export default function ChatPanel() {
               )}
 
             </div>
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading || sending || listening || images.length >= 5}
+              className="grid h-10 w-9 shrink-0 place-items-center rounded-bubble text-muted hover:text-primary disabled:opacity-30 transition-colors"
+              aria-label="上传图片"
+              title="上传图片（最多 5 张）"
+            >
+              <ImagePlus size={18} aria-hidden="true" />
+            </button>
 
             <button
               type="button"
@@ -500,6 +578,7 @@ export default function ChatPanel() {
                 || (
                   !sending
                   && draft.trim() === ''
+                  && images.length === 0
                 )
               }
               aria-label={

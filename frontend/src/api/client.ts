@@ -168,11 +168,12 @@ export async function chat(
   message: string,
   history: { role: string; content: string }[] | undefined,
   updates?: FieldUpdate[],
+  images?: string[],
 ): Promise<ChatResult> {
   const r = await request('/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ session_id: sessionId, message, history, updates }),
+    body: JSON.stringify({ session_id: sessionId, message, history, updates, images }),
   })
   if (!r.ok) throw await responseError(r, `chat: ${r.status}`)
   return r.json()

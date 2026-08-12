@@ -43,7 +43,7 @@ def test_stream_emits_ordered_events_persists_and_replays(client, auth_headers):
     session_id = _session_id(client, auth_headers)
     request_id = str(uuid4())
 
-    async def fake_stream(state, message, history):
+    async def fake_stream(state, message, history, images=None):
         yield AgentStreamStatus(phase='generating', message='正在生成回复')
         yield AgentStreamDelta('好的，')
         yield AgentStreamDelta('已记录。')

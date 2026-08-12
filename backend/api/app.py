@@ -29,7 +29,7 @@ from anthropic import APIConnectionError, APIStatusError
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from agent.auth import (
     create_token,
@@ -115,11 +115,42 @@ class SessionResponse(BaseModel):
     greeting: str
 
 
+IMAGE_MIME_WHITELIST = {'image/png', 'image/jpeg', 'image/webp', 'image/gif'}
+
+
+def _parse_data_uri(uri: str) -> tuple[str, str]:
+    """解析 data URI,返回 (mime_type, base64_data)。非法格式抛 400。"""
+    if not uri.startswith('data:'):
+        raise HTTPException(status_code=400, detail='图片格式无效,需要 data URI')
+    try:
+        header, data = uri.split(',', 1)
+        mime = header.split(':')[1].split(';')[0]
+    except (IndexError, ValueError):
+        raise HTTPException(status_code=400, detail='图片 data URI 格式无效')
+    if mime not in IMAGE_MIME_WHITELIST:
+        raise HTTPException(status_code=400, detail=f'不支持的图片格式: {mime}')
+    if len(data) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail='图片过大,单张不能超过 15MB')
+    return mime, data
+
+
+def _build_user_content(message: str, images: list[str] | None) -> str | list[dict]:
+    """构造 user message 的 content。无图片返回字符串,有图片返回 content block 数组。"""
+    if not images:
+        return message or ''
+    content: list[dict] = [{'type': 'text', 'text': message or '请分析这张图片'}]
+    for uri in images:
+        mime, data = _parse_data_uri(uri)
+        content.append({'type': 'image', 'source': {'type': 'base64', 'media_type': mime, 'data': data}})
+    return content
+
+
 class ChatRequest(BaseModel):
     session_id: str
     message: str
     history: list[dict] | None = None
     updates: list[dict] | None = None
+    images: list[str] | None = None
 
 
 class ChatResponse(BaseModel):
@@ -136,16 +167,21 @@ class ChatStreamRequest(BaseModel):
     message: str
     history: list[dict] | None = None
     updates: list[dict] | None = None
+    images: list[str] | None = None
 
     @field_validator('message')
     @classmethod
     def validate_message(cls, value: str) -> str:
         value = value.strip()
-        if not value:
-            raise ValueError('message 不能为空')
         if len(value) > 8000:
             raise ValueError('message 不能超过 8000 个字符')
         return value
+
+    @model_validator(mode='after')
+    def require_message_or_images(self) -> 'ChatStreamRequest':
+        if not self.message.strip() and not self.images:
+            raise ValueError('message 和 images 不能同时为空')
+        return self
 
 
 class OrderRequest(BaseModel):
@@ -225,29 +261,6 @@ def me(current: dict = Depends(get_current_user)) -> UserResponse:
     return UserResponse(id=current['id'], username=current['username'], role=current['role'])
 
 
-# ── 请求/响应模型 ─────────────────────────────────────────────
-
-class SessionResponse(BaseModel):
-    session_id: str
-    form_state: dict
-    greeting: str
-
-
-class ChatRequest(BaseModel):
-    session_id: str
-    message: str
-    history: list[dict] | None = None
-    updates: list[dict] | None = None
-
-
-class ChatResponse(BaseModel):
-    reply: str
-    tool_events: list[dict]
-    form_state: dict
-    form_complete: bool
-    suggestions: list[dict] = []
-
-
 class AdminUserCreate(BaseModel):
     username: str
     password: str
@@ -323,7 +336,7 @@ def chat(req: ChatRequest, current: dict = Depends(get_current_user)) -> ChatRes
     history = db.get_messages(req.session_id, limit=50) or req.history
 
     try:
-        result = run_agent(state, req.message, history)
+        result = run_agent(state, req.message, history, req.images)
     except APIStatusError as exc:
         if exc.status_code != 402:
             raise
@@ -336,9 +349,10 @@ def chat(req: ChatRequest, current: dict = Depends(get_current_user)) -> ChatRes
     # tool_events 转 dict（updates 事件 + agent 事件）
     events_dict = [asdict(e) for e in (update_events + result.tool_events)]
 
-    # 持久化
+    # 持久化（用户消息有图片时存 content block 数组的 JSON,保持兼容）
+    user_content: str | list[dict] = _build_user_content(req.message, req.images)
     db.save_session(req.session_id, to_dict(result.state))
-    db.add_message(req.session_id, 'user', req.message)
+    db.add_message(req.session_id, 'user', user_content)
     db.add_message(req.session_id, 'assistant', result.reply, events_dict)
 
     return ChatResponse(
@@ -383,6 +397,7 @@ async def chat_stream(
         user_id=current['id'],
         message=req.message,
         updates=req.updates,
+        images=req.images,
     )
     if request_status == 'running':
         raise HTTPException(status_code=409, detail='request_in_progress')
@@ -421,7 +436,7 @@ async def chat_stream(
         phase = 'generating'
         try:
             result: AgentStreamResult | None = None
-            async for item in run_agent_stream(state, req.message, history):
+            async for item in run_agent_stream(state, req.message, history, req.images):
                 if item is None:
                     yield ': heartbeat\n\n'
                 elif isinstance(item, AgentStreamDelta):
@@ -462,6 +477,7 @@ async def chat_stream(
                 assistant_reply=result.reply,
                 tool_events=events_dict,
                 done_payload=done_payload,
+                images=req.images,
             )
             yield event('done', {
                 **done_payload,
