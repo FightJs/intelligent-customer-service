@@ -128,6 +128,7 @@ export default function ChatPanel() {
       .then((data) => {
         if (cancelled) return
         setSessionId(data.session_id)
+        dispatch({ type: 'replace_state', state: data.form_state })
         sessionStorage.setItem('ics_session_id', data.session_id)
         setMessages([{ id: newId(), role: 'ai', text: data.greeting }])
       })
@@ -137,7 +138,7 @@ export default function ChatPanel() {
       })
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
-  }, [])
+  }, [dispatch])
 
   useEffect(() => {
     const el = scrollRef.current

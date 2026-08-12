@@ -261,3 +261,24 @@ def test_image_fields_merge_incrementally():
     ]
 
     assert '失败' not in result
+
+
+def test_fill_fields_writes_host_height_dimension():
+    state = create_initial_state()
+
+    result = execute_tool('fill_fields', {
+        'updates': [{
+            'section_id': 'host',
+            'field_id': 'height',
+            'value': {
+                '男主播': '175',
+            },
+        }],
+    }, state)
+
+    assert state.sections['host'].fields[
+        'height'
+    ].value == {
+        '男主播': '175',
+    }
+    assert '失败' not in result

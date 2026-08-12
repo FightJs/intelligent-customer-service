@@ -94,6 +94,8 @@ export interface SectionState {
 }
 
 export interface StudioFormState {
+  mode: 'full' | 'quick'
+  requiredFieldIds: string[]
   sections: Record<SectionId, SectionState>
   currentSectionId: SectionId
   completed: boolean

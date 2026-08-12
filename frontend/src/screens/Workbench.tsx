@@ -23,6 +23,9 @@ export default function Workbench() {
   const [orderModalOpen, setOrderModalOpen] = useState(false)
   const [orderSent, setOrderSent] = useState(false)
   const { theme, toggleTheme } = useTheme()
+  const isGuest = (
+    user?.role === 'guest'
+  )
 
   function handleReset() {
     setResetKey((key) => key + 1)
@@ -97,12 +100,14 @@ export default function Workbench() {
                 />
               </section>
 
-              <DeliverableSlot
-                orderSent={orderSent}
-                onSendOrder={() => {
-                  setOrderModalOpen(true)
-                }}
-              />
+              {!isGuest && (
+                <DeliverableSlot
+                  orderSent={orderSent}
+                  onSendOrder={() => {
+                    setOrderModalOpen(true)
+                  }}
+                />
+              )}
             </aside>
           </main>
 
@@ -115,7 +120,7 @@ export default function Workbench() {
             />
           )}
 
-          {orderModalOpen && (
+          {!isGuest && orderModalOpen && (
             <OrderConfirmationModal
               onClose={() => {
                 setOrderModalOpen(false)

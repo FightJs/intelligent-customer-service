@@ -5,7 +5,11 @@ import { useAuth } from '../state/AuthContext'
 type Mode = 'login' | 'register'
 
 export default function AuthScreen() {
-  const { login, register } = useAuth()
+  const {
+    login,
+    register,
+    quickLogin,
+  } = useAuth()
   const navigate = useNavigate()
   const [mode, setMode] = useState<Mode>('login')
   const [username, setUsername] = useState('')
@@ -26,6 +30,24 @@ export default function AuthScreen() {
       navigate('/workbench')
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleQuickUse() {
+    setError('')
+    setBusy(true)
+
+    try {
+      await quickLogin()
+      navigate('/workbench')
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : '快速使用失败',
+      )
     } finally {
       setBusy(false)
     }
@@ -127,6 +149,30 @@ export default function AuthScreen() {
             </>
           )}
         </div>
+        <div className="my-5 flex items-center gap-3">
+          <span className="h-px flex-1 bg-idle" />
+
+          <span className="text-xs text-muted">
+            或
+          </span>
+
+          <span className="h-px flex-1 bg-idle" />
+        </div>
+
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            void handleQuickUse()
+          }}
+          className="w-full rounded-bubble px-4 py-2.5 text-sm font-medium text-primary ring-1 ring-idle transition-colors hover:bg-idle/40 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          快速使用
+        </button>
+
+        <p className="mt-2 text-center text-xs text-muted">
+          无需注册，体验精简版需求采集
+        </p>
       </div>
     </div>
   )

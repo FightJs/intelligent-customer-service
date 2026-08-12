@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect, type React
 import {
   login as apiLogin,
   register as apiRegister,
+  guestLogin as apiGuestLogin,
   getMe,
   setAuth,
   clearAuth,
@@ -11,9 +12,16 @@ import {
 
 interface AuthContextValue {
   user: AuthUser | null
-  loading: boolean  // 初始化时校验 token 用
-  login: (username: string, password: string) => Promise<void>
-  register: (username: string, password: string) => Promise<void>
+  loading: boolean
+  login: (
+    username: string,
+    password: string,
+  ) => Promise<void>
+  register: (
+    username: string,
+    password: string,
+  ) => Promise<void>
+  quickLogin: () => Promise<void>
   logout: () => void
 }
 
@@ -66,13 +74,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u)
   }, [])
 
+  const quickLogin = useCallback(
+    async () => {
+      const {
+        token,
+        user: guest,
+      } = await apiGuestLogin()
+
+      setAuth(
+        token,
+        guest,
+      )
+
+      setUser(guest)
+    },
+    [],
+  )
+
   const logout = useCallback(() => {
     clearAuth()
     setUser(null)
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        quickLogin,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

@@ -1,4 +1,10 @@
-import type { SectionState, FieldValue, SectionDef, FieldDef } from '../types/schema'
+import type {
+  StudioFormState,
+  SectionState,
+  FieldValue,
+  SectionDef,
+  FieldDef,
+} from '../types/schema'
 
 /** 字段是否可见（条件分支：visibleIf 条件满足才可见）。 */
 export function isFieldVisible(field: FieldDef, section: SectionState): boolean {
@@ -52,16 +58,94 @@ export function makeSummary(section: SectionState, def: SectionDef): string {
   return parts.join(' · ')
 }
 
-export function filledCount(section: SectionState, def: SectionDef): { filled: number; total: number } {
+export function isFieldRequired(
+  state: StudioFormState,
+  sectionId: string,
+  field: FieldDef,
+): boolean {
+  if (state.mode === 'quick') {
+    return state.requiredFieldIds.includes(
+      `${sectionId}.${field.id}`,
+    )
+  }
+
+  if (field.required) {
+    return true
+  }
+
+  if (
+    sectionId === 'equipment'
+    && field.id === 'inventory'
+  ) {
+    const hasExisting = (
+      state.sections.budget
+        .fields.has_existing
+    )
+
+    return (
+      hasExisting?.type
+        === 'choice-single'
+      && hasExisting.value
+        === 'yes'
+    )
+  }
+
+  return false
+}
+
+export function filledCount(
+  state: StudioFormState,
+  def: SectionDef,
+): {
+  filled: number
+  total: number
+} {
+  const section = (
+    state.sections[def.id]
+  )
+
   let filled = 0
   let total = 0
-  for (const f of def.fields) {
-    if (!f.required) continue
-    if (!isFieldVisible(f, section)) continue
-    total++
-    const v = section.fields[f.id]
-    if (!v) continue
-    if (valueToText(v, f) !== '') filled++
+
+  for (const field of def.fields) {
+    if (
+      !isFieldRequired(
+        state,
+        def.id,
+        field,
+      )
+    ) {
+      continue
+    }
+
+    if (
+      !isFieldVisible(
+        field,
+        section,
+      )
+    ) {
+      continue
+    }
+
+    total += 1
+
+    const value = (
+      section.fields[field.id]
+    )
+
+    if (
+      value
+      && valueToText(
+        value,
+        field,
+      ) !== ''
+    ) {
+      filled += 1
+    }
   }
-  return { filled, total }
+
+  return {
+    filled,
+    total,
+  }
 }

@@ -22,7 +22,7 @@ import sqlite3
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from typing import Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from dotenv import load_dotenv
 from anthropic import APIConnectionError, APIStatusError
@@ -39,7 +39,10 @@ from agent.auth import (
     verify_password,
 )
 from agent.gather import initial_greeting
-from agent.flow import form_complete
+from agent.flow import (
+    form_complete,
+    next_unfilled_field,
+)
 from agent.loop import (
     AgentStreamDelta,
     AgentStreamResult,
@@ -180,6 +183,42 @@ def login(req: AuthRequest) -> AuthResponse:
     return AuthResponse(token=token, user={'id': user['id'], 'username': user['username'], 'role': user['role']})
 
 
+@app.post(
+    '/api/auth/guest',
+    response_model=AuthResponse,
+)
+def guest_login() -> AuthResponse:
+    """创建独立游客身份，用于快速体验。"""
+
+    db.cleanup_expired_guests(
+        max_idle_hours=24,
+    )
+
+    guest_id = uuid4().hex
+
+    username = (
+        f'guest_{guest_id[:10]}'
+    )
+
+    user_id = db.create_user(
+        username,
+        hash_password(guest_id),
+        role='guest',
+    )
+
+    user = db.get_user_by_id(user_id)
+    token = create_token(user)
+
+    return AuthResponse(
+        token=token,
+        user={
+            'id': user['id'],
+            'username': user['username'],
+            'role': user['role'],
+        },
+    )
+
+
 @app.get('/api/auth/me', response_model=UserResponse)
 def me(current: dict = Depends(get_current_user)) -> UserResponse:
     """返回当前登录用户信息。"""
@@ -231,7 +270,13 @@ class AdminDeliveryUpdate(BaseModel):
 @app.post('/api/session', response_model=SessionResponse)
 def create_session(current: dict = Depends(get_current_user)) -> SessionResponse:
     """创建新会话（绑定当前 user），生成开场白。"""
-    state = create_initial_state()
+    state = create_initial_state(
+        mode=(
+            'quick'
+            if current['role'] == 'guest'
+            else 'full'
+        ),
+    )
     session_id = db.create_session(current['id'], to_dict(state))
     greeting = initial_greeting(state)
     return SessionResponse(
@@ -494,6 +539,15 @@ def submit_order(
     只有发送成功后才写入 deliveries，
     管理员后台才会看到该会话。
     """
+    if current['role'] == 'guest':
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                '快速体验模式不支持'
+                '发送订单'
+            ),
+        )
+
     rec = db.get_session(req.session_id)
 
     if rec is None:
@@ -514,9 +568,24 @@ def submit_order(
     state = from_dict(rec['form_state'])
 
     if not form_complete(state):
+        missing = next_unfilled_field(
+            state,
+        )
+
+        detail = (
+            '必填信息尚未采集完成'
+        )
+
+        if missing is not None:
+            _, field = missing
+
+            detail = (
+                f'{detail}：{field.label}'
+            )
+
         raise HTTPException(
             status_code=409,
-            detail='必填信息尚未采集完成',
+            detail=detail,
         )
 
     # 防止重复点击产生多条相同订单。

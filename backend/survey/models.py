@@ -92,6 +92,14 @@ class StudioFormState(BaseModel):
     current_section_id → currentSectionId
     """
     model_config = ConfigDict(extra='forbid', populate_by_name=True)
+
+    mode: Literal['full', 'quick'] = 'full'
+
+    required_field_ids: list[str] = Field(
+        default_factory=list,
+        alias='requiredFieldIds',
+    )
+
     sections: dict[str, SectionState] = Field(default_factory=dict)
     current_section_id: str = Field(default='', alias='currentSectionId')
     completed: bool = False

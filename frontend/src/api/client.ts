@@ -28,7 +28,7 @@ export function clearAuth(): void {
 export interface AuthUser {
   id: number
   username: string
-  role: 'user' | 'admin'
+  role: 'user' | 'admin' | 'guest'
 }
 
 /** 统一请求封装：注入 token、401 自动清 auth。 */
@@ -82,6 +82,27 @@ export async function login(username: string, password: string): Promise<{ token
     throw new Error(detail)
   }
   return r.json()
+}
+
+export async function guestLogin(): Promise<{
+  token: string
+  user: AuthUser
+}> {
+  const response = await request(
+    '/auth/guest',
+    {
+      method: 'POST',
+    },
+  )
+
+  if (!response.ok) {
+    throw await responseError(
+      response,
+      `guestLogin: ${response.status}`,
+    )
+  }
+
+  return response.json()
 }
 
 export async function getMe(): Promise<AuthUser> {

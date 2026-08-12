@@ -1451,8 +1451,24 @@
       }
     },
     "additionalProperties": false,
-    "description": "完整表单状态，跨会话持久化的对象。",
+    "description": "完整表单状态，跨会话持久化的对象。\n\n序列化统一用 camelCase（与前端 TS 一致）：\ncurrent_section_id → currentSectionId",
     "properties": {
+      "mode": {
+        "default": "full",
+        "enum": [
+          "full",
+          "quick"
+        ],
+        "title": "Mode",
+        "type": "string"
+      },
+      "requiredFieldIds": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Requiredfieldids",
+        "type": "array"
+      },
       "sections": {
         "additionalProperties": {
           "$ref": "#/$defs/SectionState"
@@ -1460,9 +1476,9 @@
         "title": "Sections",
         "type": "object"
       },
-      "current_section_id": {
+      "currentSectionId": {
         "default": "",
-        "title": "Current Section Id",
+        "title": "Currentsectionid",
         "type": "string"
       },
       "completed": {

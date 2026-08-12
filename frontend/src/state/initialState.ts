@@ -23,6 +23,8 @@ export function createInitialState(): StudioFormState {
   const sections = {} as StudioFormState['sections']
   for (const def of SECTIONS) sections[def.id] = emptySectionState(def)
   return {
+    mode: 'full',
+    requiredFieldIds: [],
     sections,
     currentSectionId: SECTION_ORDER[0],
     completed: false,

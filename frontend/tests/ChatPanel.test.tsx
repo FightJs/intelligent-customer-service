@@ -9,15 +9,17 @@ import {
 import { describe, expect, it, vi } from 'vitest'
 import ChatPanel, { suggestionMatchesReply, toolEventStatus } from '../src/components/ChatPanel/ChatPanel'
 import { FormProvider } from '../src/state/FormContext'
-import { SECTIONS } from '../src/data/sections'
 import { streamChat } from '../src/api/chatStream'
 
 vi.mock('../src/api/client', () => ({
-  createSession: () => Promise.resolve({
-    session_id: 'session-1',
-    form_state: {},
-    greeting: '你好',
-  }),
+  createSession: async () => {
+    const { createInitialState } = await import('../src/state/initialState')
+    return {
+      session_id: 'session-1',
+      form_state: createInitialState(),
+      greeting: '你好',
+    }
+  },
   chat: vi.fn(),
 }))
 

@@ -17,7 +17,7 @@ function sectionDef(id: SectionId) {
 function recomputeStatus(state: StudioFormState, sectionId: SectionId): StudioFormState {
   const def = sectionDef(sectionId)
   const sec = state.sections[sectionId]
-  const { filled, total } = filledCount(sec, def)
+  const { filled, total } = filledCount(state, def)
   let status: SectionState['status']
   if (filled >= total && total > 0) status = 'complete'
   else if (filled > 0 || sectionId === state.currentSectionId) status = 'active'

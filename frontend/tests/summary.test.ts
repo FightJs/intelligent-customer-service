@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeSummary, filledCount, valueToText } from '../src/utils/summary'
 import type { SectionState, SectionDef } from '../src/types/schema'
+import { createInitialState } from '../src/state/initialState'
 
 const def: SectionDef = {
   id: 'venue', title: '四、场地条件', order: 4,
@@ -53,6 +54,7 @@ describe('makeSummary', () => {
 
 describe('filledCount', () => {
   it('统计必填已填数', () => {
+    const state = createInitialState()
     const s: SectionState = {
       id: 'venue', status: 'active',
       fields: {
@@ -60,7 +62,20 @@ describe('filledCount', () => {
         size: { type: 'dimension', value: { 宽: '', 深: '', 高: '' } },
       },
     }
-    expect(filledCount(s, def)).toEqual({ filled: 1, total: 2 })
+    state.sections.venue = s
+    expect(filledCount(state, def)).toEqual({ filled: 1, total: 2 })
+  })
+
+  it('快速模式只统计指定字段', () => {
+    const state = createInitialState()
+    state.mode = 'quick'
+    state.requiredFieldIds = ['venue.area']
+    state.sections.venue.fields.area = {
+      type: 'choice-single',
+      value: '10-20',
+    }
+
+    expect(filledCount(state, def)).toEqual({ filled: 1, total: 1 })
   })
 })
 

@@ -36,6 +36,9 @@ TOOL_DEFS: list[dict] = [
             'choice-single 填选项 value（英文标识），text 填原话。'
             'choice-multi、dimension、table 只传本轮新增或补充的内容，'
             '后端会与已有值合并。'
+            'dimension 必须传对象，键必须使用字段定义中的 dims。'
+            '主播身高示例：{"男主播":"175"} 或 {"女主播":"165"}，'
+            '数值中不要重复填写 cm。'
             'table 填行对象数组，例如 '
             '[{"type":"相机","model":"Sony A7M4","qty":"1","note":""}]。'
             'text 或 choice-single 修改已有值时，'
@@ -60,7 +63,9 @@ TOOL_DEFS: list[dict] = [
                             },
                             'value': {
                                 'description': (
-                                    '字段值；table 必须传行对象数组，'
+                                    '字段值。dimension 必须传对象，例如 '
+                                    '{"男主播":"175"}；'
+                                    'table 必须传行对象数组，'
                                     '列 id 使用 type、model、qty、note'
                                 ),
                             },

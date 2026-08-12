@@ -1,7 +1,7 @@
 import type { SectionId } from '../../types/schema'
 import { SECTIONS, SECTION_ORDER } from '../../data/sections'
 import { useFormState } from '../../state/FormContext'
-import { isFieldVisible, valueToText } from '../../utils/summary'
+import { isFieldRequired, isFieldVisible, valueToText } from '../../utils/summary'
 import SectionRow from './SectionRow'
 
 interface Props {
@@ -48,7 +48,7 @@ export default function SectionList({
                   <SectionRow
                     key={id}
                     def={def}
-                    section={state.sections[id]}
+                    state={state}
                     expanded={expandedSections.has(id)}
                     onToggle={() => onToggleSection(id)}
                   />
@@ -69,13 +69,13 @@ export default function SectionList({
             <div key={id}>
               <SectionRow
                 def={def}
-                section={state.sections[id]}
+                state={state}
                 expanded={expandedSections.has(id)}
                 onToggle={() => onToggleSection(id)}
               />
               {isCurrent && isActive && (() => {
                 const nextField = def.fields.find((f) => {
-                  if (!f.required) return false
+                  if (!isFieldRequired(state, id, f)) return false
                   if (!isFieldVisible(f, state.sections[id])) return false
                   const v = state.sections[id].fields[f.id]
                   return !v || valueToText(v, f) === ''
@@ -98,7 +98,7 @@ export default function SectionList({
               <SectionRow
                 key={id}
                 def={def}
-                section={state.sections[id]}
+                state={state}
                 expanded={expandedSections.has(id)}
                 onToggle={() => onToggleSection(id)}
               />

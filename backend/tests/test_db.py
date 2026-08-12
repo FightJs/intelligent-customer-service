@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from store import db
 
 
@@ -378,3 +380,105 @@ def test_update_and_delete_delivery(
 
     # 重复删除不存在的交付物，应返回 False。
     assert db.delete_delivery(delivery_id) is False
+
+
+def test_cleanup_expired_guests_removes_only_inactive_guests(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        db,
+        'DB_PATH',
+        tmp_path / 'test.db',
+    )
+    db.init_db()
+
+    now = datetime(
+        2026,
+        8,
+        12,
+        12,
+        tzinfo=timezone.utc,
+    )
+    old_time = (
+        now - timedelta(hours=25)
+    ).isoformat()
+
+    monkeypatch.setattr(
+        db,
+        '_now',
+        lambda: old_time,
+    )
+
+    expired_id = db.create_user(
+        'guest_expired',
+        'hash',
+        role='guest',
+    )
+    expired_session = db.create_session(
+        expired_id,
+        {},
+    )
+    db.add_message(
+        expired_session,
+        'user',
+        '旧消息',
+    )
+    db.begin_chat_request(
+        'expired-request',
+        expired_session,
+        expired_id,
+        '旧请求',
+        None,
+    )
+
+    active_id = db.create_user(
+        'guest_active',
+        'hash',
+        role='guest',
+    )
+    active_session = db.create_session(
+        active_id,
+        {},
+    )
+
+    regular_id = db.create_user(
+        'regular_old',
+        'hash',
+        role='user',
+    )
+
+    monkeypatch.setattr(
+        db,
+        '_now',
+        lambda: now.isoformat(),
+    )
+    db.save_session(
+        active_session,
+        {},
+    )
+
+    deleted = db.cleanup_expired_guests(
+        max_idle_hours=24,
+        now=now,
+    )
+
+    assert deleted == 1
+    assert db.get_user_by_id(expired_id) is None
+    assert db.get_session(expired_session) is None
+    assert db.get_messages(expired_session) == []
+    assert db.get_user_by_id(active_id) is not None
+    assert db.get_session(active_session) is not None
+    assert db.get_user_by_id(regular_id) is not None
+
+    with db._connect() as conn:
+        request_count = conn.execute(
+            '''
+            SELECT COUNT(*)
+            FROM chat_requests
+            WHERE request_id = ?
+            ''',
+            ('expired-request',),
+        ).fetchone()[0]
+
+    assert request_count == 0

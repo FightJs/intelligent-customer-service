@@ -118,6 +118,42 @@ def test_login_nonexistent_user_401(client):
     assert r.status_code == 401
 
 
+def test_guest_login_creates_quick_session(client):
+    login_response = client.post('/api/auth/guest')
+    assert login_response.status_code == 200
+
+    login_data = login_response.json()
+    assert login_data['user']['role'] == 'guest'
+
+    headers = {
+        'Authorization': f"Bearer {login_data['token']}",
+    }
+    session_response = client.post('/api/session', headers=headers)
+    assert session_response.status_code == 200
+
+    form_state = session_response.json()['form_state']
+    assert form_state['mode'] == 'quick'
+    assert len(form_state['requiredFieldIds']) == 12
+
+
+def test_guest_cannot_submit_order(client):
+    login_response = client.post('/api/auth/guest')
+    token = login_response.json()['token']
+    headers = {'Authorization': f'Bearer {token}'}
+
+    session_response = client.post('/api/session', headers=headers)
+    session_id = session_response.json()['session_id']
+
+    response = client.post(
+        '/api/orders',
+        headers=headers,
+        json={'session_id': session_id},
+    )
+
+    assert response.status_code == 403
+    assert response.json()['detail'] == '快速体验模式不支持发送订单'
+
+
 def test_me_with_token(client):
     import secrets
     username = f'meuser_{secrets.token_hex(4)}'
@@ -341,7 +377,7 @@ def test_submit_order_rejects_incomplete_form(
     assert response.status_code == 409
     assert (
         response.json()['detail']
-        == '必填信息尚未采集完成'
+        == '必填信息尚未采集完成：客户名称/品牌名'
     )
 
 

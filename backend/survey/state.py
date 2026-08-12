@@ -5,18 +5,33 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from typing import Literal
 
 from .models import StudioFormState, SectionState, empty_value
-from .schema_def import SECTIONS, SECTION_ORDER, SECTION_BY_ID, FIELD_BY_ID
+from .schema_def import (
+    SECTIONS,
+    SECTION_ORDER,
+    SECTION_BY_ID,
+    FIELD_BY_ID,
+    QUICK_REQUIRED_FIELD_IDS,
+)
 
 
-def create_initial_state() -> StudioFormState:
+def create_initial_state(
+    mode: Literal['full', 'quick'] = 'full',
+) -> StudioFormState:
     """从 schema 构造空的 form state（所有字段填默认空值）。"""
     sections: dict[str, SectionState] = {}
     for sec_def in SECTIONS:
         fields = {f.id: empty_value(f.type) for f in sec_def.fields}
         sections[sec_def.id] = SectionState(id=sec_def.id, status='pending', fields=fields)
     return StudioFormState(
+        mode=mode,
+        required_field_ids=(
+            list(QUICK_REQUIRED_FIELD_IDS)
+            if mode == 'quick'
+            else []
+        ),
         sections=sections,
         current_section_id=SECTION_ORDER[0],
         completed=False,

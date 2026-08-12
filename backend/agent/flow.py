@@ -60,6 +60,17 @@ def is_field_required(
     field: FieldDef,
 ) -> bool:
     """判断字段在当前表单状态下是否必填。"""
+
+    if state.mode == 'quick':
+        field_key = (
+            f'{section_id}.{field.id}'
+        )
+
+        return (
+            field_key
+            in state.required_field_ids
+        )
+
     if field.required:
         return True
 
@@ -67,11 +78,14 @@ def is_field_required(
         section_id == 'equipment'
         and field.id == 'inventory'
     ):
-        has_existing = state.sections[
-            'budget'
-        ].fields['has_existing']
+        has_existing = (
+            state.sections['budget']
+            .fields['has_existing']
+        )
 
-        return has_existing.value == 'yes'
+        return (
+            has_existing.value == 'yes'
+        )
 
     return False
 

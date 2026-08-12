@@ -46,7 +46,7 @@ export default function DeliverableSlot({
 
   for (const definition of SECTIONS) {
     const progress = filledCount(
-      state.sections[definition.id],
+      state,
       definition,
     )
 

@@ -66,8 +66,14 @@ export default function ProgressCard({ visible }: Props) {
     else if (status === 'active') activeCount++
     else if (status === 'pending') pendingCount++
   }
-  const totalFilled = SECTIONS.reduce((acc, def) => acc + filledCount(state.sections[def.id], def).filled, 0)
-  const totalRequired = SECTIONS.reduce((acc, def) => acc + filledCount(state.sections[def.id], def).total, 0)
+  const totalFilled = SECTIONS.reduce(
+    (acc, def) => acc + filledCount(state, def).filled,
+    0,
+  )
+  const totalRequired = SECTIONS.reduce(
+    (acc, def) => acc + filledCount(state, def).total,
+    0,
+  )
 
   return (
     <FloatingCard

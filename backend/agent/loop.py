@@ -311,8 +311,33 @@ def _build_system_prompt(state: StudioFormState,history_summary: str = '',) -> s
                 )
 
             dimensions_text = ''
+
             if fdef.dims:
-                dimensions_text = f'  维度{fdef.dims}'
+                dimension_example = {
+                    dimension: '值'
+                    for dimension in fdef.dims
+                }
+
+                if (
+                    sec_id == 'host'
+                    and fdef.id == 'height'
+                ):
+                    dimension_example = {
+                        '女主播': '165',
+                        '男主播': '175',
+                    }
+
+                example_text = json.dumps(
+                    dimension_example,
+                    ensure_ascii=False,
+                )
+
+                dimensions_text = (
+                    f'  维度{fdef.dims}；'
+                    'value 必须传对象，'
+                    '可只传本轮提到的维度，'
+                    f'例如 {example_text}'
+                )
 
             columns_text = ''
             if fdef.columns:
@@ -375,15 +400,59 @@ def _build_system_prompt(state: StudioFormState,history_summary: str = '',) -> s
         mark = '✓' if p['complete'] else f"{p['filled']}/{p['total']}"
         progress_lines.append(f"  {p['title']} {mark}")
 
-    next_hint = (
-        '所有必填信息已采集完毕。'
-        '请告知用户：右上角客户需求表会实时展示当前信息，'
-        '确认内容无误后，可点击右侧“发送订单”。'
-        '不要再询问用户需要生成哪种文件。'
-    )
+    if state.mode == 'quick':
+        completion_rule = (
+            '快速体验的必填信息齐了，'
+            '提醒用户查看右上角'
+            '客户需求表；'
+            '说明快速体验已经完成，'
+            '登录或注册后可以进行'
+            '完整采集和发送订单。'
+        )
+
+        next_hint = (
+            '快速体验所需信息'
+            '已采集完毕。'
+            '请提醒用户查看右上角'
+            '客户需求表；'
+            '如需完整需求采集和'
+            '发送订单，请登录或注册'
+            '正式账号。'
+        )
+    else:
+        completion_rule = (
+            '所有必填信息齐了，'
+            '提醒用户查看右上角'
+            '客户需求表，'
+            '确认无误后点击'
+            '“发送订单”。'
+        )
+
+        next_hint = (
+            '所有必填信息已采集完毕。'
+            '请告知用户：右上角'
+            '客户需求表会实时展示'
+            '当前信息，'
+            '确认内容无误后，'
+            '可点击右侧“发送订单”。'
+            '不要再询问用户需要'
+            '生成哪种文件。'
+        )
+
     if nxt:
         sec_id, field = nxt
-        next_hint = f'下一个该问：【{SECTION_BY_ID[sec_id].title}】{field.label}'
+
+        section_title = (
+            SECTION_BY_ID[
+                sec_id
+            ].title
+        )
+
+        next_hint = (
+            f'下一个该问：'
+            f'【{section_title}】'
+            f'{field.label}'
+        )
 
     return f"""你是直播间搭建顾问，负责通过对话收集客户搭建直播间的需求。
 
@@ -397,7 +466,7 @@ def _build_system_prompt(state: StudioFormState,history_summary: str = '',) -> s
 1. 用户消息含信息时，调 fill_fields 填入
 2. 需要知道下一步问什么时，调 get_progress
 3. 信息足够时，自然地确认并问下一个问题
-4. 所有必填信息齐了，提醒用户查看右上角客户需求表，确认无误后点击“发送订单”
+4. {completion_rule}
 5. 信息采集完成不代表会话关闭；用户仍可以继续补充或修改信息
 6. 禁止询问用户需要 Markdown、Excel 或 Word 中的哪一种
 7. 禁止声称订单已经发送；只有用户点击“发送订单”才算发送
@@ -412,7 +481,7 @@ def _build_system_prompt(state: StudioFormState,history_summary: str = '',) -> s
 2. 用户本轮回答涉及多个字段时，必须一次性 fill_fields 全部
 3. 优先按【下一个该问】推进；只有信息不确定、用户主动修改或工具写入失败时，才回到相关字段确认
 4. 选填字段只在用户主动提供时记录，禁止主动询问选填字段
-5. 用户回答“无”“没有”“不用补充”时，禁止再次询问“还有什么需要补充”；仍有必填字段就继续【下一个该问】，全部完成就告知可以生成交付物
+5. 用户回答“无”“没有”“不用补充”时，禁止再次询问“还有什么需要补充”；仍有必填字段就继续【下一个该问】，全部完成后按当前模式的完成指引回复
 6. 若 fill_fields 返回失败明细，根据原因修正后最多重试一次
 
 

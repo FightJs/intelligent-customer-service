@@ -145,3 +145,14 @@ def test_inventory_completed_resumes_normal_flow():
     assert nxt is not None
     assert nxt[0] == 'customer'
     assert nxt[1].id == 'brand'
+
+
+def test_quick_mode_has_twelve_required_fields():
+    state = create_initial_state(mode='quick')
+
+    assert overall_progress(state) == (0, 12)
+
+    nxt = next_unfilled_field(state)
+    assert nxt is not None
+    assert nxt[0] == 'customer'
+    assert nxt[1].id == 'brand'

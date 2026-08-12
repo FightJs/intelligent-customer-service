@@ -61,7 +61,7 @@ export default function OrderConfirmationModal({
   const counts = SECTIONS.reduce(
     (result, definition) => {
       const current = filledCount(
-        state.sections[definition.id],
+        state,
         definition,
       )
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -43,7 +43,7 @@ def init_db() -> None:
                 id             INTEGER PRIMARY KEY AUTOINCREMENT,
                 username       TEXT UNIQUE NOT NULL,
                 password_hash  TEXT NOT NULL,
-                role           TEXT NOT NULL DEFAULT 'user',   -- 'user' | 'admin'
+                role           TEXT NOT NULL DEFAULT 'user',   -- 'user' | 'admin' | 'guest'
                 created_at     TEXT NOT NULL
             );
 
@@ -109,6 +109,15 @@ def init_db() -> None:
         cols = [r[1] for r in conn.execute('PRAGMA table_info(messages)').fetchall()]
         if 'tool_events' not in cols:
             conn.execute('ALTER TABLE messages ADD COLUMN tool_events TEXT')
+
+        conn.execute('''
+            CREATE INDEX IF NOT EXISTS idx_users_role_created
+            ON users(role, created_at)
+        ''')
+        conn.execute('''
+            CREATE INDEX IF NOT EXISTS idx_sessions_user_updated
+            ON sessions(user_id, updated_at)
+        ''')
 
 
 # ── Session ──────────────────────────────────────────────────
@@ -449,6 +458,13 @@ def delete_user(user_id: int) -> bool:
         )
         conn.execute(
             '''
+            DELETE FROM chat_requests
+            WHERE user_id = ?
+            ''',
+            (user_id,),
+        )
+        conn.execute(
+            '''
             DELETE FROM deliveries
             WHERE user_id = ?
             ''',
@@ -470,6 +486,89 @@ def delete_user(user_id: int) -> bool:
         )
 
     return True
+
+
+def cleanup_expired_guests(
+    max_idle_hours: int = 24,
+    *,
+    now: datetime | None = None,
+) -> int:
+    """删除超过指定闲置时间的游客及其全部关联数据。"""
+    reference_time = now or datetime.now(timezone.utc)
+    cutoff = (
+        reference_time
+        - timedelta(hours=max_idle_hours)
+    ).isoformat()
+
+    with _connect() as conn:
+        conn.execute('''
+            CREATE TEMP TABLE expired_guest_ids (
+                id INTEGER PRIMARY KEY
+            )
+        ''')
+        conn.execute(
+            '''
+            INSERT INTO expired_guest_ids (id)
+            SELECT u.id
+            FROM users u
+            WHERE u.role = 'guest'
+              AND u.created_at < ?
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM sessions s
+                  WHERE s.user_id = u.id
+                    AND s.updated_at >= ?
+              )
+            ''',
+            (cutoff, cutoff),
+        )
+
+        expired_count = conn.execute(
+            'SELECT COUNT(*) FROM expired_guest_ids'
+        ).fetchone()[0]
+
+        if expired_count == 0:
+            return 0
+
+        conn.execute('''
+            DELETE FROM messages
+            WHERE session_id IN (
+                SELECT s.session_id
+                FROM sessions s
+                JOIN expired_guest_ids e
+                  ON e.id = s.user_id
+            )
+        ''')
+        conn.execute('''
+            DELETE FROM chat_requests
+            WHERE user_id IN (
+                SELECT id
+                FROM expired_guest_ids
+            )
+        ''')
+        conn.execute('''
+            DELETE FROM deliveries
+            WHERE user_id IN (
+                SELECT id
+                FROM expired_guest_ids
+            )
+        ''')
+        conn.execute('''
+            DELETE FROM sessions
+            WHERE user_id IN (
+                SELECT id
+                FROM expired_guest_ids
+            )
+        ''')
+        conn.execute('''
+            DELETE FROM users
+            WHERE id IN (
+                SELECT id
+                FROM expired_guest_ids
+            )
+        ''')
+
+    return int(expired_count)
 
 
 # users 列表允许排序的字段白名单（防 SQL 注入：列名不能参数化）
@@ -498,12 +597,25 @@ def list_users(
     size = max(size, 1)
     offset = (page - 1) * size
 
-    where = ''
+    conditions = [
+        "role != 'guest'",
+    ]
+
     params: list[Any] = []
 
     if search:
-        where = 'WHERE username LIKE ?'
-        params.append(f'%{search}%')
+        conditions.append(
+            'username LIKE ?'
+        )
+
+        params.append(
+            f'%{search}%'
+        )
+
+    where = (
+        'WHERE '
+        + ' AND '.join(conditions)
+    )
 
     with _connect() as conn:
         admin_count = conn.execute(

@@ -26,7 +26,13 @@ export default function TopBar({
   const avatarClass = role === 'admin'
     ? 'border border-idle/80 hover:border-secondary'
     : `ring-1 ${role === 'user' ? 'ring-accent' : 'ring-idle'} hover:ring-2`
-  const roleLabel = role === 'admin' ? '管理员' : role === 'user' ? '普通用户' : '账户'
+  const roleLabel = role === 'admin'
+    ? '管理员'
+    : role === 'user'
+      ? '普通用户'
+      : role === 'guest'
+        ? '游客'
+        : '账户'
 
   function handleContextMenu(e: React.MouseEvent) {
     e.preventDefault()

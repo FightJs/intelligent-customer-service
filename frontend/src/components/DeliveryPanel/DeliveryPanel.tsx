@@ -20,7 +20,7 @@ export default function DeliveryPanel() {
   // 计算总进度
   let filled = 0, total = 0
   for (const def of SECTIONS) {
-    const r = filledCount(state.sections[def.id], def)
+    const r = filledCount(state, def)
     filled += r.filled
     total += r.total
   }

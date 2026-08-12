@@ -1,17 +1,18 @@
-import type { SectionDef, SectionState } from '../../types/schema'
+import type { SectionDef, StudioFormState } from '../../types/schema'
 import { filledCount } from '../../utils/summary'
 import StatusIcon from './StatusIcon'
 import FieldDetail from './FieldDetail'
 
 interface Props {
   def: SectionDef
-  section: SectionState
+  state: StudioFormState
   expanded: boolean
   onToggle: () => void
 }
 
-export default function SectionRow({ def, section, expanded, onToggle }: Props) {
-  const { filled, total } = filledCount(section, def)
+export default function SectionRow({ def, state, expanded, onToggle }: Props) {
+  const section = state.sections[def.id]
+  const { filled, total } = filledCount(state, def)
   return (
     <div
       data-section-row

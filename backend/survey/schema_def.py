@@ -85,6 +85,23 @@ class SectionDef(BaseModel):
 # 选项常量（被多个字段复用，集中定义减少重复）
 # ──────────────────────────────────────────────────────────────
 
+QUICK_REQUIRED_FIELD_IDS = [
+    'customer.brand',
+    'industry.category',
+    'industry.subcategory',
+    'industry.price_band',
+    'industry.live_type',
+    'status.has_room',
+    'venue.area',
+    'budget.total',
+    'product.main',
+    'product.keywords',
+    'goal.core',
+    'goal.deadline',
+]
+
+
+
 _YES_NO = [OptionDef(value='yes', label='是'), OptionDef(value='no', label='否')]
 
 _INDUSTRY_CATEGORIES = [
