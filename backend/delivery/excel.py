@@ -7,8 +7,10 @@
 from __future__ import annotations
 
 import io
+import math
 
 from openpyxl import Workbook
+from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 from delivery.render_data import build_render_data
@@ -143,6 +145,32 @@ def generate_excel(state: StudioFormState) -> bytes:
 
     for col, width in enumerate([16, 28, 10, 30], 1):
         ws2.column_dimensions[chr(64 + col)].width = width
+
+    # ── Sheet 3: 参考图片（用户上传的对标场景/场地/商品图等）──
+    image_entries = [
+        (sec['title'], f['label'], path)
+        for sec in data['sections']
+        if not sec.get('skipped')
+        for f in sec['fields']
+        for path in f.get('images', [])
+    ]
+    if image_entries:
+        ws3 = wb.create_sheet('参考图片')
+        ws3.column_dimensions['A'].width = 70
+        row_idx = 1
+        for sec_title, label, path in image_entries:
+            caption = ws3.cell(row=row_idx, column=1, value=f'{sec_title} — {label}')
+            caption.font = _BODY_FONT
+            img = XLImage(str(path))
+            # 限制显示宽度 480px，等比缩放
+            if img.width > 480:
+                ratio = 480 / img.width
+                img.width = 480
+                img.height = int(img.height * ratio)
+            ws3.add_image(img, f'A{row_idx + 1}')
+            # 默认行高约 20px，按图片高度占用行数
+            rows_spanned = math.ceil(img.height / 20)
+            row_idx += 1 + rows_spanned + 1
 
     # 输出字节流
     buf = io.BytesIO()

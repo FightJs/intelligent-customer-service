@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from agent import flow
+from store.uploads import resolve_image
 from survey.models import StudioFormState, FieldValue
 from survey.schema_def import SECTION_BY_ID, FIELD_BY_ID, SECTION_ORDER, AGENT_GUIDE
 
@@ -41,6 +42,8 @@ TOOL_DEFS: list[dict] = [
             '数值中不要重复填写 cm。'
             'table 填行对象数组，例如 '
             '[{"type":"相机","model":"Sony A7M4","qty":"1","note":""}]。'
+            'image 填本轮消息 [图片N id=...] 标记里的 id 字符串数组，'
+            '不要编造 id。'
             'text 或 choice-single 修改已有值时，'
             '必须先向用户确认，'
             '确认后传 confirmed=true。'
@@ -252,12 +255,18 @@ def _apply_one(state: StudioFormState,section_id: str,field_id: str,value,confir
                     f'收到 {type(value).__name__}'
                 )
 
-            new_images = [
-                str(item)
-                for item in value
-                if item is not None
-                and str(item).strip()
-            ]
+            new_images = []
+            for item in value:
+                if item is None or not str(item).strip():
+                    continue
+                image_id = str(item)
+                # 只接受真实落盘的图片 id，丢弃幻觉引用
+                if resolve_image(image_id) is None:
+                    return False, (
+                        f'{clean_fid} 图片 id 无效: {image_id}。'
+                        '只能填本轮消息 [图片N id=...] 标记里的 id。'
+                    )
+                new_images.append(image_id)
 
             current.value = list(dict.fromkeys([
                 *current.value,
@@ -334,8 +343,8 @@ def apply_updates(state: StudioFormState, updates: list[dict]) -> tuple[int, lis
     return count, failures
 
 
-def execute_tool(name: str, tool_input: dict, state: StudioFormState) -> str:
-    """执行 tool，返回结果字符串（给模型看）。直接操作 state（原地修改）。"""
+def execute_tool(name: str, tool_input: dict, state: StudioFormState) -> tuple[str, bool]:
+    """执行 tool，返回 (结果字符串, 是否全部成功)。直接操作 state（原地修改）。"""
     if name == 'fill_fields':
         count = 0
         details: list[str] = []
@@ -360,12 +369,12 @@ def execute_tool(name: str, tool_input: dict, state: StudioFormState) -> str:
             msg = f'已填充 {count} 个字段（{"、".join(details)}）。'
         if failures:
             msg += f' 失败 {len(failures)} 个：{"; ".join(failures)}。请根据原因修正后最多重试一次。'
-        return msg
+        return msg, not failures
 
     if name == 'skip_section':
         sid = tool_input['section_id']
         flow.skip_section(state, sid)
-        return f'已跳过章节 {sid}。'
+        return f'已跳过章节 {sid}。', True
 
     if name == 'get_progress':
         progress = flow.section_progress(state)
@@ -383,14 +392,14 @@ def execute_tool(name: str, tool_input: dict, state: StudioFormState) -> str:
             )
         else:
             lines.append('所有必填信息已采集完毕。')
-        return '\n'.join(lines)
+        return '\n'.join(lines), True
 
     if name == 'set_current_section':
         sid = tool_input['section_id']
         if sid in state.sections:
             state.current_section_id = sid
-            return f'已切换到章节 {SECTION_BY_ID[sid].title}。'
-        return f'[error] 未知章节 {sid}'
+            return f'已切换到章节 {SECTION_BY_ID[sid].title}。', True
+        return f'[error] 未知章节 {sid}', False
 
 
-    return f'[error] 未知 tool {name}'
+    return f'[error] 未知 tool {name}', False

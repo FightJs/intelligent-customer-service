@@ -56,6 +56,7 @@ from delivery.markdown import generate_markdown
 from delivery.excel import generate_excel
 from delivery.word import generate_word
 from store import db
+from store.uploads import SavedImage, UploadError, is_data_uri, save_upload
 from survey.state import create_initial_state, to_dict, from_dict
 
 load_dotenv()
@@ -134,8 +135,8 @@ def _parse_data_uri(uri: str) -> tuple[str, str]:
     return mime, data
 
 
-def _build_user_content(message: str, images: list[str] | None) -> str | list[dict]:
-    """构造 user message 的 content。无图片返回字符串,有图片返回 content block 数组。"""
+def _persist_user_content(message: str, images: list[str] | None) -> str | list[dict]:
+    """构造存入 messages 表的 user content（保留原图 base64，供会话恢复时回显）。"""
     if not images:
         return message or ''
     content: list[dict] = [{'type': 'text', 'text': message or '请分析这张图片'}]
@@ -143,6 +144,42 @@ def _build_user_content(message: str, images: list[str] | None) -> str | list[di
         mime, data = _parse_data_uri(uri)
         content.append({'type': 'image', 'source': {'type': 'base64', 'media_type': mime, 'data': data}})
     return content
+
+
+def _save_images(session_id: str, images: list[str] | None) -> list[SavedImage] | None:
+    """上传图片缩放落盘，返回 SavedImage 列表；非法图片抛 400。"""
+    if not images:
+        return None
+    saved = []
+    for uri in images:
+        try:
+            saved.append(save_upload(session_id, uri))
+        except UploadError as exc:
+            raise HTTPException(status_code=400, detail=f'图片无效: {exc}') from exc
+    return saved
+
+
+def _normalize_image_updates(session_id: str, updates: list[dict] | None) -> None:
+    """updates 直推的 image 字段值若是 data URI，落盘并替换为图片 id（原地修改）。"""
+    if not updates:
+        return
+    for upd in updates:
+        value = upd.get('value')
+        if not isinstance(value, list):
+            continue
+        normalized = []
+        changed = False
+        for item in value:
+            if is_data_uri(item):
+                try:
+                    normalized.append(save_upload(session_id, item).id)
+                except UploadError as exc:
+                    raise HTTPException(status_code=400, detail=f'图片无效: {exc}') from exc
+                changed = True
+            else:
+                normalized.append(item)
+        if changed:
+            upd['value'] = normalized
 
 
 class ChatRequest(BaseModel):
@@ -321,6 +358,10 @@ def chat(req: ChatRequest, current: dict = Depends(get_current_user)) -> ChatRes
 
     state = from_dict(rec['form_state'])
 
+    # 上传图片落盘（缩放），LLM 通过 id 引用；updates 里的 data URI 同样转 id
+    saved_images = _save_images(req.session_id, req.images)
+    _normalize_image_updates(req.session_id, req.updates)
+
     # 前端权威 updates（chip 点击）绕过 LLM 抽取，在 run_agent 前直接 apply
     update_events: list[ToolEvent] = []
     if req.updates:
@@ -336,7 +377,7 @@ def chat(req: ChatRequest, current: dict = Depends(get_current_user)) -> ChatRes
     history = db.get_messages(req.session_id, limit=50) or req.history
 
     try:
-        result = run_agent(state, req.message, history, req.images)
+        result = run_agent(state, req.message, history, saved_images)
     except APIStatusError as exc:
         if exc.status_code != 402:
             raise
@@ -350,7 +391,7 @@ def chat(req: ChatRequest, current: dict = Depends(get_current_user)) -> ChatRes
     events_dict = [asdict(e) for e in (update_events + result.tool_events)]
 
     # 持久化（用户消息有图片时存 content block 数组的 JSON,保持兼容）
-    user_content: str | list[dict] = _build_user_content(req.message, req.images)
+    user_content: str | list[dict] = _persist_user_content(req.message, req.images)
     db.save_session(req.session_id, to_dict(result.state))
     db.add_message(req.session_id, 'user', user_content)
     db.add_message(req.session_id, 'assistant', result.reply, events_dict)
@@ -420,6 +461,8 @@ async def chat_stream(
             return
 
         state = from_dict(rec['form_state'])
+        saved_images = _save_images(req.session_id, req.images)
+        _normalize_image_updates(req.session_id, req.updates)
         update_events: list[ToolEvent] = []
         if req.updates:
             apply_updates(state, req.updates)
@@ -436,7 +479,7 @@ async def chat_stream(
         phase = 'generating'
         try:
             result: AgentStreamResult | None = None
-            async for item in run_agent_stream(state, req.message, history, req.images):
+            async for item in run_agent_stream(state, req.message, history, saved_images):
                 if item is None:
                     yield ': heartbeat\n\n'
                 elif isinstance(item, AgentStreamDelta):

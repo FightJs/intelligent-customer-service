@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from agent.flow import value_to_text, value_is_empty, is_field_visible
+from store.uploads import resolve_image
 from survey.models import StudioFormState
 from survey.schema_def import SECTIONS, SECTION_BY_ID
 
@@ -57,10 +58,19 @@ def build_render_data(state: StudioFormState) -> dict:
 
             text = value_to_text(v, f)
             filled = not value_is_empty(v)
+            images = []
+            if f.type == 'image' and filled:
+                # 解析图片 id 为磁盘路径，缺失文件静默跳过
+                images = [
+                    path
+                    for image_id in v.value
+                    if (path := resolve_image(image_id)) is not None
+                ]
             fields_data.append({
                 'label': f.label,
                 'value': text if filled else '未填写',
                 'filled': filled,
+                'images': images,
             })
 
             if f.required:

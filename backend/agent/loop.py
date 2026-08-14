@@ -7,7 +7,9 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
+import logging
 from dataclasses import dataclass, field
 from typing import AsyncIterator, Literal
 
@@ -18,8 +20,9 @@ from agent.llm import (
     LLM_MODEL,
     LLM_TEMPERATURE,
 )
-from agent.tools import TOOL_DEFS, execute_tool, ToolEvent, _apply_one
+from agent.tools import TOOL_DEFS, execute_tool, ToolEvent
 from agent import flow
+from store.uploads import SavedImage
 from survey.models import StudioFormState
 from survey.schema_def import (
     AGENT_GUIDE,
@@ -32,6 +35,13 @@ from survey.schema_def import (
 
 MAX_ITERATIONS = 5
 RECENT_MESSAGE_LIMIT = 12
+
+logger = logging.getLogger(__name__)
+
+FILL_ONLY_TOOLS = [
+    tool for tool in TOOL_DEFS
+    if tool['name'] == 'fill_fields'
+]
 
 SUGGESTION_FIELD_PREFIXES = (
     '目标客群',
@@ -55,12 +65,6 @@ SUGGESTION_GENERIC_WORDS = {
     '现有',
     '需求',
 }
-
-FILL_FIELDS_TOOL = next(
-    tool
-    for tool in TOOL_DEFS
-    if tool['name'] == 'fill_fields'
-)
 
 @dataclass
 class AgentResult:
@@ -110,20 +114,117 @@ def _extract_text(content: str | list[dict]) -> str:
     return ''.join(parts)
 
 
-def _build_user_content(message: str, images: list[str] | None) -> str | list[dict]:
-    """构造 user message 的 content。无图片返回字符串,有图片返回 content block 数组。"""
+def _build_user_content(message: str, images: list[SavedImage] | None) -> str | list[dict]:
+    """构造 user message 的 content。
+
+    images 为已落盘的 SavedImage 列表：文本里注入 [图片N id=...] 标记
+    （供 LLM 在 fill_fields 里引用），图片本体送缩放后的文件内容。
+    """
     if not images:
         return message or ''
-    content: list[dict] = [{'type': 'text', 'text': message or '请分析这张图片'}]
-    for uri in images:
-        try:
-            header, data_str = uri.split(',', 1)
-            mime = header.split(':')[1].split(';')[0]
-        except (IndexError, ValueError):
-            mime = 'image/png'
-            data_str = uri
-        content.append({'type': 'image', 'source': {'type': 'base64', 'media_type': mime, 'data': data_str}})
+    markers = ' '.join(
+        f'[图片{i} id={img.id}]'
+        for i, img in enumerate(images, 1)
+    )
+    note = (
+        f'（用户上传了 {len(images)} 张图片。请识别图片内容，'
+        '并用 fill_fields 把对应 id 填到合适的图片字段，'
+        'value 传 id 字符串数组）'
+    )
+    text = f'{markers}\n{note}\n{message}' if message else f'{markers}\n{note}'
+    content: list[dict] = [{'type': 'text', 'text': text}]
+    for img in images:
+        data_str = base64.b64encode(img.path.read_bytes()).decode('ascii')
+        content.append({
+            'type': 'image',
+            'source': {'type': 'base64', 'media_type': img.mime, 'data': data_str},
+        })
     return content
+
+
+_EXTRACT_NUDGE = (
+    '（系统检查：请检查客户上一条消息，如有尚未记录的需求信息或图片，'
+    '调用 fill_fields 补记；图片 value 用消息里 [图片N id=...] 的 id。'
+    '确实没有可记录的，传 updates=[]。）'
+)
+
+
+def _extraction_messages(
+    messages: list[dict],
+    reply: str,
+) -> list[dict]:
+    """构造抽取补轮的消息：对话现场 + 刚生成的回复 + 系统检查指令。"""
+    extract_messages = [*messages]
+    if reply:
+        extract_messages.append({'role': 'assistant', 'content': reply})
+    extract_messages.append({'role': 'user', 'content': _EXTRACT_NUDGE})
+    return extract_messages
+
+
+def _run_extraction_pass(
+    client: Anthropic,
+    state: StudioFormState,
+    messages: list[dict],
+    reply: str,
+    history_summary: str,
+    events: list[ToolEvent],
+) -> None:
+    """漏采保险：整轮没调过 fill_fields 时补一轮抽取（模型可能只顾回复忘了填表）。
+
+    抽取失败不影响已生成的回复，记日志即可。
+    """
+    try:
+        resp = client.messages.create(
+            model=LLM_MODEL,
+            max_tokens=800,
+            temperature=LLM_TEMPERATURE,
+            thinking={'type': 'disabled'},
+            system=_build_system_prompt(state, history_summary),
+            tools=FILL_ONLY_TOOLS,
+            tool_choice={'type': 'auto'},
+            messages=_extraction_messages(messages, reply),
+        )
+    except Exception:
+        logger.warning('extraction pass failed', exc_info=True)
+        return
+    for block in resp.content:
+        if block.type == 'tool_use' and block.name == 'fill_fields':
+            execute_tool('fill_fields', block.input, state)
+            events.extend(
+                _tool_events_for_block('fill_fields', block.input, state)
+            )
+
+
+async def _run_extraction_pass_async(
+    client: AsyncAnthropic,
+    state: StudioFormState,
+    messages: list[dict],
+    reply: str,
+    history_summary: str,
+) -> list[ToolEvent]:
+    """_run_extraction_pass 的异步版（流式路径用），返回产生的事件。"""
+    try:
+        resp = await client.messages.create(
+            model=LLM_MODEL,
+            max_tokens=800,
+            temperature=LLM_TEMPERATURE,
+            thinking={'type': 'disabled'},
+            system=_build_system_prompt(state, history_summary),
+            tools=FILL_ONLY_TOOLS,
+            tool_choice={'type': 'auto'},
+            messages=_extraction_messages(messages, reply),
+        )
+    except Exception:
+        logger.warning('extraction pass failed', exc_info=True)
+        return []
+    events: list[ToolEvent] = []
+    for block in resp.content:
+        if block.type == 'tool_use' and block.name == 'fill_fields':
+            execute_tool('fill_fields', block.input, state)
+            events.extend(
+                _tool_events_for_block('fill_fields', block.input, state)
+            )
+    return events
 
 
 def _summarize_history(
@@ -305,7 +406,7 @@ def _build_system_prompt(state: StudioFormState,history_summary: str = '',) -> s
     """构造 system prompt，含字段说明 + 当前进度 + SOP。"""
     progress = flow.section_progress(state)
     filled, total = flow.overall_progress(state)
-    nxt = flow.next_unfilled_field(state)
+    batch = flow.next_field_batch(state, n=3)
 
 
     summary_text = (
@@ -442,7 +543,7 @@ def _build_system_prompt(state: StudioFormState,history_summary: str = '',) -> s
             '完整采集和发送订单。'
         )
 
-        next_hint = (
+        topic_hint = (
             '快速体验所需信息'
             '已采集完毕。'
             '请提醒用户查看右上角'
@@ -460,7 +561,7 @@ def _build_system_prompt(state: StudioFormState,history_summary: str = '',) -> s
             '“发送订单”。'
         )
 
-        next_hint = (
+        topic_hint = (
             '所有必填信息已采集完毕。'
             '请告知用户：右上角'
             '客户需求表会实时展示'
@@ -471,37 +572,34 @@ def _build_system_prompt(state: StudioFormState,history_summary: str = '',) -> s
             '生成哪种文件。'
         )
 
-    if nxt:
-        sec_id, field = nxt
-
-        section_title = (
-            SECTION_BY_ID[
-                sec_id
-            ].title
+    if batch:
+        topics_text = '；'.join(
+            f'【{SECTION_BY_ID[sec_id].title}】{f.label}'
+            for sec_id, f in batch
+        )
+        topic_hint = (
+            '接下来还需要了解'
+            f'（话题参考，不必逐个盘问）：'
+            f'{topics_text}'
         )
 
-        next_hint = (
-            f'下一个该问：'
-            f'【{section_title}】'
-            f'{field.label}'
-        )
-
-    return f"""你是直播间搭建顾问，负责通过对话收集客户搭建直播间的需求。
+    return f"""你是「小搭」，一位经验丰富的直播间搭建顾问。你正在和客户聊天，了解他们的需求，顺手把信息记进表单。
 
 你可以调用以下工具：
 - fill_fields：把用户说的信息填入表单（一句话含多个字段就一次填多个）
 - skip_section：用户不具备某条件时跳过章节（如"没有直播间"→skip status）
-- get_progress：查看采集进度和下一个该问的字段
+- get_progress：查看采集进度和接下来还需要了解什么
 - set_current_section：用户跳着回答或回头改时切换章节
 
 工作方式：
-1. 用户消息含信息时，调 fill_fields 填入
-2. 需要知道下一步问什么时，调 get_progress
-3. 信息足够时，自然地确认并问下一个问题
+1. 用户消息里有新信息（品牌、品类、预算、场地、风格、图片等任何需求相关内容）时，必须在回复的同时调 fill_fields 记录——先调工具，回复文本紧随其后，漏填等于信息丢失；没有新信息（纯闲聊、提问、确认）就不用调
+2. 回复时先接住用户的话（回答问题、回应情绪、承接闲聊），再自然地带出 1~2 个相关问题
+3. 围绕当前话题聊，【待了解话题】只是参考，不要按表单顺序逐项盘问；用户跑题时先回应，再温和地带回来
 4. {completion_rule}
 5. 信息采集完成不代表会话关闭；用户仍可以继续补充或修改信息
 6. 禁止询问用户需要 Markdown、Excel 或 Word 中的哪一种
 7. 禁止声称订单已经发送；只有用户点击“发送订单”才算发送
+8. 回复文本要么单独出，要么只和 fill_fields 一起出；get_progress、set_current_section 这类查询/切换工具要单独调用（不带回复文本，等结果回来再回复），避免用户看到两段重复的回复
 
 {AGENT_GUIDE}
 
@@ -511,9 +609,9 @@ def _build_system_prompt(state: StudioFormState,history_summary: str = '',) -> s
 【采集纪律】
 1. 信息成功写入表单优先于减少重复。已成功写入且无冲突的字段避免重复询问；信息不确定、新旧答案冲突或工具写入失败时，允许再次确认
 2. 用户本轮回答涉及多个字段时，必须一次性 fill_fields 全部
-3. 优先按【下一个该问】推进；只有信息不确定、用户主动修改或工具写入失败时，才回到相关字段确认
+3. 已填过的信息用口语化复述确认（如"记下了，你们主推口红"），不要念字段名
 4. 选填字段只在用户主动提供时记录，禁止主动询问选填字段
-5. 用户回答“无”“没有”“不用补充”时，禁止再次询问“还有什么需要补充”；仍有必填字段就继续【下一个该问】，全部完成后按当前模式的完成指引回复
+5. 用户回答“无”“没有”“不用补充”时，禁止再次询问“还有什么需要补充”；仍有必填字段就换个话题继续聊，全部完成后按当前模式的完成指引回复
 6. 若 fill_fields 返回失败明细，根据原因修正后最多重试一次
 
 
@@ -529,21 +627,29 @@ def _build_system_prompt(state: StudioFormState,history_summary: str = '',) -> s
 当前进度（{filled}/{total}）：
 {chr(10).join(progress_lines)}
 
-{next_hint}
+【待了解话题】
+{topic_hint}
 
 回复规则：
-- 像真人客服，亲切自然，2-3 句话
-- 不要机械照念字段名
-- 用户没说清的信息不要猜"""
+- 像朋友一样聊，亲切自然，每轮 2-3 句话
+- 每轮最多问 1~2 个问题，问题要融进对话里，不要罗列、不要编号
+- 不要照念字段名。说"主要想吸引哪个年龄段的粉丝呀"，不说"请问目标客群年龄段"
+- 用户没说清的信息不要猜
+
+示例：
+- 用户："我们是做美妆的" → 好："美妆类目很上镜！你们主推哪类产品？客单价大概在什么区间？" 坏："已记录品类。请问价格带？"
+- 用户："你好" → 好："你好呀！欢迎来到直播间搭建咨询～怎么称呼你的品牌？" 坏："请问客户品牌名。"
+- 用户："哈哈我预算还没想好" → 好："不急～大概想做普通一点的还是专业级的？我好按档位帮你估。" 坏："请选择预算档位：1万以下/1-3万/3-5万。"
+"""
 
 
 def run_agent(
     state: StudioFormState,
     user_message: str,
     history: list[dict] | None = None,
-    images: list[str] | None = None,
+    images: list[SavedImage] | None = None,
 ) -> AgentResult:
-    """跑 agent loop。images 为 base64 data URI 列表,有图片时送多模态模型。"""
+    """跑 agent loop。images 为已落盘的 SavedImage 列表，有图片时送多模态模型。"""
     client = get_client()
     events: list[ToolEvent] = []
 
@@ -578,27 +684,10 @@ def run_agent(
         'content': _build_user_content(user_message, images),
     })
 
-    for iteration in range(MAX_ITERATIONS):
+    reply = ''
+    filled = False  # 本轮是否调过 fill_fields（updates=[] 也算，说明模型判断过）
+    for _ in range(MAX_ITERATIONS):
         # 每轮刷新 system prompt（state 可能变了）
-        is_capture_turn = iteration == 0
-
-        request_tools = (
-            [FILL_FIELDS_TOOL]
-            if is_capture_turn
-            else TOOL_DEFS
-        )
-
-        request_tool_choice = (
-            {
-                'type': 'tool',
-                'name': 'fill_fields',
-            }
-            if is_capture_turn
-            else {
-                'type': 'auto',
-            }
-        )
-        
         resp = client.messages.create(
             model=LLM_MODEL,
             max_tokens=800,
@@ -608,8 +697,8 @@ def run_agent(
                 state,
                 history_summary,
             ),
-            tools=request_tools,
-            tool_choice=request_tool_choice,
+            tools=TOOL_DEFS,
+            tool_choice={'type': 'auto'},
             messages=messages,
         )
 
@@ -622,65 +711,57 @@ def run_agent(
             elif block.type == 'tool_use':
                 tool_use_blocks.append(block)
 
-        if is_capture_turn:
-            has_fill_fields = any(
-                block.name == 'fill_fields'
-                for block in tool_use_blocks
-            )
-
-            if not has_fill_fields:
-                continue
-
         if resp.stop_reason != 'tool_use' or not tool_use_blocks:
             # end_turn，取文本回复
             reply = ''.join(text_parts).strip()
 
             break
 
-        # 执行 tools，收集 assistant 消息 + tool_result
-        messages.append({'role': 'assistant', 'content': resp.content})
+        # 执行 tools，收集结果
         tool_results = []
+        all_ok = True
+        only_fill = all(
+            tb.name == 'fill_fields'
+            for tb in tool_use_blocks
+        )
         for tb in tool_use_blocks:
+            if tb.name == 'fill_fields':
+                filled = True
             try:
-                result_str = execute_tool(tb.name, tb.input, state)
+                result_str, ok = execute_tool(tb.name, tb.input, state)
             except Exception as exc:
                 result_str = f'[error] tool {tb.name} 执行失败：{exc}'
+                ok = False
+            if not ok:
+                all_ok = False
             # 记录事件
-            if tb.name == 'fill_fields':
-                for upd in tb.input.get('updates', []):
-                    raw_fid = upd.get('field_id', '')
-                    clean_fid = (
-                        raw_fid.split('.')[-1]
-                        if '.' in raw_fid
-                        else raw_fid
-                    )
-
-                    section_id = upd.get('section_id', '')
-                    section_state = state.sections.get(section_id)
-                    if section_state is None:
-                        continue
-
-                    stored_field = section_state.fields.get(clean_fid)
-                    if stored_field is None:
-                        continue
-
-                    events.append(ToolEvent(
-                        kind='fill',
-                        section_id=section_id,
-                        field_id=clean_fid,
-                        value=stored_field.value,
-                    ))
-            elif tb.name == 'skip_section':
-                events.append(ToolEvent(kind='skip', section_id=tb.input['section_id']))
+            events.extend(_tool_events_for_block(tb.name, tb.input, state))
             tool_results.append({
                 'type': 'tool_result',
                 'tool_use_id': tb.id,
                 'content': result_str,
             })
+
+        # 快速路径：纯填表且全部成功，模型本轮已给出回复文本 → 直接结束（省一次 LLM 往返）
+        if (
+            only_fill
+            and all_ok
+            and any(part.strip() for part in text_parts)
+        ):
+            reply = ''.join(text_parts).strip()
+            break
+
+        messages.append({'role': 'assistant', 'content': resp.content})
         messages.append({'role': 'user', 'content': tool_results})
     else:
         # 循环用尽，兜底
         reply = '信息已记录，还有什么需要补充的吗？'
+
+    # 漏采保险：整轮没调过 fill_fields，补一轮抽取
+    if not filled:
+        _run_extraction_pass(
+            client, state, messages, reply, history_summary, events,
+        )
 
     # 返回前重算章节 status（治"全 pending"显示问题）
     flow.recompute_section_status(state)
@@ -756,11 +837,11 @@ async def run_agent_stream(
     state: StudioFormState,
     user_message: str,
     history: list[dict] | None = None,
-    images: list[str] | None = None,
+    images: list[SavedImage] | None = None,
 ) -> AsyncIterator[
     AgentStreamDelta | AgentStreamStatus | AgentStreamToolEvent | AgentStreamResult | None
 ]:
-    """运行真实 SDK stream，并产出安全的内部流式事件。images 为图片 data URI 列表。"""
+    """运行真实 SDK stream，并产出安全的内部流式事件。images 为已落盘的 SavedImage 列表。"""
     client = get_async_client()
     events: list[ToolEvent] = []
     try:
@@ -775,14 +856,8 @@ async def run_agent_stream(
         messages.append({'role': 'user', 'content': _build_user_content(user_message, images)})
 
         reply = ''
-        for iteration in range(MAX_ITERATIONS):
-            capture_turn = iteration == 0
-            request_tools = [FILL_FIELDS_TOOL] if capture_turn else TOOL_DEFS
-            tool_choice = (
-                {'type': 'tool', 'name': 'fill_fields'}
-                if capture_turn
-                else {'type': 'auto'}
-            )
+        filled = False  # 本轮是否调过 fill_fields（updates=[] 也算）
+        for _ in range(MAX_ITERATIONS):
             yield AgentStreamStatus(phase='generating', message='正在生成回复')
             response = None
             async for item in _stream_response(
@@ -792,8 +867,8 @@ async def run_agent_stream(
                 temperature=LLM_TEMPERATURE,
                 thinking={'type': 'disabled'},
                 system=_build_system_prompt(state, history_summary),
-                tools=request_tools,
-                tool_choice=tool_choice,
+                tools=TOOL_DEFS,
+                tool_choice={'type': 'auto'},
                 messages=messages,
             ):
                 if item is None:
@@ -806,26 +881,33 @@ async def run_agent_stream(
             if response is None:
                 raise RuntimeError('LLM stream ended without final response')
 
+            text = ''.join(
+                block.text
+                for block in response.content
+                if block.type == 'text'
+            ).strip()
             tool_blocks = [
                 block for block in response.content
                 if block.type == 'tool_use'
             ]
-            if capture_turn and not any(
-                block.name == 'fill_fields' for block in tool_blocks
-            ):
-                continue
 
             if response.stop_reason != 'tool_use' or not tool_blocks:
-                reply = ''.join(
-                    block.text for block in response.content if block.type == 'text'
-                ).strip()
+                reply += text
                 break
 
             yield AgentStreamStatus(phase='tool_call', message='正在更新表单')
-            messages.append({'role': 'assistant', 'content': response.content})
             tool_results = []
+            all_ok = True
+            only_fill = all(
+                block.name == 'fill_fields'
+                for block in tool_blocks
+            )
             for block in tool_blocks:
-                result = execute_tool(block.name, block.input, state)
+                if block.name == 'fill_fields':
+                    filled = True
+                result, ok = execute_tool(block.name, block.input, state)
+                if not ok:
+                    all_ok = False
                 block_events = _tool_events_for_block(block.name, block.input, state)
                 events.extend(block_events)
                 for event in block_events:
@@ -835,9 +917,27 @@ async def run_agent_stream(
                     'tool_use_id': block.id,
                     'content': result,
                 })
+
+            # 快速路径：纯填表且全部成功，本轮文本已流给用户 → 直接结束
+            if only_fill and all_ok and text:
+                reply += text
+                break
+
+            messages.append({'role': 'assistant', 'content': response.content})
             messages.append({'role': 'user', 'content': tool_results})
         else:
             reply = '信息已记录，还有什么需要补充的吗？'
+
+        # 漏采保险：整轮没调过 fill_fields，补一轮抽取
+        if not filled:
+            extract_events = await _run_extraction_pass_async(
+                client, state, messages, reply, history_summary,
+            )
+            if extract_events:
+                yield AgentStreamStatus(phase='tool_call', message='正在更新表单')
+                events.extend(extract_events)
+                for event in extract_events:
+                    yield AgentStreamToolEvent(event)
 
         flow.recompute_section_status(state)
         yield AgentStreamResult(

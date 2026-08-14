@@ -1,17 +1,19 @@
 """Word 交付物生成（需求确认书）。
 
-调研表格式，含客户签字栏。
+调研表格式，含客户签字栏。图片字段在章节表格下方内嵌原图 + 图注。
 """
 from __future__ import annotations
 
 import io
 from datetime import date
+from pathlib import Path
 
 from docx import Document
 from docx.shared import Cm, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn
+from PIL import Image
 
 from delivery.render_data import build_render_data
 from survey.models import StudioFormState
@@ -26,6 +28,17 @@ def _set_cell_font(cell, text: str, bold: bool = False, size: int = 10) -> None:
             run.font.size = Pt(size)
             run.font.bold = bold
             run._element.rPr.rFonts.set(qn('w:eastAsia'), '微软雅黑')
+
+
+def _image_source(path: Path):
+    """python-docx 不支持 webp，转成 png 字节流；其余格式直接给路径。"""
+    if path.suffix.lower() == '.webp':
+        with Image.open(path) as img:
+            buf = io.BytesIO()
+            img.save(buf, format='PNG')
+        buf.seek(0)
+        return buf
+    return str(path)
 
 
 def generate_word(state: StudioFormState) -> bytes:
@@ -97,6 +110,16 @@ def generate_word(state: StudioFormState) -> bytes:
         for row in table.rows:
             row.cells[0].width = Cm(4.5)
             row.cells[1].width = Cm(11)
+
+        # 图片字段：表格下方内嵌原图 + 图注
+        for f in sec['fields']:
+            for path in f.get('images', []):
+                caption = doc.add_paragraph()
+                caption_run = caption.add_run(f'{f["label"]}：')
+                caption_run.font.size = Pt(9)
+                caption_run.font.color.rgb = RGBColor(0x88, 0x88, 0x88)
+                doc.add_picture(_image_source(path), width=Cm(12))
+                doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
         doc.add_paragraph('')
 

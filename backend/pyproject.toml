@@ -15,6 +15,7 @@ dependencies = [
     "jinja2>=3.1",         # Markdown 模板
     "openpyxl>=3.1",       # Excel
     "python-docx>=1.1",    # Word
+    "pillow>=10.0",        # 上传图片缩放 + openpyxl 插图
     # HTTP（agent 调 LLM 用）
     "httpx>=0.28",
     # Auth —— 密码 hash + JWT + env（auth 改造新增）

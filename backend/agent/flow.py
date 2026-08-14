@@ -172,10 +172,12 @@ def filled_required_count(
     return filled, total
 
 
-def next_unfilled_field(
+def unfilled_required_fields(
     state: StudioFormState,
-) -> tuple[str, FieldDef] | None:
-    """找到下一个需要填写的字段。"""
+) -> list[tuple[str, FieldDef]]:
+    """所有未填的必填字段，按推进顺序（equipment.inventory 特殊优先）。"""
+    result: list[tuple[str, FieldDef]] = []
+
     equipment_field = next(
         field
         for field in SECTION_BY_ID[
@@ -196,7 +198,7 @@ def next_unfilled_field(
         )
         and value_is_empty(equipment_value)
     ):
-        return 'equipment', equipment_field
+        result.append(('equipment', equipment_field))
 
     for section_id, field in visible_fields(state):
         if not is_field_required(
@@ -211,9 +213,25 @@ def next_unfilled_field(
         ].fields.get(field.id)
 
         if value is None or value_is_empty(value):
-            return section_id, field
+            result.append((section_id, field))
 
-    return None
+    return result
+
+
+def next_unfilled_field(
+    state: StudioFormState,
+) -> tuple[str, FieldDef] | None:
+    """找到下一个需要填写的字段。"""
+    fields = unfilled_required_fields(state)
+    return fields[0] if fields else None
+
+
+def next_field_batch(
+    state: StudioFormState,
+    n: int = 3,
+) -> list[tuple[str, FieldDef]]:
+    """接下来最多 n 个未填必填字段（给 prompt 做话题建议，支持合并提问）。"""
+    return unfilled_required_fields(state)[:n]
 
 
 def section_progress(state: StudioFormState) -> list[dict]:

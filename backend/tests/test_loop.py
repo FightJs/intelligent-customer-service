@@ -30,7 +30,7 @@ def _mock_tool_response(tool_name: str, tool_input: dict, tool_use_id: str = 'tu
 
 
 def _mock_empty_capture_response():
-    """模拟当前用户消息没有可写入字段。"""
+    """模拟只调 fill_fields（无文本）的响应，触发下一轮。"""
     return _mock_tool_response(
         'fill_fields',
         {
@@ -38,6 +38,27 @@ def _mock_empty_capture_response():
         },
         tool_use_id='capture_1',
     )
+
+
+def _mock_text_and_tool_response(
+    text: str,
+    tool_name: str,
+    tool_input: dict,
+    tool_use_id: str = 'tu_fast',
+):
+    """构造同一响应里既有文本又有 tool_use 的 mock response（快速路径）。"""
+    resp = MagicMock()
+    resp.stop_reason = 'tool_use'
+    text_block = MagicMock()
+    text_block.type = 'text'
+    text_block.text = text
+    tool_block = MagicMock()
+    tool_block.type = 'tool_use'
+    tool_block.name = tool_name
+    tool_block.input = tool_input
+    tool_block.id = tool_use_id
+    resp.content = [text_block, tool_block]
+    return resp
 
 
 @patch('agent.loop.get_client')
@@ -68,14 +89,15 @@ def test_run_agent_text_only(mock_get_client):
 def test_run_agent_capture_without_tool_does_not_crash(
     mock_get_client,
 ):
-    """捕获轮没有返回工具时，不应导致请求 500。"""
+    """模型直接回复文本（不调工具）时正常结束，并触发补采轮。"""
     mock_client = MagicMock()
 
     mock_client.messages.create.side_effect = [
-        _mock_text_response(''),
         _mock_text_response(
             '您好！请问有什么可以帮您？'
         ),
+        # 补采轮：没有可记录的，updates=[]
+        _mock_empty_capture_response(),
     ]
 
     mock_get_client.return_value = mock_client
@@ -97,6 +119,76 @@ def test_run_agent_capture_without_tool_does_not_crash(
         mock_client.messages.create.call_count
         == 2
     )
+
+
+@patch('agent.loop.get_client')
+def test_run_agent_extraction_pass_recovers_missed_fill(mock_get_client):
+    """第一轮只顾回复没填表时，补采轮能把漏掉的信息填上。"""
+    mock_client = MagicMock()
+    mock_client.messages.create.side_effect = [
+        _mock_text_response('云裳这名字真好听！'),
+        # 补采轮把 brand 填上
+        _mock_tool_response('fill_fields', {
+            'updates': [{'section_id': 'customer', 'field_id': 'brand', 'value': '云裳'}]
+        }),
+    ]
+    mock_get_client.return_value = mock_client
+
+    state = create_initial_state()
+    result = run_agent(state, '我们品牌叫云裳')
+
+    assert result.reply == '云裳这名字真好听！'
+    assert state.sections['customer'].fields['brand'].value == '云裳'
+    assert len(result.tool_events) == 1
+    assert result.tool_events[0].field_id == 'brand'
+    assert mock_client.messages.create.call_count == 2
+
+
+@patch('agent.loop.get_client')
+def test_run_agent_fast_path_text_with_fill(mock_get_client):
+    """文本+fill_fields 同响应且全部成功时，一轮结束（省一次 LLM 往返）。"""
+    mock_client = MagicMock()
+    mock_client.messages.create.side_effect = [
+        _mock_text_and_tool_response(
+            '记下了，云裳这个品牌名很好听！主要做哪个品类呀？',
+            'fill_fields',
+            {'updates': [{'section_id': 'customer', 'field_id': 'brand', 'value': '云裳'}]},
+        ),
+    ]
+    mock_get_client.return_value = mock_client
+
+    state = create_initial_state()
+    result = run_agent(state, '品牌叫云裳')
+
+    assert result.reply == '记下了，云裳这个品牌名很好听！主要做哪个品类呀？'
+    assert state.sections['customer'].fields['brand'].value == '云裳'
+    assert len(result.tool_events) == 1
+    assert result.tool_events[0].kind == 'fill'
+    assert mock_client.messages.create.call_count == 1
+
+
+@patch('agent.loop.get_client')
+def test_run_agent_fill_failure_continues_loop(mock_get_client):
+    """文本+fill_fields 同响应但填写失败（需确认）时，丢弃本轮文本继续循环。"""
+    mock_client = MagicMock()
+    mock_client.messages.create.side_effect = [
+        _mock_text_and_tool_response(
+            '好的，改成新品牌。',
+            'fill_fields',
+            {'updates': [{'section_id': 'customer', 'field_id': 'brand', 'value': '新品牌'}]},
+        ),
+        _mock_text_response('您之前说品牌叫云裳，确认要改成新品牌吗？'),
+    ]
+    mock_get_client.return_value = mock_client
+
+    state = create_initial_state()
+    state.sections['customer'].fields['brand'] = TextValue(type='text', value='云裳')
+    result = run_agent(state, '品牌改成新品牌')
+
+    # 未 confirmed，旧值保留；回复来自第二轮
+    assert state.sections['customer'].fields['brand'].value == '云裳'
+    assert result.reply == '您之前说品牌叫云裳，确认要改成新品牌吗？'
+    assert mock_client.messages.create.call_count == 2
 
 
 @patch('agent.loop.get_client')
@@ -130,15 +222,12 @@ def test_run_agent_fill_fields_then_reply(mock_get_client):
         .kwargs
     )
 
-    assert first_request['tool_choice'] == {
-        'type': 'tool',
-        'name': 'fill_fields',
-    }
+    assert first_request['tool_choice'] == {'type': 'auto'}
 
     assert [
         tool['name']
         for tool in first_request['tools']
-    ] == ['fill_fields']
+    ] == ['fill_fields', 'skip_section', 'get_progress', 'set_current_section']
 
 
 @patch('agent.loop.get_client')
@@ -470,10 +559,7 @@ def test_run_agent_uses_summary_and_recent_messages(
     'content': '当前消息',
     }
 
-    assert capture_call.kwargs['tool_choice'] == {
-        'type': 'tool',
-        'name': 'fill_fields',
-    }
+    assert capture_call.kwargs['tool_choice'] == {'type': 'auto'}
 
     # 第三次调用：生成正式客服回复。
     reply_call = (
@@ -500,7 +586,7 @@ def test_system_prompt_includes_table_columns():
 
 
 def test_system_prompt_requires_inventory_when_existing():
-    """有现有设备时，提示词要求立即采集设备明细。"""
+    """有现有设备时，提示词的待了解话题应包含设备明细。"""
     state = create_initial_state()
 
     state.sections['budget'].fields[
@@ -509,12 +595,8 @@ def test_system_prompt_requires_inventory_when_existing():
 
     prompt = _build_system_prompt(state)
 
-    assert (
-        '下一个该问：'
-        '【八、现有设备情况】'
-        '现有设备明细'
-        in prompt
-    )
+    assert '待了解话题' in prompt
+    assert '【八、现有设备情况】现有设备明细' in prompt
 
     required_part = prompt.split(
         '当前需要推进的必填字段：',
@@ -607,10 +689,7 @@ def test_run_agent_uses_stable_llm_parameters(
         'type': 'disabled',
     }
 
-    assert capture_request['tool_choice'] == {
-        'type': 'tool',
-        'name': 'fill_fields',
-    }
+    assert capture_request['tool_choice'] == {'type': 'auto'}
 
     assert reply_request['temperature'] == 0.3
     assert reply_request['thinking'] == {
@@ -676,12 +755,9 @@ def test_run_agent_persists_field_before_reply(
         .kwargs
     )
 
-    assert first_request['tool_choice'] == {
-        'type': 'tool',
-        'name': 'fill_fields',
-    }
+    assert first_request['tool_choice'] == {'type': 'auto'}
 
     assert [
         tool['name']
         for tool in first_request['tools']
-    ] == ['fill_fields']
+    ] == ['fill_fields', 'skip_section', 'get_progress', 'set_current_section']
