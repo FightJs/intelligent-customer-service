@@ -131,10 +131,21 @@ export interface Suggestion {
   options: SuggestionOption[]
 }
 
+export interface SessionMessage {
+  role: string
+  content: string | Array<{
+    type: string
+    text?: string
+    source?: { media_type: string; data: string }
+  }>
+}
+
 export interface SessionData {
   session_id: string
   form_state: StudioFormState
   greeting: string
+  messages?: SessionMessage[]
+  form_complete?: boolean
 }
 
 export interface ChatResult {

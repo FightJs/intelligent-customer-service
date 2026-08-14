@@ -21,7 +21,7 @@ import os
 import sqlite3
 from contextlib import asynccontextmanager
 from dataclasses import asdict
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID, uuid4
 
 from dotenv import load_dotenv
@@ -119,10 +119,17 @@ class UserResponse(BaseModel):
     role: str
 
 
+class SessionMessage(BaseModel):
+    role: str
+    content: Any
+
+
 class SessionResponse(BaseModel):
     session_id: str
     form_state: dict
     greeting: str
+    messages: list[SessionMessage] | None = None
+    form_complete: bool | None = None
 
 
 IMAGE_MIME_WHITELIST = {'image/png', 'image/jpeg', 'image/webp', 'image/gif'}
@@ -417,7 +424,18 @@ def get_session(session_id: str, current: dict = Depends(get_current_user)) -> S
         raise HTTPException(status_code=404, detail='session not found')
     if rec['user_id'] != current['id'] and current['role'] != 'admin':
         raise HTTPException(status_code=403, detail='无权访问该会话')
-    return SessionResponse(session_id=session_id, form_state=rec['form_state'], greeting='')
+    state = from_dict(rec['form_state'])
+    messages = [
+        SessionMessage(role=m['role'], content=m['content'])
+        for m in db.get_messages(session_id)
+    ]
+    return SessionResponse(
+        session_id=session_id,
+        form_state=rec['form_state'],
+        greeting='',
+        messages=messages,
+        form_complete=form_complete(state),
+    )
 
 
 @app.post('/api/chat', response_model=ChatResponse)

@@ -12,8 +12,8 @@ import {
   useSpeechRecognition,
 } from '../../hooks/useSpeechRecognition'
 import { useFormState } from '../../state/FormContext'
-import { createSession, chat } from '../../api/client'
-import type { FieldUpdate, Suggestion, SuggestionOption } from '../../api/client'
+import { createSession, getSession, chat } from '../../api/client'
+import type { FieldUpdate, SessionMessage, Suggestion, SuggestionOption } from '../../api/client'
 import type { StudioFormState } from '../../types/schema'
 import {
   ChatStreamHttpError,
@@ -46,6 +46,20 @@ let idCounter = 0
 function newId(): string {
   idCounter += 1
   return `m${Date.now()}_${idCounter}`
+}
+
+function toChatMessage(message: SessionMessage): ChatMessage {
+  if (typeof message.content === 'string') {
+    return { id: newId(), role: message.role === 'assistant' ? 'ai' : 'user', text: message.content }
+  }
+  const text = message.content
+    .filter((block) => block.type === 'text')
+    .map((block) => block.text ?? '')
+    .join('')
+  const images = message.content
+    .filter((block) => block.type === 'image' && block.source)
+    .map((block) => `data:${block.source!.media_type};base64,${block.source!.data}`)
+  return { id: newId(), role: message.role === 'assistant' ? 'ai' : 'user', text, images }
 }
 
 function newRequestId(): string {
@@ -129,13 +143,22 @@ export default function ChatPanel() {
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    createSession()
+    const savedId = sessionStorage.getItem('ics_session_id')
+    const restore = savedId
+      ? getSession(savedId).catch(() => createSession())
+      : createSession()
+    restore
       .then((data) => {
         if (cancelled) return
         setSessionId(data.session_id)
         dispatch({ type: 'replace_state', state: data.form_state })
         sessionStorage.setItem('ics_session_id', data.session_id)
-        setMessages([{ id: newId(), role: 'ai', text: data.greeting }])
+        if (data.messages?.length) {
+          setMessages(data.messages.map(toChatMessage))
+          setFinished(data.form_complete ?? false)
+        } else if (data.greeting) {
+          setMessages([{ id: newId(), role: 'ai', text: data.greeting }])
+        }
       })
       .catch((err) => {
         if (cancelled) return

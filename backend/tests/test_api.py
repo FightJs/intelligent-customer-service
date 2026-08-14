@@ -223,6 +223,30 @@ def test_get_session_recovers_state(client, auth_headers):
     assert r.json()['session_id'] == sid
 
 
+def test_get_session_returns_messages_and_form_complete(client, auth_headers):
+    from agent.loop import AgentResult
+    from survey.state import create_initial_state
+    sid = client.post('/api/session', headers=auth_headers).json()['session_id']
+
+    mock_result = AgentResult(
+        reply='收到云裳品牌',
+        tool_events=[],
+        state=create_initial_state(),
+        form_complete=False,
+    )
+    with patch('api.app.run_agent', return_value=mock_result):
+        client.post('/api/chat', json={'session_id': sid, 'message': '云裳'}, headers=auth_headers)
+
+    r = client.get(f'/api/session/{sid}', headers=auth_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data['form_complete'] is False
+    roles = [m['role'] for m in data['messages']]
+    assert roles == ['user', 'assistant']
+    assert data['messages'][0]['content'] == '云裳'
+    assert data['messages'][1]['content'] == '收到云裳品牌'
+
+
 def test_get_missing_session_404(client, auth_headers):
     r = client.get('/api/session/nonexistent', headers=auth_headers)
     assert r.status_code == 404
