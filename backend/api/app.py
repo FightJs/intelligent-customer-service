@@ -26,7 +26,7 @@ from uuid import UUID, uuid4
 
 from dotenv import load_dotenv
 from anthropic import APIConnectionError, APIStatusError
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, field_validator, model_validator
@@ -67,6 +67,15 @@ LLM_CONNECTION_ERROR = 'LLM 服务暂时无法连接，请检查网络或联系�
 
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
 ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123456')  # 仅测试期默认，生产必改 env
+CHAT_RATE_LIMIT_PER_MINUTE = int(
+    os.getenv('CHAT_RATE_LIMIT_PER_MINUTE', '12')
+)
+CHAT_DAILY_MESSAGE_LIMIT = int(
+    os.getenv('CHAT_DAILY_MESSAGE_LIMIT', '200')
+)
+CHAT_DAILY_IMAGE_LIMIT = int(
+    os.getenv('CHAT_DAILY_IMAGE_LIMIT', '30')
+)
 
 
 def _seed_admin() -> None:
@@ -182,12 +191,71 @@ def _normalize_image_updates(session_id: str, updates: list[dict] | None) -> Non
             upd['value'] = normalized
 
 
+def _validate_images(images: list[str] | None) -> list[str] | None:
+    if images is not None and len(images) > 5:
+        raise ValueError('每条消息最多上传 5 张图片')
+    return images
+
+
+def _reserve_chat_quota(
+    current: dict,
+    request: Request,
+    images: list[str] | None,
+    *,
+    request_key: str | None = None,
+) -> None:
+    """在调用 LLM 前预占额度，避免并发请求一起越过限制。"""
+    ip_address = (
+        request.client.host
+        if request.client is not None
+        else 'unknown'
+    )
+    violation = db.reserve_chat_usage(
+        user_id=current['id'],
+        ip_address=ip_address,
+        image_count=len(images or []),
+        per_minute_limit=CHAT_RATE_LIMIT_PER_MINUTE,
+        daily_message_limit=CHAT_DAILY_MESSAGE_LIMIT,
+        daily_image_limit=CHAT_DAILY_IMAGE_LIMIT,
+        request_key=request_key,
+    )
+    details = {
+        'rate': '请求过于频繁，请稍后再试。',
+        'messages': '今日消息额度已用完，请明天再试。',
+        'images': '今日图片额度已用完，请明天再试。',
+    }
+    if violation is not None:
+        raise HTTPException(
+            status_code=429,
+            detail=details[violation],
+        )
+
+
 class ChatRequest(BaseModel):
     session_id: str
     message: str
     history: list[dict] | None = None
     updates: list[dict] | None = None
     images: list[str] | None = None
+
+    @field_validator('message')
+    @classmethod
+    def validate_message(cls, value: str) -> str:
+        value = value.strip()
+        if len(value) > 8000:
+            raise ValueError('message 不能超过 8000 个字符')
+        return value
+
+    @field_validator('images')
+    @classmethod
+    def validate_images(cls, value: list[str] | None) -> list[str] | None:
+        return _validate_images(value)
+
+    @model_validator(mode='after')
+    def require_message_or_images(self) -> 'ChatRequest':
+        if not self.message and not self.images:
+            raise ValueError('message 和 images 不能同时为空')
+        return self
 
 
 class ChatResponse(BaseModel):
@@ -213,6 +281,11 @@ class ChatStreamRequest(BaseModel):
         if len(value) > 8000:
             raise ValueError('message 不能超过 8000 个字符')
         return value
+
+    @field_validator('images')
+    @classmethod
+    def validate_images(cls, value: list[str] | None) -> list[str] | None:
+        return _validate_images(value)
 
     @model_validator(mode='after')
     def require_message_or_images(self) -> 'ChatStreamRequest':
@@ -348,13 +421,19 @@ def get_session(session_id: str, current: dict = Depends(get_current_user)) -> S
 
 
 @app.post('/api/chat', response_model=ChatResponse)
-def chat(req: ChatRequest, current: dict = Depends(get_current_user)) -> ChatResponse:
+def chat(
+    req: ChatRequest,
+    request: Request,
+    current: dict = Depends(get_current_user),
+) -> ChatResponse:
     """普通 POST 对话（非 SSE）。校验 session 归属。"""
     rec = db.get_session(req.session_id)
     if rec is None:
         raise HTTPException(status_code=404, detail='session not found')
     if rec['user_id'] != current['id'] and current['role'] != 'admin':
         raise HTTPException(status_code=403, detail='无权操作该会话')
+
+    _reserve_chat_quota(current, request, req.images)
 
     state = from_dict(rec['form_state'])
 
@@ -422,6 +501,7 @@ def _encode_sse(
 @app.post('/api/chat/stream')
 async def chat_stream(
     req: ChatStreamRequest,
+    request: Request,
     current: dict = Depends(get_current_user),
 ) -> StreamingResponse:
     """真实 LLM stream 的 SSE 聊天接口，支持 request_id 幂等回放。"""
@@ -444,6 +524,17 @@ async def chat_stream(
         raise HTTPException(status_code=409, detail='request_in_progress')
     if request_status == 'conflict':
         raise HTTPException(status_code=409, detail='request_conflict')
+    if request_status == 'new':
+        try:
+            _reserve_chat_quota(
+                current,
+                request,
+                req.images,
+                request_key=request_id,
+            )
+        except HTTPException:
+            db.fail_chat_request(request_id, 'quota_exceeded')
+            raise
 
     async def event_generator():
         sequence = 0

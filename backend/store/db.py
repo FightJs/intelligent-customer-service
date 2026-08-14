@@ -15,6 +15,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from store import uploads
+
 DB_PATH = Path(__file__).resolve().parents[1] / 'data' / 'ics.db'
 
 
@@ -86,6 +88,23 @@ def init_db() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_chat_requests_session
                 ON chat_requests(session_id);
+
+            CREATE TABLE IF NOT EXISTS chat_usage (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id        INTEGER NOT NULL,
+                ip_address     TEXT NOT NULL,
+                image_count    INTEGER NOT NULL DEFAULT 0,
+                request_key    TEXT,
+                created_at     TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_chat_usage_user_time
+                ON chat_usage(user_id, created_at);
+            CREATE INDEX IF NOT EXISTS idx_chat_usage_ip_time
+                ON chat_usage(ip_address, created_at);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_usage_request
+                ON chat_usage(request_key)
+                WHERE request_key IS NOT NULL;
         ''')
 
         # sessions 表：检测老结构（无 user_id），DROP 重建
@@ -335,6 +354,112 @@ def persist_chat_completion(
     return assistant_message_id
 
 
+def reserve_chat_usage(
+    user_id: int,
+    ip_address: str,
+    image_count: int,
+    *,
+    per_minute_limit: int,
+    daily_message_limit: int,
+    daily_image_limit: int,
+    request_key: str | None = None,
+    now: datetime | None = None,
+) -> str | None:
+    """原子检查并预占一次聊天额度。
+
+    返回 None 表示成功；超限时返回 rate/messages/images。
+    request_key 用于流式请求重放，确保同一请求只计费一次。
+    """
+    current = now or datetime.now(timezone.utc)
+    minute_cutoff = (current - timedelta(minutes=1)).isoformat()
+    day_start = current.replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    ).isoformat()
+    cleanup_cutoff = (current - timedelta(days=2)).isoformat()
+    created_at = current.isoformat()
+    safe_image_count = max(0, image_count)
+
+    with _connect() as conn:
+        conn.execute('BEGIN IMMEDIATE')
+
+        if request_key is not None:
+            existing = conn.execute(
+                'SELECT 1 FROM chat_usage WHERE request_key = ?',
+                (request_key,),
+            ).fetchone()
+            if existing is not None:
+                return None
+
+        conn.execute(
+            'DELETE FROM chat_usage WHERE created_at < ?',
+            (cleanup_cutoff,),
+        )
+
+        user_minute_count = conn.execute(
+            '''SELECT COUNT(*) FROM chat_usage
+               WHERE user_id = ? AND created_at >= ?''',
+            (user_id, minute_cutoff),
+        ).fetchone()[0]
+        ip_minute_count = conn.execute(
+            '''SELECT COUNT(*) FROM chat_usage
+               WHERE ip_address = ? AND created_at >= ?''',
+            (ip_address, minute_cutoff),
+        ).fetchone()[0]
+
+        if max(user_minute_count, ip_minute_count) >= per_minute_limit:
+            return 'rate'
+
+        user_daily_messages = conn.execute(
+            '''SELECT COUNT(*) FROM chat_usage
+               WHERE user_id = ? AND created_at >= ?''',
+            (user_id, day_start),
+        ).fetchone()[0]
+        ip_daily_messages = conn.execute(
+            '''SELECT COUNT(*) FROM chat_usage
+               WHERE ip_address = ? AND created_at >= ?''',
+            (ip_address, day_start),
+        ).fetchone()[0]
+
+        if max(user_daily_messages, ip_daily_messages) >= daily_message_limit:
+            return 'messages'
+
+        user_daily_images = conn.execute(
+            '''SELECT COALESCE(SUM(image_count), 0) FROM chat_usage
+               WHERE user_id = ? AND created_at >= ?''',
+            (user_id, day_start),
+        ).fetchone()[0]
+        ip_daily_images = conn.execute(
+            '''SELECT COALESCE(SUM(image_count), 0) FROM chat_usage
+               WHERE ip_address = ? AND created_at >= ?''',
+            (ip_address, day_start),
+        ).fetchone()[0]
+
+        if (
+            max(user_daily_images, ip_daily_images)
+            + safe_image_count
+            > daily_image_limit
+        ):
+            return 'images'
+
+        conn.execute(
+            '''INSERT INTO chat_usage
+               (user_id, ip_address, image_count, request_key, created_at)
+               VALUES (?, ?, ?, ?, ?)''',
+            (
+                user_id,
+                ip_address,
+                safe_image_count,
+                request_key,
+                created_at,
+            ),
+        )
+
+    return None
+
+
 # ── Users ──────────────────────────────────────────────────────
 
 def create_user(username: str, password_hash: str, role: str = 'user') -> int:
@@ -492,6 +617,13 @@ def delete_user(user_id: int) -> bool:
         )
         conn.execute(
             '''
+            DELETE FROM chat_usage
+            WHERE user_id = ?
+            ''',
+            (user_id,),
+        )
+        conn.execute(
+            '''
             DELETE FROM deliveries
             WHERE user_id = ?
             ''',
@@ -527,6 +659,8 @@ def cleanup_expired_guests(
         - timedelta(hours=max_idle_hours)
     ).isoformat()
 
+    expired_session_ids: list[str] = []
+
     with _connect() as conn:
         conn.execute('''
             CREATE TEMP TABLE expired_guest_ids (
@@ -557,6 +691,16 @@ def cleanup_expired_guests(
         if expired_count == 0:
             return 0
 
+        expired_session_ids = [
+            row[0]
+            for row in conn.execute('''
+                SELECT s.session_id
+                FROM sessions s
+                JOIN expired_guest_ids e
+                  ON e.id = s.user_id
+            ''').fetchall()
+        ]
+
         conn.execute('''
             DELETE FROM messages
             WHERE session_id IN (
@@ -568,6 +712,13 @@ def cleanup_expired_guests(
         ''')
         conn.execute('''
             DELETE FROM chat_requests
+            WHERE user_id IN (
+                SELECT id
+                FROM expired_guest_ids
+            )
+        ''')
+        conn.execute('''
+            DELETE FROM chat_usage
             WHERE user_id IN (
                 SELECT id
                 FROM expired_guest_ids
@@ -594,6 +745,10 @@ def cleanup_expired_guests(
                 FROM expired_guest_ids
             )
         ''')
+
+    uploads.delete_session_uploads(
+        expired_session_ids,
+    )
 
     return int(expired_count)
 

@@ -292,3 +292,61 @@ describe('toolEventStatus', () => {
     expect(toolEventStatus('deliverable')).toBe('正在生成交付物')
   })
 })
+
+describe('ChatPanel 生成期间输入保护', () => {
+  it('禁用输入并显示当前处理阶段', async () => {
+    let finishStream!: () => void
+    const pending = new Promise<void>((resolve) => {
+      finishStream = resolve
+    })
+
+    vi.mocked(streamChat).mockImplementation(async (_request, handlers) => {
+      handlers.onStart({
+        request_id: 'request-pending',
+        status: 'started',
+      })
+      handlers.onStatus({
+        phase: 'generating',
+        message: '正在生成回复',
+      })
+      await pending
+      handlers.onDone({
+        request_id: 'request-pending',
+        reply: '回复完成',
+        tool_events: [],
+        form_state: {
+          sections: {},
+          currentSectionId: 'customer',
+          completed: false,
+        } as any,
+        form_complete: false,
+        suggestions: [],
+        assistant_message_id: 1,
+      })
+    })
+
+    render(
+      <FormProvider>
+        <ChatPanel />
+      </FormProvider>,
+    )
+
+    const input = await screen.findByPlaceholderText('输入您的回答…')
+    fireEvent.change(input, { target: { value: '第一条消息' } })
+    fireEvent.click(screen.getByRole('button', { name: '发送' }))
+
+    const waitingInput = await screen.findByPlaceholderText(
+      '正在生成回复，请稍候…',
+    )
+    expect(waitingInput).toBeDisabled()
+    expect(screen.getByRole('button', { name: '停止生成' })).toBeEnabled()
+
+    await act(async () => {
+      finishStream()
+      await pending
+    })
+
+    await screen.findByText('回复完成')
+    expect(waitingInput).toBeEnabled()
+  })
+})

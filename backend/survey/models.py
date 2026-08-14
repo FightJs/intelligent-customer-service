@@ -102,6 +102,14 @@ class StudioFormState(BaseModel):
 
     sections: dict[str, SectionState] = Field(default_factory=dict)
     current_section_id: str = Field(default='', alias='currentSectionId')
+    room_image_invited: bool = Field(
+        default=False,
+        alias='roomImageInvited',
+    )
+    reference_image_invited: bool = Field(
+        default=False,
+        alias='referenceImageInvited',
+    )
     completed: bool = False
 
 

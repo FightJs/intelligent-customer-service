@@ -24,7 +24,7 @@ uv run pytest
 
 | 目录 | 职责 |
 |---|---|
-| `agent/` | LLM 调用（Anthropic SDK → DeepSeek）、tool-use 循环、表单状态机 |
+| `agent/` | LLM 调用（Anthropic 兼容端点）、tool-use 循环、表单状态机 |
 | `api/` | FastAPI 路由（`app.py`：session / chat / generate） |
 | `survey/` | 表单 schema 单一真相源 + codegen（生成前端 `schema.json`） |
 | `store/` | SQLite 持久化（`db.py`：sessions / messages，无 ORM） |

@@ -29,7 +29,7 @@ def _insufficient_balance_error() -> APIStatusError:
 
 def _llm_connection_error() -> APIConnectionError:
     return APIConnectionError(
-        request=httpx.Request('POST', 'https://api.deepseek.com/anthropic/v1/messages'),
+        request=httpx.Request('POST', 'https://llm.example.test/v1/messages'),
     )
 
 
@@ -54,6 +54,14 @@ def _mock_greeting():
     """自动 mock initial_greeting，所有测试都不调真实 LLM 生成开场白。"""
     with patch('api.app.initial_greeting', return_value='hi'):
         yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_chat_usage(client):
+    """API 用例共享客户端 IP，每个用例独立计算聊天额度。"""
+    with db._connect() as conn:
+        conn.execute('DELETE FROM chat_usage')
+    yield
 
 
 @pytest.fixture
@@ -194,30 +202,18 @@ def test_create_session_returns_greeting(client, auth_headers):
     assert len(fs['sections']) == 10
 
 
-def test_create_session_falls_back_when_llm_balance_is_insufficient(client, auth_headers):
+def test_create_session_uses_static_greeting_without_llm(client, auth_headers):
     from agent.gather import initial_greeting
 
     with patch('api.app.initial_greeting', new=initial_greeting):
-        with patch('agent.gather.get_client') as get_client:
-            get_client.return_value.messages.create.side_effect = _insufficient_balance_error()
-            with TestClient(app, raise_server_exceptions=False) as degraded_client:
-                r = degraded_client.post('/api/session', headers=auth_headers)
+        r = client.post('/api/session', headers=auth_headers)
 
     assert r.status_code == 200
-    assert r.json()['greeting'] == '您好！我是直播间搭建顾问，请问您的品牌名是？'
-
-
-def test_create_session_falls_back_when_llm_cannot_connect(client, auth_headers):
-    from agent.gather import initial_greeting
-
-    with patch('api.app.initial_greeting', new=initial_greeting):
-        with patch('agent.gather.get_client') as get_client:
-            get_client.return_value.messages.create.side_effect = _llm_connection_error()
-            with TestClient(app, raise_server_exceptions=False) as degraded_client:
-                r = degraded_client.post('/api/session', headers=auth_headers)
-
-    assert r.status_code == 200
-    assert r.json()['greeting'] == '您好！我是直播间搭建顾问，请问您的品牌名是？'
+    assert r.json()['greeting'] == (
+        '嗨，欢迎来聊直播间搭建～我是小搭，'
+        '会边聊边帮你把需求整理好。'
+        '先跟我说说你的品牌叫什么、主要做哪类产品吧？'
+    )
 
 
 def test_get_session_recovers_state(client, auth_headers):

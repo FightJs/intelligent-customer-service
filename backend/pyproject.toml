@@ -9,7 +9,7 @@ dependencies = [
     "uvicorn[standard]>=0.32",
     # Schema（已在用）
     "pydantic>=2.10",
-    # AI Agent — Anthropic SDK（直连 DeepSeek /anthropic 端点）
+    # AI Agent — Anthropic SDK（连接环境变量指定的兼容端点）
     "anthropic>=0.40",
     # 交付物生成（阶段 3）
     "jinja2>=3.1",         # Markdown 模板

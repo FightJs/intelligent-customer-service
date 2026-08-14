@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
-from store import db
+from store import db, uploads
+from tests.test_uploads import make_png_data_uri
 
 
 def test_get_messages_returns_latest_in_chronological_order(
@@ -424,6 +425,10 @@ def test_cleanup_expired_guests_removes_only_inactive_guests(
         'user',
         '旧消息',
     )
+    expired_image = uploads.save_upload(
+        expired_session,
+        make_png_data_uri(),
+    )
     db.begin_chat_request(
         'expired-request',
         expired_session,
@@ -441,11 +446,23 @@ def test_cleanup_expired_guests_removes_only_inactive_guests(
         active_id,
         {},
     )
+    active_image = uploads.save_upload(
+        active_session,
+        make_png_data_uri(),
+    )
 
     regular_id = db.create_user(
         'regular_old',
         'hash',
         role='user',
+    )
+    regular_session = db.create_session(
+        regular_id,
+        {},
+    )
+    regular_image = uploads.save_upload(
+        regular_session,
+        make_png_data_uri(),
     )
 
     monkeypatch.setattr(
@@ -467,9 +484,13 @@ def test_cleanup_expired_guests_removes_only_inactive_guests(
     assert db.get_user_by_id(expired_id) is None
     assert db.get_session(expired_session) is None
     assert db.get_messages(expired_session) == []
+    assert expired_image.path.exists() is False
+    assert expired_image.path.parent.exists() is False
     assert db.get_user_by_id(active_id) is not None
     assert db.get_session(active_session) is not None
+    assert active_image.path.exists() is True
     assert db.get_user_by_id(regular_id) is not None
+    assert regular_image.path.exists() is True
 
     with db._connect() as conn:
         request_count = conn.execute(
@@ -482,3 +503,90 @@ def test_cleanup_expired_guests_removes_only_inactive_guests(
         ).fetchone()[0]
 
     assert request_count == 0
+
+
+def test_chat_usage_enforces_rate_and_daily_limits(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        db,
+        'DB_PATH',
+        tmp_path / 'test.db',
+    )
+    monkeypatch.setattr(
+        uploads,
+        'UPLOADS_ROOT',
+        tmp_path / 'uploads',
+    )
+    db.init_db()
+    user_id = db.create_user('limited-user', 'hash')
+    now = datetime(2026, 8, 14, 8, tzinfo=timezone.utc)
+
+    assert db.reserve_chat_usage(
+        user_id,
+        '127.0.0.1',
+        2,
+        per_minute_limit=2,
+        daily_message_limit=3,
+        daily_image_limit=3,
+        request_key='request-1',
+        now=now,
+    ) is None
+
+    # 同一流式 request_id 重放不重复计数。
+    assert db.reserve_chat_usage(
+        user_id,
+        '127.0.0.1',
+        2,
+        per_minute_limit=2,
+        daily_message_limit=3,
+        daily_image_limit=3,
+        request_key='request-1',
+        now=now,
+    ) is None
+
+    assert db.reserve_chat_usage(
+        user_id,
+        '127.0.0.1',
+        1,
+        per_minute_limit=2,
+        daily_message_limit=3,
+        daily_image_limit=3,
+        request_key='request-2',
+        now=now,
+    ) is None
+
+    assert db.reserve_chat_usage(
+        user_id,
+        '127.0.0.1',
+        0,
+        per_minute_limit=2,
+        daily_message_limit=3,
+        daily_image_limit=3,
+        request_key='request-3',
+        now=now,
+    ) == 'rate'
+
+    later = now + timedelta(minutes=2)
+    assert db.reserve_chat_usage(
+        user_id,
+        '127.0.0.1',
+        1,
+        per_minute_limit=2,
+        daily_message_limit=3,
+        daily_image_limit=3,
+        request_key='request-4',
+        now=later,
+    ) == 'images'
+
+    assert db.reserve_chat_usage(
+        user_id,
+        '127.0.0.1',
+        0,
+        per_minute_limit=2,
+        daily_message_limit=2,
+        daily_image_limit=3,
+        request_key='request-5',
+        now=later,
+    ) == 'messages'

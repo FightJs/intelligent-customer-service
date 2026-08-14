@@ -67,5 +67,7 @@ export interface StudioFormState {
   requiredFieldIds: string[]
   sections: Record<SectionId, SectionState>
   currentSectionId: SectionId
+  roomImageInvited: boolean
+  referenceImageInvited: boolean
   completed: boolean
 }

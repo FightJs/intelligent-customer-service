@@ -9,6 +9,7 @@ import base64
 import binascii
 import io
 import re
+import shutil
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,6 +31,7 @@ MIME_EXT = {
 DATA_URI_RE = re.compile(r'^data:(?P<mime>[^;,]+);base64,(?P<data>.*)$', re.DOTALL)
 
 _ID_RE = re.compile(r'^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+\.(png|jpg|webp|gif)$')
+_SESSION_ID_RE = re.compile(r'^[a-zA-Z0-9_-]+$')
 
 
 class UploadError(ValueError):
@@ -104,3 +106,26 @@ def image_to_data_uri(path: Path) -> str:
     mime = {v: k for k, v in MIME_EXT.items()}[ext]
     data = base64.b64encode(path.read_bytes()).decode('ascii')
     return f'data:{mime};base64,{data}'
+
+
+def delete_session_uploads(session_ids: list[str]) -> int:
+    """删除指定会话的全部落盘图片，返回删除的会话目录数量。
+
+    只接受单段安全 session_id，并验证目标目录直属 UPLOADS_ROOT，
+    防止路径穿越或误删上传根目录。
+    """
+    root = UPLOADS_ROOT.resolve()
+    deleted = 0
+
+    for session_id in dict.fromkeys(session_ids):
+        if _SESSION_ID_RE.fullmatch(session_id) is None:
+            continue
+
+        session_dir = (UPLOADS_ROOT / session_id).resolve()
+        if session_dir.parent != root or not session_dir.is_dir():
+            continue
+
+        shutil.rmtree(session_dir)
+        deleted += 1
+
+    return deleted

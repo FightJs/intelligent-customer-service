@@ -462,14 +462,16 @@ export default function ChatPanel() {
                     && !listening
                   ) {
                     event.preventDefault()
-                    send()
+                    if (!sending) {
+                      send()
+                    }
                   }
                 }}
                 placeholder={
                   listening
                     ? '正在聆听，请再次点击麦克风结束…'
                     : sending
-                      ? '顾问回复中…'
+                      ? `${streamStatus ?? '正在处理'}，请稍候…`
                       : '输入您的回答…'
                 }
                 disabled={sending || loading}

@@ -8,6 +8,7 @@ from PIL import Image
 import store.uploads as uploads
 from store.uploads import (
     UploadError,
+    delete_session_uploads,
     image_to_data_uri,
     resolve_image,
     save_upload,
@@ -55,6 +56,20 @@ def test_save_upload_resizes_long_edge(uploads_root):
     saved = save_upload('sess1', make_png_data_uri(width=2000, height=1000))
     with Image.open(saved.path) as img:
         assert max(img.size) == uploads.MAX_EDGE
+
+
+def test_delete_session_uploads_only_removes_exact_session(uploads_root):
+    first = save_upload('session-one', make_png_data_uri())
+    second = save_upload('session-two', make_png_data_uri())
+
+    deleted = delete_session_uploads([
+        'session-one',
+        '../session-two',
+    ])
+
+    assert deleted == 1
+    assert first.path.exists() is False
+    assert second.path.exists() is True
 
 
 def test_resolve_image_rejects_traversal_and_missing(uploads_root):

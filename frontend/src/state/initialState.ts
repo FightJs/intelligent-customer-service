@@ -27,6 +27,8 @@ export function createInitialState(): StudioFormState {
     requiredFieldIds: [],
     sections,
     currentSectionId: SECTION_ORDER[0],
+    roomImageInvited: false,
+    referenceImageInvited: false,
     completed: false,
   }
 }
