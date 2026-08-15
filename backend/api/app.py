@@ -21,6 +21,7 @@ import os
 import sqlite3
 from contextlib import asynccontextmanager
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
@@ -29,6 +30,8 @@ from anthropic import APIConnectionError, APIStatusError
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel, field_validator, model_validator
 
 from agent.auth import (
@@ -95,7 +98,10 @@ app = FastAPI(title='ICS Backend', version='0.3.0', lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['http://localhost:5173', 'http://127.0.0.1:5173'],
+    allow_origins=os.getenv(
+        'CORS_ORIGINS',
+        'http://localhost:5173,http://127.0.0.1:5173',
+    ).split(','),
     allow_methods=['*'],
     allow_headers=['*'],
 )
@@ -1180,3 +1186,27 @@ def admin_delete_delivery(
         )
 
     return Response(status_code=204)
+
+
+# ── 前端静态托管（SPA）────────────────────────────────────────
+# 隧道/单入口部署时前后端同域：API 在 /api 前缀（先注册优先匹配），
+# 其余路径落到前端静态文件，未命中路径回退 index.html 交给 react-router。
+FRONTEND_DIST = Path(
+    os.getenv('FRONTEND_DIST', Path(__file__).resolve().parents[1].parent / 'frontend' / 'dist')
+)
+
+
+class SPAStaticFiles(StaticFiles):
+    """未命中静态文件时回退 index.html（SPA 客户端路由）。"""
+
+    async def get_response(self, path: str, scope: dict) -> Response:
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code == 404:
+                return await super().get_response('index.html', scope)
+            raise
+
+
+if FRONTEND_DIST.is_dir():
+    app.mount('/', SPAStaticFiles(directory=FRONTEND_DIST, html=True), name='spa')
