@@ -48,7 +48,7 @@ export default function Sidebar({
 
   return (
     <div
-      className={`absolute top-1 bottom-2 ${isLeft ? 'left-2' : 'right-2'} flex flex-col bg-surface rounded-[12px] shadow-xl ring-1 ring-white/10 transition-transform duration-300 ${
+      className={`absolute top-1 bottom-2 ${isLeft ? 'left-2' : 'right-2'} flex flex-col bg-surface rounded-[12px] shadow-xl ring-1 ring-outline/70 transition-transform duration-300 ${
         open ? 'translate-x-0 opacity-100' : `${hiddenTransform} opacity-0 pointer-events-none`
       }`}
       style={{ width }}

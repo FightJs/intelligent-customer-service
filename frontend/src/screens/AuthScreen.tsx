@@ -60,7 +60,7 @@ export default function AuthScreen() {
         className="auth-form-container w-full max-w-sm p-6 shadow-xl"
       >
         <div className="mb-6 text-center">
-          <img src="/favicon.svg" alt="" className="mx-auto mb-3 h-10 w-10" />
+          <img src="/logo.svg" alt="" className="mx-auto mb-3 h-10 w-10" />
           <h1 className="text-xl font-semibold">
             {mode === 'login' ? '登录' : '注册'}
           </h1>
@@ -110,7 +110,7 @@ export default function AuthScreen() {
           </div>
 
           {error && (
-            <p role="alert" className="text-sm text-red-400">
+            <p role="alert" className="text-sm text-danger">
               {error}
             </p>
           )}
@@ -118,7 +118,7 @@ export default function AuthScreen() {
           <button
             type="submit"
             disabled={busy || username.length < 2 || password.length < 6}
-            className="w-full rounded-bubble bg-accent px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+            className="w-full rounded-bubble bg-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
           >
             {busy ? '处理中…' : mode === 'login' ? '登录' : '注册'}
           </button>

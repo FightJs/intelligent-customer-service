@@ -14,19 +14,19 @@ const STRUCTURED_CONTENT = [
     label: '场景设计说明',
     description: '直播场景与空间设计结构',
     icon: FileText,
-    color: '#ef4444',
+    color: 'rgb(var(--color-danger))',
   },
   {
     label: '设备参数清单',
     description: '现有设备与推荐设备结构',
     icon: FileSpreadsheet,
-    color: '#22c55e',
+    color: 'rgb(var(--color-done))',
   },
   {
     label: '需求确认书',
     description: '客户完整需求确认结构',
     icon: FileType2,
-    color: '#3b82f6',
+    color: 'rgb(var(--color-accent))',
   },
 ] as const
 

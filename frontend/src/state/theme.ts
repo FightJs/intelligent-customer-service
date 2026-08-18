@@ -2,18 +2,22 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 
 export type Theme = 'dark' | 'light'
 
+const THEME_MIGRATION_KEY = 'theme-preference-v2'
+
 export function useTheme(): { theme: Theme; toggleTheme: () => void } {
   const transitionTimerRef = useRef<number | null>(null)
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem('theme')
-    return saved === 'light' ? 'light' : 'dark'
+    const migrated = localStorage.getItem(THEME_MIGRATION_KEY) === '1'
+    return migrated && saved === 'dark' ? 'dark' : 'light'
   })
 
   useEffect(() => {
     const root = document.documentElement
-    if (theme === 'light') root.classList.add('light')
-    else root.classList.remove('light')
+    root.classList.toggle('light', theme === 'light')
+    root.classList.toggle('dark', theme === 'dark')
     localStorage.setItem('theme', theme)
+    localStorage.setItem(THEME_MIGRATION_KEY, '1')
   }, [theme])
 
   useEffect(() => () => {

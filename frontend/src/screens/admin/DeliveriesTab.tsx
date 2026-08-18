@@ -116,7 +116,7 @@ export default function DeliveriesTab({ onUnsupportedDocument, selectedUserId, o
         </div>
       </div>
 
-      {list.error && <p className="text-sm text-red-400">{list.error}</p>}
+      {list.error && <p className="text-sm text-danger">{list.error}</p>}
 
       <DataTable<AdminDeliveryListItem>
         columns={COLUMNS}

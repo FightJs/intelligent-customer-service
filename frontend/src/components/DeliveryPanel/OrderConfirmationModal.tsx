@@ -306,7 +306,7 @@ export default function OrderConfirmationModal({
 
               {error && (
                 <p
-                  className="mt-3 text-sm text-red-400"
+                  className="mt-3 text-sm text-danger"
                   role="alert"
                 >
                   {error}

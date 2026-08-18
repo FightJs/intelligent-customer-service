@@ -74,7 +74,7 @@ export default function AvatarMenu({
             onClose()
           }}
           className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-active-surface ${
-            danger ? 'text-red-400' : 'text-secondary hover:text-primary'
+            danger ? 'text-danger' : 'text-secondary hover:text-primary'
           }`}
         >
           {icon}

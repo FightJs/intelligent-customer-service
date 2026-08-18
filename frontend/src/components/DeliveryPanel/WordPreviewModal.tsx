@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Download, FileType, Loader2, X } from 'lucide-react'
+import { FileType, Loader2, X } from 'lucide-react'
 import { renderAsync } from 'docx-preview'
 import { generateUrl } from '../../api/client'
 
@@ -9,19 +9,11 @@ interface WordPreviewModalProps {
   onClose: () => void
 }
 
-function getFilename(response: Response): string {
-  const contentDisposition = response.headers.get('content-disposition') || ''
-  const match = contentDisposition.match(/filename\*=UTF-8''(.+)/)
-  return match ? decodeURIComponent(match[1]) : '客户需求表.docx'
-}
-
 /** 实验性 DOCX 预览：直接渲染当前会话生成的文件流，不向第三方发送文档。 */
 export default function WordPreviewModal({ sessionId, onClose }: WordPreviewModalProps) {
   const documentRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [filename, setFilename] = useState('客户需求表.docx')
-  const [downloading, setDownloading] = useState(false)
   const [isScrolling, setIsScrolling] = useState(false)
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -42,11 +34,10 @@ export default function WordPreviewModal({ sessionId, onClose }: WordPreviewModa
       }
 
       try {
-        const response = await generateUrl('word', sessionId)
+        const response = await generateUrl('word', sessionId, { preview: true })
         if (!response.ok) throw new Error(`生成失败：${response.status}`)
 
         const blob = await response.blob()
-        const nextFilename = getFilename(response)
         await renderAsync(blob, container, container, {
           className: 'docx',
           inWrapper: true,
@@ -55,7 +46,6 @@ export default function WordPreviewModal({ sessionId, onClose }: WordPreviewModa
           useBase64URL: true,
         })
 
-        if (!cancelled) setFilename(nextFilename)
       } catch (renderError) {
         if (!cancelled) setError(renderError instanceof Error ? renderError.message : '文档预览失败')
       } finally {
@@ -82,27 +72,6 @@ export default function WordPreviewModal({ sessionId, onClose }: WordPreviewModa
     return () => window.removeEventListener('keydown', handleKeydown)
   }, [onClose])
 
-  async function handleDownload() {
-    setDownloading(true)
-    try {
-      const response = await generateUrl('word', sessionId)
-      if (!response.ok) throw new Error(`生成失败：${response.status}`)
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = getFilename(response)
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      URL.revokeObjectURL(url)
-    } catch (downloadError) {
-      setError(downloadError instanceof Error ? downloadError.message : '下载失败')
-    } finally {
-      setDownloading(false)
-    }
-  }
-
   function handleBodyScroll() {
     setIsScrolling(true)
     if (scrollTimer.current !== null) clearTimeout(scrollTimer.current)
@@ -123,19 +92,10 @@ export default function WordPreviewModal({ sessionId, onClose }: WordPreviewModa
             <span className="word-preview-file-icon" aria-hidden="true"><FileType size={18} /></span>
             <div className="min-w-0">
               <h2 id="word-preview-title">客户需求表</h2>
-              <p>{filename} <span>实验预览</span></p>
+              <p>实验预览</p>
             </div>
           </div>
           <div className="word-preview-actions">
-            <button
-              type="button"
-              className="word-preview-download"
-              onClick={() => void handleDownload()}
-              disabled={!sessionId || loading || downloading}
-            >
-              {downloading ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-              下载
-            </button>
             <button type="button" className="word-preview-close" onClick={onClose} aria-label="关闭预览">
               <X size={19} />
             </button>

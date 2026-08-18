@@ -25,6 +25,22 @@ describe('generateUrl', () => {
       },
     )
   })
+
+  it('需求表预览请求标记为 preview', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 200, ok: true })
+    vi.stubGlobal('fetch', fetchMock)
+    setAuth('token-123', { id: 1, username: 'user-a', role: 'user' })
+
+    await generateUrl('word', 'session-1', { preview: true })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:8000/api/generate/word?session_id=session-1&preview=true',
+      {
+        method: 'POST',
+        headers: { Authorization: 'Bearer token-123' },
+      },
+    )
+  })
 })
 
 describe('sendOrder', () => {

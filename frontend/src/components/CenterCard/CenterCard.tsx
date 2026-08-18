@@ -19,8 +19,7 @@ interface CenterCardProps {
 
 // 工作台中央主卡（4:3）。两态：
 //   默认态：fixed 居中 + 拖拽偏移（calc(-50% + pos)），可拖可缩放，含放大按钮。
-//   放大态：absolute 占中右（left:120 让出 ProgressCard 区 → right:16），锁定拖拽、隐藏缩放手柄、显示还原按钮。
-// 不复用 FloatingCard：CenterCard 需 calc(-50%+pos) 居中变换，FloatingCard 仅支持 translate(pos)。
+//   放大态：absolute 占满中央区，锁定拖拽、隐藏缩放手柄、显示还原按钮。
 // 后续 ChatPanel（Task6）会作为 children 传入；本 task 用占位内容。
 export default function CenterCard({ expanded, onToggleExpand, children }: CenterCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
@@ -62,7 +61,8 @@ export default function CenterCard({ expanded, onToggleExpand, children }: Cente
     maxSize: CENTER_MAX_SIZE,
     ratio: CENTER_RATIO,
   })
-  const { z, bringToFront } = useZStack({ id: 'center', defaultZ: 20 })
+  // 主对话框默认高于左侧进度卡，避免输入区被覆盖后无法点击；其他卡片仍可通过交互置顶。
+  const { z, bringToFront } = useZStack({ id: 'center', defaultZ: 40 })
 
   return (
     <div
@@ -70,6 +70,7 @@ export default function CenterCard({ expanded, onToggleExpand, children }: Cente
       data-center-card
       data-expanded={expanded}
       onMouseDown={bringToFront}
+      onFocusCapture={bringToFront}
       onDoubleClick={expanded ? undefined : onToggleExpand}
       className={`center-card flex flex-col overflow-hidden rounded-xl bg-surface/95 backdrop-blur-md shadow-2xl${expanded ? ' is-expanded' : ''}${dragging || resizing ? ' is-interacting' : ''}`}
       style={{

@@ -22,7 +22,7 @@ describe('WordPreviewModal', () => {
     render(<WordPreviewModal sessionId="" onClose={vi.fn()} />)
 
     expect(await screen.findByRole('alert')).toHaveTextContent('当前会话尚未建立，无法预览 Word 文档')
-    expect(screen.getByRole('button', { name: '下载' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: '下载' })).not.toBeInTheDocument()
     expect(generateUrlMock).not.toHaveBeenCalled()
     expect(renderAsyncMock).not.toHaveBeenCalled()
   })

@@ -187,7 +187,7 @@ export default function DeliveryDrawer({ detail, loading, error, onClose, onUnsu
             <button type="button" onClick={() => setEditing((current) => !current)} disabled={saving} className="grid h-7 w-7 place-items-center rounded-card text-muted transition-colors hover:bg-active-surface hover:text-primary disabled:opacity-40" aria-label={editing ? '取消编辑' : '编辑交付物'} title={editing ? '取消编辑' : '编辑交付物'}>
               <Pencil size={14} />
             </button>
-            <button type="button" onClick={() => void handleDelete()} disabled={saving} className="grid h-7 w-7 place-items-center rounded-card text-muted transition-colors hover:bg-red-950 hover:text-red-300 disabled:opacity-40" aria-label="删除交付物" title="删除交付物">
+            <button type="button" onClick={() => void handleDelete()} disabled={saving} className="grid h-7 w-7 place-items-center rounded-card text-muted transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-40" aria-label="删除交付物" title="删除交付物">
               <Trash2 size={14} />
             </button>
           </div>
@@ -198,19 +198,19 @@ export default function DeliveryDrawer({ detail, loading, error, onClose, onUnsu
           className={`delivery-drawer-scroll flex-1 overflow-auto px-6 py-5 ${isScrolling ? 'is-scrolling' : ''}`}
           onScroll={handleContentScroll}
         >
-          {actionError && <p className="mb-4 text-sm text-red-400">{actionError}</p>}
+          {actionError && <p className="mb-4 text-sm text-danger">{actionError}</p>}
           {loading ? (
             <div className="flex items-center gap-2 text-sm text-muted">
               <Loader2 size={16} className="animate-spin" />
               加载中…
             </div>
           ) : error ? (
-            <p className="text-sm text-red-400">{error}</p>
+            <p className="text-sm text-danger">{error}</p>
           ) : detail && editing ? (
             <div className="space-y-4">
               <label className="block text-xs text-secondary">客户名<input value={draftName} onChange={(event) => setDraftName(event.target.value)} className="mt-1.5 w-full rounded-card bg-surface px-3 py-2.5 text-sm text-primary outline-none ring-1 ring-idle focus:ring-accent" /></label>
               <label className="block text-xs text-secondary">Markdown 正文<textarea value={draftMarkdown} onChange={(event) => setDraftMarkdown(event.target.value)} rows={18} className="mt-1.5 w-full resize-y rounded-card bg-surface px-3 py-2.5 font-mono text-sm text-primary outline-none ring-1 ring-idle focus:ring-accent" /></label>
-              <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditing(false)} disabled={saving} className="rounded-card px-3 py-2 text-sm text-secondary hover:bg-active-surface">取消</button><button type="button" onClick={() => void handleSave()} disabled={saving || !draftMarkdown.trim()} className="rounded-card bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-blue-400 disabled:opacity-50">{saving ? '保存中…' : '保存修改'}</button></div>
+              <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditing(false)} disabled={saving} className="rounded-card px-3 py-2 text-sm text-secondary hover:bg-active-surface">取消</button><button type="button" onClick={() => void handleSave()} disabled={saving || !draftMarkdown.trim()} className="rounded-card bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-strong disabled:opacity-50">{saving ? '保存中…' : '保存修改'}</button></div>
             </div>
           ) : detail ? (
             <div className="prose-chat">

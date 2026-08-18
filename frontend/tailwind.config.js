@@ -11,7 +11,11 @@ export default {
         secondary: 'rgb(var(--color-secondary) / <alpha-value>)',
         muted: 'rgb(var(--color-muted) / <alpha-value>)',
         accent: 'rgb(var(--color-accent) / <alpha-value>)',
+        'accent-strong': 'rgb(var(--color-accent-strong) / <alpha-value>)',
         done: 'rgb(var(--color-done) / <alpha-value>)',
+        warning: 'rgb(var(--color-warning) / <alpha-value>)',
+        danger: 'rgb(var(--color-danger) / <alpha-value>)',
+        'brand-soft': 'rgb(var(--color-brand-soft) / <alpha-value>)',
         idle: 'rgb(var(--color-idle) / <alpha-value>)',
       },
       borderRadius: {

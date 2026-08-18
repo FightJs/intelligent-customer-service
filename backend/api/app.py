@@ -808,6 +808,7 @@ def submit_order(
 def generate(
     doc_type: Literal['markdown', 'excel', 'word'],
     session_id: str,
+    preview: bool = False,
     current: dict = Depends(get_current_user),
 ) -> Response:
     """临时生成文件流，不写入管理员交付物列表。
@@ -842,7 +843,7 @@ def generate(
         media_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         suffix = 'xlsx'
     elif doc_type == 'word':
-        content = generate_word(state)
+        content = generate_word(state, filled_only=preview)
         media_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         suffix = 'docx'
     else:

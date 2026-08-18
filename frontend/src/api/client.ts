@@ -220,9 +220,14 @@ export async function sendOrder(
   return response.json()
 }
 
-/** 生成交付物下载（文件流）。调用方自取 blob。 */
-export async function generateUrl(docType: 'markdown' | 'excel' | 'word', sessionId: string): Promise<Response> {
-  return request(`/generate/${docType}?session_id=${sessionId}`, { method: 'POST' })
+/** 生成交付物文件流。调用方自取 blob。 */
+export async function generateUrl(
+  docType: 'markdown' | 'excel' | 'word',
+  sessionId: string,
+  options: { preview?: boolean } = {},
+): Promise<Response> {
+  const previewQuery = options.preview ? '&preview=true' : ''
+  return request(`/generate/${docType}?session_id=${sessionId}${previewQuery}`, { method: 'POST' })
 }
 
 // ── Admin ────────────────────────────────────────────────────

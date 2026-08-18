@@ -8,20 +8,20 @@ const Loader = () => {
           <svg viewBox="250 120 400 260" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
             <defs>
               <linearGradient id="traceGradient1" x1={250} y1={120} x2={100} y2={200} gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stopColor="#00ccff" stopOpacity={1} />
-                <stop offset="100%" stopColor="#00ccff" stopOpacity={0.5} />
+                <stop offset="0%" stopColor="currentColor" stopOpacity={1} />
+                <stop offset="100%" stopColor="currentColor" stopOpacity={0.5} />
               </linearGradient>
               <linearGradient id="traceGradient2" x1={650} y1={120} x2={800} y2={300} gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stopColor="#00ccff" stopOpacity={1} />
-                <stop offset="100%" stopColor="#00ccff" stopOpacity={0.5} />
+                <stop offset="0%" stopColor="currentColor" stopOpacity={1} />
+                <stop offset="100%" stopColor="currentColor" stopOpacity={0.5} />
               </linearGradient>
               <linearGradient id="traceGradient3" x1={250} y1={380} x2={400} y2={400} gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stopColor="#00ccff" stopOpacity={1} />
-                <stop offset="100%" stopColor="#00ccff" stopOpacity={0.5} />
+                <stop offset="0%" stopColor="currentColor" stopOpacity={1} />
+                <stop offset="100%" stopColor="currentColor" stopOpacity={0.5} />
               </linearGradient>
               <linearGradient id="traceGradient4" x1={650} y1={120} x2={500} y2={100} gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stopColor="#00ccff" stopOpacity={1} />
-                <stop offset="100%" stopColor="#00ccff" stopOpacity={0.5} />
+                <stop offset="0%" stopColor="currentColor" stopOpacity={1} />
+                <stop offset="100%" stopColor="currentColor" stopOpacity={0.5} />
               </linearGradient>
             </defs>
             <g id="browser">
@@ -62,6 +62,7 @@ const StyledWrapper = styled.div`
     display: block;
     width: 100%;
     height: 100%;
+    color: rgb(var(--color-accent));
   }
 
   #browser {
@@ -114,7 +115,7 @@ const StyledWrapper = styled.div`
     opacity: 0.95;
     stroke-linejoin: round;
     filter: drop-shadow(0 0 8px currentColor) blur(0.5px);
-    color: #00ccff;
+    color: rgb(var(--color-accent));
   }
   .trace-flow:nth-child(1) {
     stroke: url(#traceGradient1);

@@ -12,6 +12,9 @@ import { FormProvider } from '../src/state/FormContext'
 import { streamChat } from '../src/api/chatStream'
 
 vi.mock('../src/api/client', () => ({
+  getSession: async () => {
+    throw new Error('restore skipped in tests')
+  },
   createSession: async () => {
     const { createInitialState } = await import('../src/state/initialState')
     return {

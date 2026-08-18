@@ -6,7 +6,6 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react'
 import styled from 'styled-components'
-import { SECTIONS } from '../../data/sections'
 
 interface FormPreviewSlotProps {
   isPreviewOpen?: boolean
@@ -139,7 +138,7 @@ export default function FormPreviewSlot({ isPreviewOpen = false, onPreview }: Fo
         />
 
         <div className="hint-wrapper" aria-hidden="true">
-          <span className="hint-text">点击查看</span>
+          <span className="hint-text">点击预览需求表</span>
           <svg className="hint-arrow" viewBox="0 0 40 40" fill="none">
             <path
               d="M35 5C35 5 15 5 10 25M10 25 3 18M10 25l8-3"
@@ -162,15 +161,6 @@ export default function FormPreviewSlot({ isPreviewOpen = false, onPreview }: Fo
           {FOLDER_FILES.map(({ className, label, tag }) => (
             <div className={`file ${className}`} key={className}>
               <div className="shine" />
-              <svg className="file-icon" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M6 3h8l4 4v14H6V3Zm8 0v5h4M9 13h6M9 17h6"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
               <div className="file-text">{label}</div>
               <div className="file-tag">{tag}</div>
             </div>
@@ -184,13 +174,6 @@ export default function FormPreviewSlot({ isPreviewOpen = false, onPreview }: Fo
               />
             </svg>
             <div className="folder-label" />
-            <div className="folder-title">客户需求表</div>
-            <div className="folder-hint">实时更新 · 点击查看</div>
-            <div className="counter">
-              <span className="status-dot" />
-              <span className="counter-label">SECTIONS</span>
-              <span className="counter-number">{String(SECTIONS.length).padStart(2, '0')}</span>
-            </div>
           </div>
         </div>
       </div>
@@ -215,7 +198,7 @@ const StyledWrapper = styled.div`
     perspective: 1200px;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    /* 内部标题/徽章/文件卡片均为绝对定位像素值,整体等比缩放而非逐一改值 */
+    /* 内部文件卡片均为绝对定位像素值,整体等比缩放而非逐一改值 */
     transform-origin: center;
   }
 
@@ -244,7 +227,7 @@ const StyledWrapper = styled.div`
     flex-direction: column;
     align-items: center;
     gap: 1px;
-    color: #60a5fa;
+    color: rgb(var(--color-accent));
     pointer-events: none;
     transform: rotate(4deg);
     transition: opacity .3s ease, transform .3s ease;
@@ -290,13 +273,13 @@ const StyledWrapper = styled.div`
   }
 
   /* 后层更深:露出的部分与前层形成层次 */
-  .folder-back { bottom: 0; color: #0b3574; }
+  .folder-back { bottom: 0; color: rgb(var(--color-accent-strong)); }
 
   /* 前层半透明玻璃盖板:透出内部文件卡片,标题与徽章保持不透明(兄弟元素不受影响) */
   .folder-front {
     bottom: 0;
     height: 100%;
-    color: #1458b8;
+    color: rgb(var(--color-accent));
     opacity: .55;
     backdrop-filter: blur(1px);
   }
@@ -334,73 +317,6 @@ const StyledWrapper = styled.div`
     background: rgb(255 255 255 / .56);
   }
 
-  .folder-title,
-  .folder-hint {
-    position: absolute;
-    left: 50%;
-    width: max-content;
-    transform: translateX(-50%);
-    color: #fff;
-    text-shadow: 0 1px 3px rgb(0 0 0 / .25);
-  }
-
-  .folder-title {
-    top: 48px;
-    font-size: 13px;
-    font-weight: 800;
-  }
-
-  .folder-hint {
-    top: 66px;
-    font-size: 9px;
-    font-weight: 600;
-    opacity: .8;
-  }
-
-  .counter {
-    position: absolute;
-    top: -12px;
-    right: -10px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 7px;
-    border-radius: 50px;
-    color: #0b1220;
-    background: #a9c7ff;
-    box-shadow: 0 7px 14px rgb(0 0 0 / .22), inset 0 1px 1px rgb(255 255 255 / .3);
-    transform: scale(0) translateY(20px);
-    opacity: 0;
-    transition: transform .5s cubic-bezier(.34, 1.56, .64, 1), opacity .5s ease;
-  }
-
-  .folder-toggle:checked ~ .folder-container .counter {
-    transform: scale(1) translateY(0);
-    opacity: 1;
-    transition-delay: .2s;
-  }
-
-  .status-dot {
-    position: relative;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #34d399;
-    box-shadow: 0 0 8px #34d399;
-  }
-
-  .status-dot::after {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    background: #34d399;
-    content: '';
-    animation: pulse 2s infinite;
-  }
-
-  .counter-label { font-size: 7px; font-weight: 800; }
-  .counter-number { color: #fff; font-size: 11px; font-weight: 900; }
-
   .file {
     position: absolute;
     bottom: 5px;
@@ -414,11 +330,11 @@ const StyledWrapper = styled.div`
     transition: transform .6s cubic-bezier(.68, -.55, .265, 1.55), filter .25s ease;
   }
 
-  .file-1 { z-index: 25; background: #0f9fa8; transition-delay: .15s; }
-  .file-2 { z-index: 24; background: #1a9b77; transition-delay: .1s; }
-  .file-3 { z-index: 23; background: #2187c9; transition-delay: .05s; }
-  .file-4 { z-index: 22; background: #1d639f; transition-delay: .02s; }
-  .file-5 { z-index: 21; background: #164782; }
+  .file-1 { z-index: 25; background: rgb(var(--color-accent)); transition-delay: .15s; }
+  .file-2 { z-index: 24; background: rgb(var(--color-done)); transition-delay: .1s; }
+  .file-3 { z-index: 23; background: rgb(var(--color-warning)); transition-delay: .05s; }
+  .file-4 { z-index: 22; background: rgb(var(--color-accent-strong)); transition-delay: .02s; }
+  .file-5 { z-index: 21; background: rgb(var(--color-secondary)); }
 
   .folder-toggle:checked ~ .folder-container .file-1 { transform: translateY(-78px) rotate(-10deg) translateX(-15px) translateZ(20px); }
   .folder-toggle:checked ~ .folder-container .file-2 { transform: translateY(-61px) rotate(8deg) translateX(18px) translateZ(10px); }
@@ -440,15 +356,6 @@ const StyledWrapper = styled.div`
     left: 150%;
     transition: left .8s ease-in-out;
     transition-delay: .3s;
-  }
-
-  .file-icon {
-    position: absolute;
-    top: 9px;
-    right: 9px;
-    width: 15px;
-    height: 15px;
-    color: rgb(255 255 255 / .52);
   }
 
   .file-text {
@@ -487,16 +394,10 @@ const StyledWrapper = styled.div`
     transform: translateX(0);
   }
 
-  @keyframes pulse {
-    from { transform: scale(1); opacity: 1; }
-    to { transform: scale(3); opacity: 0; }
-  }
-
   @media (prefers-reduced-motion: reduce) {
     .folder-container,
     .folder-front-wrapper,
     .file,
-    .counter,
     .file-text,
     .file-tag,
     .shine,

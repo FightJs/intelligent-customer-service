@@ -1,0 +1,369 @@
+.camera-pet-shell {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 168px;
+  height: 176px;
+  pointer-events: auto;
+  transition: opacity .2s ease-out;
+}
+
+.camera-pet-shell.is-dragging {
+  transition: none;
+}
+
+.camera-pet-button {
+  display: grid;
+  width: 100%;
+  height: 168px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.camera-pet-button:active { cursor: grabbing; }
+.camera-pet-button:focus-visible {
+  outline: 2px solid rgb(var(--color-accent));
+  outline-offset: 4px;
+  border-radius: 18px;
+}
+
+.camera-pet-svg {
+  width: 160px;
+  height: 160px;
+  overflow: visible;
+  filter: drop-shadow(0 10px 16px rgb(25 59 53 / .14));
+}
+
+.camera-pet-svg * {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.camera-pet-mover,
+.camera-pet-body-nod,
+.camera-pet-lens,
+.camera-pet-arm,
+.camera-pet-leg,
+.camera-pet-record-light,
+.camera-pet-eyes {
+  transform-origin: center;
+}
+
+.camera-pet-body-nod { transform-origin: 50% 72%; }
+.camera-pet-arm-left { transform-origin: 72% 18%; }
+.camera-pet-arm-right { transform-origin: 28% 18%; }
+.camera-pet-leg { transform-origin: 50% 0%; }
+
+.camera-pet-handle,
+.camera-pet-arm,
+.camera-pet-leg {
+  fill: none;
+  stroke: #00584f;
+  stroke-linecap: round;
+}
+
+.camera-pet-handle { stroke-width: 8px; }
+.camera-pet-arm { stroke-width: 8px; }
+.camera-pet-leg { stroke-width: 7px; }
+.camera-pet-feet {
+  fill: none;
+  stroke: #193b35;
+  stroke-width: 6px;
+  stroke-linecap: round;
+}
+
+.camera-pet-body {
+  fill: url(#cameraPetGradient);
+  stroke: #00584f;
+  stroke-width: 4px;
+}
+
+.camera-pet-screen {
+  fill: #f2f8f6;
+  opacity: .96;
+}
+
+.camera-pet-eye { fill: #193b35; }
+
+.camera-pet-mouth,
+.camera-pet-wink-eye,
+.camera-pet-playful-mouth {
+  fill: none;
+  stroke: #193b35;
+  stroke-linecap: round;
+}
+
+.camera-pet-mouth { stroke-width: 3.5px; }
+.camera-pet-wink-eye,
+.camera-pet-playful-mouth {
+  opacity: 0;
+  stroke-width: 3.5px;
+}
+
+.camera-pet-output-lines { opacity: 0; }
+.camera-pet-output-line { transform-origin: left center; }
+.camera-pet-output-line-1 { fill: #006a60; }
+.camera-pet-output-line-2 { fill: #1f7a5a; }
+.camera-pet-output-line-3 { fill: #00584f; }
+
+.camera-pet-lens-outer { fill: #00584f; }
+.camera-pet-lens-ring { fill: #a9dcd0; }
+.camera-pet-lens-glass { fill: #006a60; }
+.camera-pet-lens-highlight { fill: #f2f8f6; opacity: .9; }
+
+.camera-pet-record-light {
+  fill: #d9ad62;
+  stroke: #996000;
+  stroke-width: 2px;
+}
+
+.camera-pet-photo-flash {
+  fill: #ffffff;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.camera-pet-sparkle {
+  fill: #d9ad62;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes camera-pet-blink {
+  0%, 91%, 100% { transform: scaleY(1); }
+  94% { transform: scaleY(.14); }
+}
+
+@keyframes camera-pet-idle-body {
+  0%, 100% { transform: rotate(-1.2deg) translateY(0); }
+  50% { transform: rotate(1.2deg) translateY(-4px); }
+}
+
+@keyframes camera-pet-idle-lens {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(3px, -2px); }
+  50% { transform: translate(0, 2px); }
+  75% { transform: translate(-3px, -1px); }
+}
+
+@keyframes camera-pet-record-pulse {
+  0%, 100% { opacity: .52; transform: scale(.9); }
+  50% { opacity: 1; transform: scale(1.12); }
+}
+
+@keyframes camera-pet-click-press {
+  0%, 100% { transform: translateY(0) scale(1); }
+  32% { transform: translateY(7px) scale(.96, .9); }
+  52% { transform: translateY(-2px) scale(1.02); }
+}
+
+@keyframes camera-pet-click-tap {
+  0%, 100% { transform: rotate(0); }
+  28% { transform: rotate(-24deg) translateY(5px); }
+  50% { transform: rotate(5deg); }
+}
+
+@keyframes camera-pet-click-light {
+  0%, 100% { opacity: .55; transform: scale(.9); }
+  30% { opacity: 1; transform: scale(1.45); }
+  48% { opacity: .75; transform: scale(1); }
+}
+
+@keyframes camera-pet-lens-up {
+  0%, 14%, 100% { transform: translateY(0); }
+  30%, 58% { transform: translateY(-10px); }
+}
+
+@keyframes camera-pet-lens-down {
+  0%, 14%, 100% { transform: translateY(0); }
+  30%, 58% { transform: translateY(10px); }
+}
+
+@keyframes camera-pet-lens-left {
+  0%, 14%, 100% { transform: translateX(0); }
+  30%, 58% { transform: translateX(-11px); }
+}
+
+@keyframes camera-pet-lens-right {
+  0%, 14%, 100% { transform: translateX(0); }
+  30%, 58% { transform: translateX(11px); }
+}
+
+@keyframes camera-pet-nod-after {
+  0%, 24%, 100% { transform: rotate(0); }
+  43% { transform: rotate(4deg); }
+  66% { transform: rotate(-2deg); }
+}
+
+@keyframes camera-pet-nod-reverse {
+  0%, 24%, 100% { transform: rotate(0); }
+  43% { transform: rotate(-4deg); }
+  66% { transform: rotate(2deg); }
+}
+
+@keyframes camera-pet-arm-swing-a {
+  0%, 100% { transform: rotate(2deg) translateY(0); }
+  50% { transform: rotate(-7deg) translateY(2px); }
+}
+
+@keyframes camera-pet-arm-swing-b {
+  0%, 100% { transform: rotate(-2deg) translateY(1px); }
+  50% { transform: rotate(7deg) translateY(-1px); }
+}
+
+@keyframes camera-pet-photo-flash {
+  0% { opacity: 0; transform: scale(.48); }
+  18% { opacity: .9; transform: scale(.78); }
+  34% { opacity: .32; transform: scale(1.1); }
+  52%, 100% { opacity: 0; transform: scale(1.32); }
+}
+
+@keyframes camera-pet-sparkle-pop {
+  0%, 100% { opacity: 0; transform: scale(.45) rotate(0deg); }
+  24% { opacity: 1; transform: scale(1.08) rotate(10deg); }
+  52% { opacity: .75; transform: scale(.9) rotate(-8deg); }
+  76% { opacity: 0; transform: scale(.55) rotate(0deg); }
+}
+
+@keyframes camera-pet-leg-step-a {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50% { transform: translateY(-6px) rotate(-8deg); }
+}
+
+@keyframes camera-pet-leg-step-b {
+  0%, 100% { transform: translateY(-6px) rotate(8deg); }
+  50% { transform: translateY(0) rotate(0); }
+}
+
+@keyframes camera-pet-output-nod {
+  0%, 100% { transform: rotate(0); }
+  28% { transform: rotate(2.5deg); }
+  48% { transform: rotate(-1.5deg); }
+}
+
+@keyframes camera-pet-output-light {
+  0%, 100% { fill: #1f7a5a; opacity: .65; transform: scale(.95); }
+  50% { fill: #1f7a5a; opacity: 1; transform: scale(1.16); }
+}
+
+@keyframes camera-pet-line-in {
+  0%, 18% { opacity: 0; transform: scaleX(.2); }
+  42%, 82% { opacity: 1; transform: scaleX(1); }
+  100% { opacity: 0; transform: scaleX(1); }
+}
+
+@keyframes camera-pet-think-lens {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  32% { transform: translate(-6px, -8px) rotate(-7deg); }
+  66% { transform: translate(6px, -6px) rotate(6deg); }
+}
+
+@keyframes camera-pet-think-body {
+  0%, 100% { transform: rotate(0); }
+  35% { transform: rotate(-2.5deg); }
+  68% { transform: rotate(2deg); }
+}
+
+@keyframes camera-pet-wait-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes camera-pet-wave-arm {
+  0%, 100% { transform: rotate(0); }
+  28% { transform: rotate(-28deg); }
+  52% { transform: rotate(10deg); }
+  72% { transform: rotate(-18deg); }
+}
+
+@keyframes camera-pet-wave-body {
+  0%, 100% { transform: rotate(0); }
+  35% { transform: rotate(-2.5deg); }
+  70% { transform: rotate(2deg); }
+}
+
+.camera-pet-action-idle .camera-pet-body-nod { animation: camera-pet-idle-body 3.8s ease-in-out infinite; }
+.camera-pet-action-idle .camera-pet-lens { animation: camera-pet-idle-lens 4.8s ease-in-out infinite; }
+.camera-pet-action-idle .camera-pet-record-light { animation: camera-pet-record-pulse 3.2s ease-in-out infinite; }
+.camera-pet-eyes { animation: camera-pet-blink 4.8s ease-in-out infinite; }
+
+.camera-pet-action-click .camera-pet-body-nod { animation: camera-pet-click-press .9s ease-in-out; }
+.camera-pet-action-click .camera-pet-arm-left { animation: camera-pet-click-tap .9s ease-in-out; }
+.camera-pet-action-click .camera-pet-record-light { animation: camera-pet-click-light .9s ease-in-out; }
+.camera-pet-action-click .camera-pet-eye-left { opacity: 0; }
+.camera-pet-action-click .camera-pet-wink-eye,
+.camera-pet-action-click .camera-pet-playful-mouth { opacity: 1; }
+.camera-pet-action-click .camera-pet-mouth-default { opacity: 0; }
+.camera-pet-action-click .camera-pet-photo-flash { animation: camera-pet-photo-flash .9s ease-out; }
+.camera-pet-action-click .camera-pet-sparkle-1 { animation: camera-pet-sparkle-pop .9s ease-out; }
+.camera-pet-action-click .camera-pet-sparkle-2 { animation: camera-pet-sparkle-pop .9s ease-out .08s; }
+.camera-pet-action-click .camera-pet-sparkle-3 { animation: camera-pet-sparkle-pop .9s ease-out .14s; }
+
+.camera-pet-action-move-up .camera-pet-lens { animation: camera-pet-lens-up 1.2s ease-in-out infinite; }
+.camera-pet-action-move-up .camera-pet-body-nod { animation: camera-pet-nod-after 1.2s ease-in-out infinite; }
+.camera-pet-action-move-down .camera-pet-lens { animation: camera-pet-lens-down 1.2s ease-in-out infinite; }
+.camera-pet-action-move-down .camera-pet-body-nod { animation: camera-pet-nod-reverse 1.2s ease-in-out infinite; }
+.camera-pet-action-move-left .camera-pet-lens { animation: camera-pet-lens-left 1.2s ease-in-out infinite; }
+.camera-pet-action-move-left .camera-pet-body-nod { animation: camera-pet-nod-reverse 1.2s ease-in-out infinite; }
+.camera-pet-action-move-right .camera-pet-lens { animation: camera-pet-lens-right 1.2s ease-in-out infinite; }
+.camera-pet-action-move-right .camera-pet-body-nod { animation: camera-pet-nod-after 1.2s ease-in-out infinite; }
+
+.camera-pet-action-move-up .camera-pet-leg-left,
+.camera-pet-action-move-down .camera-pet-leg-left,
+.camera-pet-action-move-left .camera-pet-leg-left,
+.camera-pet-action-move-right .camera-pet-leg-left,
+.camera-pet-action-waiting .camera-pet-leg-left {
+  animation: camera-pet-leg-step-a .6s ease-in-out infinite;
+}
+
+.camera-pet-action-move-up .camera-pet-leg-right,
+.camera-pet-action-move-down .camera-pet-leg-right,
+.camera-pet-action-move-left .camera-pet-leg-right,
+.camera-pet-action-move-right .camera-pet-leg-right,
+.camera-pet-action-waiting .camera-pet-leg-right {
+  animation: camera-pet-leg-step-b .6s ease-in-out infinite;
+}
+
+
+.camera-pet-action-move-up .camera-pet-arm-left,
+.camera-pet-action-move-down .camera-pet-arm-left,
+.camera-pet-action-move-left .camera-pet-arm-left,
+.camera-pet-action-move-right .camera-pet-arm-left {
+  animation: camera-pet-arm-swing-a .6s ease-in-out infinite;
+}
+
+.camera-pet-action-move-up .camera-pet-arm-right,
+.camera-pet-action-move-down .camera-pet-arm-right,
+.camera-pet-action-move-left .camera-pet-arm-right,
+.camera-pet-action-move-right .camera-pet-arm-right {
+  animation: camera-pet-arm-swing-b .6s ease-in-out infinite;
+}
+
+.camera-pet-action-output .camera-pet-face { opacity: 0; }
+.camera-pet-action-output .camera-pet-output-lines { opacity: 1; }
+.camera-pet-action-output .camera-pet-output-line-1 { animation: camera-pet-line-in 2.4s ease-in-out infinite; }
+.camera-pet-action-output .camera-pet-output-line-2 { animation: camera-pet-line-in 2.4s ease-in-out .24s infinite; }
+.camera-pet-action-output .camera-pet-output-line-3 { animation: camera-pet-line-in 2.4s ease-in-out .48s infinite; }
+.camera-pet-action-output .camera-pet-body-nod { animation: camera-pet-output-nod 2.4s ease-in-out infinite; }
+.camera-pet-action-output .camera-pet-record-light { animation: camera-pet-output-light 1.5s ease-in-out infinite; }
+
+.camera-pet-action-thinking .camera-pet-lens { animation: camera-pet-think-lens 3.4s ease-in-out infinite; }
+.camera-pet-action-thinking .camera-pet-body-nod { animation: camera-pet-think-body 3.4s ease-in-out infinite; }
+.camera-pet-action-thinking .camera-pet-record-light { animation: camera-pet-record-pulse 1.3s ease-in-out infinite; }
+
+.camera-pet-action-waiting .camera-pet-mover { animation: camera-pet-wait-bob 1.7s ease-in-out infinite; }
+.camera-pet-action-waiting .camera-pet-record-light { animation: camera-pet-record-pulse 1.05s ease-in-out infinite; }
+
+.camera-pet-action-wave .camera-pet-arm-right { animation: camera-pet-wave-arm 1.2s ease-in-out; }
+.camera-pet-action-wave .camera-pet-body-nod { animation: camera-pet-wave-body 1.2s ease-in-out; }
+.camera-pet-action-wave .camera-pet-lens { animation: camera-pet-lens-right 1.2s ease-in-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .camera-pet-svg * {
+    animation: none !important;
+  }
+}

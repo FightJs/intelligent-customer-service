@@ -110,7 +110,7 @@ export default function UsersTab({ onViewDeliveries }: UsersTabProps) {
         <StatCard label="用户总数" value={list.data?.total ?? '—'} icon={<UserRound size={16} />} />
         <StatCard label="管理员" value={list.data ? adminCount : '—'} icon={<ShieldCheck size={16} />} />
         <StatCard label="当前页" value={list.data ? users.length : '—'} />
-        <button type="button" onClick={openCreateForm} className="ml-auto inline-flex items-center gap-1.5 rounded-card bg-accent px-3 py-2.5 text-sm font-medium text-white hover:bg-blue-400">
+        <button type="button" onClick={openCreateForm} className="ml-auto inline-flex items-center gap-1.5 rounded-card bg-accent px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-strong">
           <Plus size={15} /> 新增用户
         </button>
       </div>
@@ -122,8 +122,8 @@ export default function UsersTab({ onViewDeliveries }: UsersTabProps) {
         </label>
       </div>
 
-      {list.error && <p className="text-sm text-red-400">{list.error}</p>}
-      {detailError && <p className="text-sm text-red-400">{detailError}</p>}
+      {list.error && <p className="text-sm text-danger">{list.error}</p>}
+      {detailError && <p className="text-sm text-danger">{detailError}</p>}
 
       <div className="overflow-x-auto rounded-card border border-idle/40">
         <table className="w-full min-w-[680px] text-sm">
@@ -148,7 +148,7 @@ export default function UsersTab({ onViewDeliveries }: UsersTabProps) {
       {detailLoading && <div className="fixed inset-0 z-40 grid place-items-center bg-black/30 text-sm text-primary">加载用户详情…</div>}
       {selectedUser && <UserDetailDrawer user={selectedUser} isLastAdmin={selectedUser.role === 'admin' && adminCount === 1} startResetPassword={resetPasswordOnOpen} startEditing={editUserOnOpen} onClose={() => { setSelectedUser(null); setResetPasswordOnOpen(false); setEditUserOnOpen(false) }} onUpdateUser={updateSelectedUser} onResetPassword={resetPassword} onViewDeliveries={() => onViewDeliveries(selectedUser.id)} />}
       {createFormOpen && <UserFormModal onClose={() => setCreateFormOpen(false)} onSubmit={submitUser} />}
-      {toast && <div role="status" className="fixed bottom-5 left-1/2 z-[70] -translate-x-1/2 rounded-card border border-done/40 bg-emerald-950/90 px-4 py-2.5 text-sm text-emerald-100 shadow-lg">{toast}</div>}
+      {toast && <div role="status" className="fixed bottom-5 left-1/2 z-[70] -translate-x-1/2 rounded-card border border-done/40 bg-done px-4 py-2.5 text-sm text-white shadow-lg">{toast}</div>}
     </div>
   )
 }
@@ -158,5 +158,5 @@ function UserActionMenu({ onDetail, onViewDeliveries, onEdit, onReset, onDelete 
 }
 
 function MenuItem({ label, onClick, danger }: { label: string; onClick: () => void; danger?: boolean }) {
-  return <button type="button" onClick={onClick} className={`block w-full border-b border-idle/50 px-3 py-2.5 text-left text-xs last:border-b-0 hover:bg-idle ${danger ? 'text-red-300 hover:text-red-200' : 'text-secondary hover:text-primary'}`}>{label}</button>
+  return <button type="button" onClick={onClick} className={`block w-full border-b border-idle/50 px-3 py-2.5 text-left text-xs last:border-b-0 hover:bg-active-surface ${danger ? 'text-danger hover:text-danger' : 'text-secondary hover:text-primary'}`}>{label}</button>
 }

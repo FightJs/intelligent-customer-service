@@ -41,9 +41,13 @@ def _image_source(path: Path):
     return str(path)
 
 
-def generate_word(state: StudioFormState) -> bytes:
+def generate_word(
+    state: StudioFormState,
+    *,
+    filled_only: bool = False,
+) -> bytes:
     """生成 Word 文档，返回字节流。"""
-    data = build_render_data(state)
+    data = build_render_data(state, filled_only=filled_only)
     doc = Document()
 
     # 默认字体

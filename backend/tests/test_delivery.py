@@ -5,6 +5,7 @@ import zipfile
 import store.uploads as uploads
 from delivery.excel import generate_excel
 from delivery.markdown import generate_markdown
+from delivery.render_data import build_render_data
 from delivery.word import generate_word
 from survey.state import create_initial_state
 from tests.test_uploads import make_png_data_uri, uploads_root  # noqa: F401（fixture）
@@ -47,3 +48,61 @@ def test_missing_image_files_silently_skipped(uploads_root):
     # word/excel 也不应崩溃
     generate_word(state)
     generate_excel(state)
+
+
+def test_filled_only_render_data_omits_empty_fields_and_sections():
+    state = create_initial_state()
+    state.sections['customer'].fields['brand'].value = '云裳'
+    state.sections['venue'].fields['size'].value = {'宽': '4.5', '深': '', '高': ''}
+    state.sections['status'].status = 'skipped'
+    state.sections['equipment'].fields['inventory'].value = [
+        {'type': '', 'model': '', 'qty': '', 'note': ''},
+    ]
+
+    data = build_render_data(state, filled_only=True)
+
+    assert data['sections'] == [
+        {
+            'title': '一、客户基础信息',
+            'fields': [
+                {
+                    'label': '客户名称/品牌名',
+                    'value': '云裳',
+                    'filled': True,
+                    'images': [],
+                },
+            ],
+            'filled_count': 1,
+            'total_count': 1,
+            'skipped': False,
+        },
+        {
+            'title': '四、场地条件信息',
+            'fields': [
+                {
+                    'label': '具体尺寸（宽×深×高）',
+                    'value': '宽4.5m',
+                    'filled': True,
+                    'images': [],
+                },
+            ],
+            'filled_count': 1,
+            'total_count': 1,
+            'skipped': False,
+        },
+    ]
+
+
+def test_filled_only_word_preview_excludes_empty_section_titles():
+    state = create_initial_state()
+    state.sections['customer'].fields['brand'].value = '云裳'
+
+    content = generate_word(state, filled_only=True)
+
+    from docx import Document
+
+    doc = Document(io.BytesIO(content))
+    paragraphs = [paragraph.text for paragraph in doc.paragraphs]
+    assert '一、客户基础信息' in paragraphs
+    assert '二、行业与品类信息' not in paragraphs
+    assert '四、场地条件信息' not in paragraphs

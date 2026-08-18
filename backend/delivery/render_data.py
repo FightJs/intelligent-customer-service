@@ -7,11 +7,44 @@ from __future__ import annotations
 
 from agent.flow import value_to_text, value_is_empty, is_field_visible
 from store.uploads import resolve_image
-from survey.models import StudioFormState
-from survey.schema_def import SECTIONS, SECTION_BY_ID
+from survey.models import FieldValue, StudioFormState
+from survey.schema_def import SECTIONS
 
 
-def build_render_data(state: StudioFormState) -> dict:
+def _render_value_is_empty(value: FieldValue) -> bool:
+    """判断值是否没有可展示的内容。"""
+    if value.type == 'text':
+        return not value.value.strip()
+    if value.type == 'choice-single':
+        return not value.value or not value.value.strip()
+    if value.type == 'choice-multi':
+        return not any(item.strip() for item in value.value)
+    if value.type == 'dimension':
+        return not any(item.strip() for item in value.value.values())
+    if value.type == 'image':
+        return not any(item.strip() for item in value.value)
+    if value.type == 'table':
+        return not any(
+            any(cell is not None and str(cell).strip() for cell in row.values())
+            for row in value.value
+        )
+    return value_is_empty(value)
+
+
+def _filled_table_rows(value) -> list[dict]:
+    """移除设备表中完全空白的行，避免预览出现空记录。"""
+    return [
+        row
+        for row in value.value
+        if any(cell is not None and str(cell).strip() for cell in row.values())
+    ]
+
+
+def build_render_data(
+    state: StudioFormState,
+    *,
+    filled_only: bool = False,
+) -> dict:
     """构造渲染数据。
 
     返回：
@@ -36,6 +69,8 @@ def build_render_data(state: StudioFormState) -> dict:
     for sec_def in SECTIONS:
         sec_state = state.sections[sec_def.id]
         if sec_state.status == 'skipped':
+            if filled_only:
+                continue
             sections_data.append({
                 'title': sec_def.title,
                 'fields': [],
@@ -57,7 +92,9 @@ def build_render_data(state: StudioFormState) -> dict:
                 continue
 
             text = value_to_text(v, f)
-            filled = not value_is_empty(v)
+            filled = not _render_value_is_empty(v)
+            if filled_only and not filled:
+                continue
             images = []
             if f.type == 'image' and filled:
                 # 解析图片 id 为磁盘路径，缺失文件静默跳过
@@ -80,6 +117,9 @@ def build_render_data(state: StudioFormState) -> dict:
 
         total_filled += sec_filled
         total_count += sec_total
+        if filled_only and not fields_data:
+            continue
+
         sections_data.append({
             'title': sec_def.title,
             'fields': fields_data,
@@ -93,8 +133,12 @@ def build_render_data(state: StudioFormState) -> dict:
     equip_state = state.sections.get('equipment')
     if equip_state:
         inv = equip_state.fields.get('inventory')
-        if inv and inv.type == 'table' and inv.value:
-            equipment_table = inv.value
+        if inv and inv.type == 'table':
+            equipment_table = (
+                _filled_table_rows(inv)
+                if filled_only
+                else inv.value
+            )
 
     # 品牌名
     customer_name = ''

@@ -17,7 +17,7 @@ export default function QuickChips({ options, onPick, disabled }: Props) {
           type="button"
           disabled={disabled}
           onClick={() => onPick(o)}
-          className="px-3 py-1.5 text-xs rounded-pill transition-colors bg-white/5 text-secondary hover:bg-white/10 hover:text-primary disabled:opacity-40 disabled:hover:bg-white/5"
+          className="px-3 py-1.5 text-xs rounded-pill transition-colors bg-active-surface text-secondary hover:bg-brand-soft hover:text-primary disabled:opacity-40 disabled:hover:bg-active-surface"
         >
           {o.label}
         </button>

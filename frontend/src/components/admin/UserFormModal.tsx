@@ -70,10 +70,10 @@ export default function UserFormModal({ onClose, onSubmit }: UserFormModalProps)
             </select>
           </label>
         </div>
-        {error && <p className="mt-3 text-xs text-red-300">{error}</p>}
+        {error && <p className="mt-3 text-xs text-danger">{error}</p>}
         <div className="mt-6 flex justify-end gap-2">
           <button type="button" onClick={onClose} disabled={submitting} className="rounded-card px-3 py-2 text-sm text-secondary hover:bg-active-surface disabled:opacity-50">取消</button>
-          <button type="submit" disabled={submitting} className="rounded-card bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-blue-400 disabled:opacity-50">{submitting ? '保存中…' : '创建用户'}</button>
+          <button type="submit" disabled={submitting} className="rounded-card bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-strong disabled:opacity-50">{submitting ? '保存中…' : '创建用户'}</button>
         </div>
       </form>
     </div>

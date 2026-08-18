@@ -13,9 +13,7 @@ function renderBar(overrides: Partial<React.ComponentProps<typeof TopBar>> = {})
     onReset: vi.fn(),
     onLogout: vi.fn(),
     role: 'user',
-    progressVisible: true,
     deliveryOpen: false,
-    onToggleProgress: vi.fn(),
     onToggleDelivery: vi.fn(),
     ...overrides,
   }
@@ -70,14 +68,6 @@ describe('TopBar', () => {
     const header = screen.getByRole('banner')
     // header 内不应含「重新开始」「切换到浅色主题」这类文本按钮
     expect(header.textContent).not.toContain('重新开始')
-  })
-
-  it('进度卡切换图标使用亮度与缩放反馈，不亮起按钮外框', () => {
-    renderBar()
-    const button = screen.getByRole('button', { name: '隐藏采集进度' })
-    expect(button).toHaveClass('top-bar-icon-button')
-    expect(button).not.toHaveClass('hover:bg-active-surface')
-    expect(button).toHaveAttribute('data-icon-feedback', 'scale-brightness')
   })
 
   it('右侧主卡放大态图标使用同样的亮度与缩放反馈', () => {

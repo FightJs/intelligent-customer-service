@@ -15,6 +15,7 @@ import { useFormState } from '../../state/FormContext'
 import { createSession, getSession, chat } from '../../api/client'
 import type { FieldUpdate, SessionMessage, Suggestion, SuggestionOption } from '../../api/client'
 import type { StudioFormState } from '../../types/schema'
+import type { CameraPetActivity } from '../CameraPet/types'
 import {
   ChatStreamHttpError,
   ChatStreamInterruptedError,
@@ -32,6 +33,7 @@ import QuickChips from './QuickChips'
 const MAX_INPUT_HEIGHT = 136
 
 const VOICE_WAVE_BARS = [8, 15, 11, 16]
+const WAITING_STREAM_STATUSES = ['正在更新表单', '正在整理需求', '正在生成交付物']
 
 interface ChatMessage {
   id: string
@@ -98,7 +100,11 @@ export function toolEventStatus(kind: 'fill' | 'skip' | 'deliverable'): string {
   }
 }
 
-export default function ChatPanel() {
+interface ChatPanelProps {
+  onPetActivityChange?: (activity: CameraPetActivity) => void
+}
+
+export default function ChatPanel({ onPetActivityChange }: ChatPanelProps) {
   const { dispatch } = useFormState()
   const [sessionId, setSessionId] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -375,6 +381,34 @@ export default function ChatPanel() {
     stopListening,
   ])
 
+  useEffect(() => {
+    if (!onPetActivityChange) return
+
+    if (loading) {
+      onPetActivityChange('waiting')
+      return
+    }
+
+    if (sending) {
+      const hasPartialOutput = messages.some((message) => (
+        message.role === 'ai'
+        && message.partial
+        && message.text.length > 0
+      ))
+      const isToolWaiting = streamStatus !== null && WAITING_STREAM_STATUSES.includes(streamStatus)
+      onPetActivityChange(
+        isToolWaiting
+          ? 'waiting'
+          : hasPartialOutput
+            ? 'output'
+            : 'thinking',
+      )
+      return
+    }
+
+    onPetActivityChange('idle')
+  }, [loading, messages, onPetActivityChange, sending, streamStatus])
+
   const latestReply = messages.at(-1)?.role === 'ai' ? messages.at(-1)?.text : undefined
   const suggestion = suggestions[0]
   const quickOptions = suggestion && suggestionMatchesReply(suggestion, latestReply)
@@ -395,7 +429,7 @@ export default function ChatPanel() {
         <div ref={scrollRef} className="chat-scrollbar flex-1 overflow-y-auto p-4">
           {loading && <div className="text-muted text-xs text-center">正在连接顾问…</div>}
           {messages.map((m) => (
-            <MessageBubble key={m.id} role={m.role} text={m.text} aiAvatarSrc="/lit-blue.svg">
+            <MessageBubble key={m.id} role={m.role} text={m.text} aiAvatarSrc="/logo.svg">
               {m.role === 'ai' ? (
                 <div className="prose-chat" aria-live={m.partial ? 'polite' : undefined}>
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
@@ -406,7 +440,7 @@ export default function ChatPanel() {
                   {m.images && m.images.length > 0 && (
                     <div className="flex gap-1.5 flex-wrap mb-1">
                       {m.images.map((uri, i) => (
-                        <img key={i} src={uri} alt="" className="h-20 max-w-[160px] rounded-lg object-cover border border-white/10" />
+                        <img key={i} src={uri} alt="" className="h-20 max-w-[160px] rounded-lg object-cover border border-outline/60" />
                       ))}
                     </div>
                   )}
@@ -417,10 +451,10 @@ export default function ChatPanel() {
           ))}
           {sending && streamStatus && <div className="mt-2 text-center text-xs text-muted">{streamStatus}</div>}
           {streamError && (
-            <div role="alert" className="mt-3 flex items-center justify-between gap-3 rounded-card border border-red-400/40 bg-red-950/30 px-3 py-2 text-xs text-red-200">
+            <div role="alert" className="mt-3 flex items-center justify-between gap-3 rounded-card border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
               <span>{streamError.message}</span>
               {streamError.retryable && retryRef.current && (
-                <button type="button" onClick={retryStreaming} className="shrink-0 font-semibold text-red-100 underline underline-offset-2">
+                <button type="button" onClick={retryStreaming} className="shrink-0 font-semibold text-danger underline underline-offset-2">
                   重试
                 </button>
               )}
@@ -443,11 +477,11 @@ export default function ChatPanel() {
             <div className="flex gap-2 flex-wrap">
               {images.map((uri, i) => (
                 <div key={i} className="relative group flex-shrink-0">
-                  <img src={uri} alt="" className="h-10 w-10 rounded-lg object-cover border border-white/10" />
+                  <img src={uri} alt="" className="h-10 w-10 rounded-lg object-cover border border-outline/60" />
                   <button
                     type="button"
                     onClick={() => removeImage(i)}
-                    className="absolute -top-1.5 -right-1.5 grid h-4 w-4 place-items-center rounded-full bg-neutral-700 text-white/80 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute -top-1.5 -right-1.5 grid h-4 w-4 place-items-center rounded-full bg-active-surface text-secondary opacity-0 group-hover:opacity-100 transition-opacity"
                     aria-label="移除图片"
                   >
                     <X size={10} />

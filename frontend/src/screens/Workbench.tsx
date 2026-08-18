@@ -2,7 +2,8 @@ import { useState } from 'react'
 import TopBar from '../components/TopBar'
 import AdminEntryButton from '../components/AdminEntryButton'
 import ChatPanel from '../components/ChatPanel/ChatPanel'
-import ProgressCard from '../components/ProgressCard/ProgressCard'
+import CameraPet from '../components/CameraPet/CameraPet'
+import type { CameraPetActivity } from '../components/CameraPet/types'
 import CenterCard from '../components/CenterCard/CenterCard'
 import FormPreviewSlot from '../components/DeliveryPanel/FormPreviewSlot'
 import WordPreviewModal from '../components/DeliveryPanel/WordPreviewModal'
@@ -17,11 +18,11 @@ import { useAuth } from '../state/AuthContext'
 export default function Workbench() {
   const { user, logout } = useAuth()
   const [resetKey, setResetKey] = useState(0)
-  const [progressVisible, setProgressVisible] = useState(true)
   const [centerExpanded, setCenterExpanded] = useState(false)
   const [formPreviewOpen, setFormPreviewOpen] = useState(false)
   const [orderModalOpen, setOrderModalOpen] = useState(false)
   const [orderSent, setOrderSent] = useState(false)
+  const [petActivity, setPetActivity] = useState<CameraPetActivity>('idle')
   const { theme, toggleTheme } = useTheme()
   const isGuest = (
     user?.role === 'guest'
@@ -29,11 +30,11 @@ export default function Workbench() {
 
   function handleReset() {
     setResetKey((key) => key + 1)
-    setProgressVisible(true)
     setCenterExpanded(false)
     setFormPreviewOpen(false)
     setOrderModalOpen(false)
     setOrderSent(false)
+    setPetActivity('idle')
   }
 
   return (
@@ -46,11 +47,7 @@ export default function Workbench() {
             onReset={handleReset}
             onLogout={logout}
             role={user?.role}
-            progressVisible={progressVisible}
             deliveryOpen={centerExpanded}
-            onToggleProgress={() => {
-              setProgressVisible((visible) => !visible)
-            }}
             onToggleDelivery={() => {
               setCenterExpanded((expanded) => !expanded)
             }}
@@ -71,8 +68,8 @@ export default function Workbench() {
           >
             <GridBackground />
 
-            <section className="workbench-progress-zone">
-              <ProgressCard visible={progressVisible} />
+            <section className="workbench-pet-zone">
+              <CameraPet activity={petActivity} />
             </section>
 
             <section className="workbench-center-zone">
@@ -82,7 +79,7 @@ export default function Workbench() {
                   setCenterExpanded((expanded) => !expanded)
                 }}
               >
-                <ChatPanel />
+                <ChatPanel onPetActivityChange={setPetActivity} />
               </CenterCard>
             </section>
 

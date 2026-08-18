@@ -38,7 +38,7 @@ export function reducer(state: StudioFormState, action: Action): StudioFormState
     }
     case 'replace_state': {
       // 后端返回的 section.status 可能不准（如从未填的章节仍为 pending），
-      // 整体替换后按填充情况重算一次，保证 ProgressCard 显示正确。
+      // 整体替换后按填充情况重算一次，保证需求总览与状态统计正确。
       let next = action.state
       for (const id of Object.keys(next.sections) as SectionId[]) {
         next = recomputeStatus(next, id)

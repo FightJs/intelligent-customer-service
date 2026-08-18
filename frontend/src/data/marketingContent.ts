@@ -35,7 +35,7 @@ export const workflowSteps = [
 export const deliverables = [
   { type: '方案 / 01', title: '直播间搭建方案', detail: '空间布局 · 灯光动线 · 视觉方向', accent: 'blue' },
   { type: '清单 / 02', title: '设备配置清单', detail: '镜头 · 收音 · 灯光 · 备用项', accent: 'green' },
-  { type: '报告 / 03', title: '需求评分报告', detail: '完整度 92% · 2 项待确认', accent: 'violet' },
+  { type: '报告 / 03', title: '需求评分报告', detail: '完整度 92% · 2 项待确认', accent: 'amber' },
 ] as const
 
 export const scenarios = [

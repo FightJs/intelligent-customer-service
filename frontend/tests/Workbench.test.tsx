@@ -13,14 +13,16 @@ vi.mock('../src/components/BreathingScreen', () => ({
 vi.mock('../src/components/TopBar', () => ({ default: () => <header /> }))
 vi.mock('../src/components/AdminEntryButton', () => ({ default: () => <div>管理后台入口</div> }))
 vi.mock('../src/components/ChatPanel/ChatPanel', () => ({ default: () => <div>工作台内容</div> }))
-vi.mock('../src/components/ProgressCard/ProgressCard', () => ({ default: () => <div /> }))
 vi.mock('../src/components/CenterCard/CenterCard', () => ({
   default: ({ children }: { children: React.ReactNode }) => <section>{children}</section>,
 }))
 vi.mock('../src/components/DeliveryPanel/FormPreviewSlot', () => ({ default: () => <div /> }))
 vi.mock('../src/components/DeliveryPanel/DeliverableSlot', () => ({ default: () => <div>订单与结构化内容</div> }))
 vi.mock('../src/components/GridBackground', () => ({ default: () => <div /> }))
-vi.mock('../src/hooks/useZStack', () => ({ ZStackProvider: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
+vi.mock('../src/hooks/useZStack', () => ({
+  ZStackProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useZStack: () => ({ z: 10, bringToFront: vi.fn(), isTopmost: true }),
+}))
 vi.mock('../src/state/FormContext', () => ({ FormProvider: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
 vi.mock('../src/state/theme', () => ({ useTheme: () => ({ theme: 'dark', toggleTheme: vi.fn() }) }))
 vi.mock('../src/state/AuthContext', () => ({

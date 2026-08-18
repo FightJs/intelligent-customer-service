@@ -15,7 +15,7 @@ import DeliverableSlot from '../src/components/DeliveryPanel/DeliverableSlot'
 import { FormProvider } from '../src/state/FormContext'
 
 describe('FormPreviewSlot', () => {
-  it('渲染实时客户需求表入口', () => {
+  it('渲染需求表预览入口并隐藏卡片中间的说明文字', () => {
     const { container } = render(
       <FormProvider>
         <FormPreviewSlot />
@@ -31,13 +31,11 @@ describe('FormPreviewSlot', () => {
       ),
     ).toBeInTheDocument()
 
-    expect(
-      screen.getByText('客户需求表'),
-    ).toBeInTheDocument()
-
-    expect(
-      screen.getByText('实时更新 · 点击查看'),
-    ).toBeInTheDocument()
+    expect(screen.getByText('点击预览需求表')).toBeInTheDocument()
+    expect(screen.queryByText('客户需求表')).not.toBeInTheDocument()
+    expect(screen.queryByText('实时更新 · 点击查看')).not.toBeInTheDocument()
+    expect(screen.queryByText('SECTIONS')).not.toBeInTheDocument()
+    expect(container.querySelectorAll('.file-icon')).toHaveLength(0)
 
     expect(
       container.querySelector('.folder-card'),

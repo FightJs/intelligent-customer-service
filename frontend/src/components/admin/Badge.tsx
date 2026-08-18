@@ -4,7 +4,7 @@ type Variant = 'accent' | 'secondary' | 'done' | 'muted'
 
 const VARIANT_CLASS: Record<Variant, string> = {
   accent: 'bg-accent/15 text-accent',
-  secondary: 'bg-white/5 text-secondary',
+  secondary: 'bg-active-surface text-secondary',
   done: 'bg-done/15 text-done',
   muted: 'bg-idle/20 text-muted',
 }
