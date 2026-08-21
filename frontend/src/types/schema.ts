@@ -3,7 +3,7 @@
  * 改后端 schema 后：python -m backend.survey.export && npm run gen:schema
  */
 
-export type SectionId = 'budget' | 'customer' | 'equipment' | 'goal' | 'host' | 'industry' | 'notes' | 'product' | 'status' | 'venue'
+export type SectionId = 'benchmark' | 'budget' | 'customer' | 'equipment' | 'goal' | 'host' | 'industry' | 'product' | 'status' | 'venue'
 
 export type FieldType =
   | 'text' | 'choice-single' | 'choice-multi' | 'dimension' | 'image' | 'table'
@@ -30,12 +30,16 @@ export interface FieldDef {
   label: string
   type: FieldType
   required: boolean
+  question: string
+  skippable: boolean
+  askInFull: boolean
   options?: OptionDef[]
   dims?: string[]              // dimension：['宽','深','高']
   unit?: string                // dimension：'m' / 'cm'
   placeholder?: string         // text
   columns?: TableColumn[]      // table：列定义
   visibleIf?: VisibleIf        // 条件分支
+  helpText?: string            // 采集口径提示
 }
 
 export interface SectionDef {
@@ -43,6 +47,8 @@ export interface SectionDef {
   title: string
   hint: string
   order: number
+  skippable: boolean
+  visibleIf?: VisibleIf
   fields: FieldDef[]
 }
 
@@ -67,7 +73,11 @@ export interface StudioFormState {
   requiredFieldIds: string[]
   sections: Record<SectionId, SectionState>
   currentSectionId: SectionId
+  currentFieldId: string
+  skippedFieldIds: string[]
   roomImageInvited: boolean
   referenceImageInvited: boolean
+  equipmentImageInvited: boolean
+  imageInvitedFieldIds: string[]
   completed: boolean
 }

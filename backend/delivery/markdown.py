@@ -43,10 +43,10 @@ _TEMPLATE = Template("""\
 {% if equipment_table %}
 ## 附：现有设备明细
 
-| 设备类型 | 品牌型号 | 数量 | 备注 |
-|---------|---------|------|------|
+| 设备类型 | 品牌型号 | 数量 |
+|---------|---------|------|
 {% for row in equipment_table %}
-| {{ row.get('type', '') }} | {{ row.get('model', '') }} | {{ row.get('qty', '') }} | {{ row.get('note', '') }} |
+| {{ row.get('type', '') }} | {{ row.get('model', '') }} | {{ row.get('qty', '') }} |
 {% endfor %}
 {% else %}
 ## 附：现有设备明细

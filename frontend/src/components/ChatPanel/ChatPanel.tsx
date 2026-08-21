@@ -3,8 +3,10 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
   ArrowUp,
+  Camera,
   ImagePlus,
   Mic,
+  SkipForward,
   Square,
   X,
 } from 'lucide-react'
@@ -12,7 +14,7 @@ import {
   useSpeechRecognition,
 } from '../../hooks/useSpeechRecognition'
 import { useFormState } from '../../state/FormContext'
-import { createSession, getSession, chat } from '../../api/client'
+import { createSession, getSession, chat, skipCurrentQuestion } from '../../api/client'
 import type { FieldUpdate, SessionMessage, Suggestion, SuggestionOption } from '../../api/client'
 import type { StudioFormState } from '../../types/schema'
 import type { CameraPetActivity } from '../CameraPet/types'
@@ -28,6 +30,7 @@ import type {
 import { SECTIONS } from '../../data/sections'
 import MessageBubble from './MessageBubble'
 import QuickChips from './QuickChips'
+import { suggestionOptionUpdate } from './suggestionUpdate'
 
 
 const MAX_INPUT_HEIGHT = 136
@@ -102,10 +105,19 @@ export function toolEventStatus(kind: 'fill' | 'skip' | 'deliverable'): string {
 
 interface ChatPanelProps {
   onPetActivityChange?: (activity: CameraPetActivity) => void
+  onFinishEarly?: () => void
+  canFinishEarly?: boolean
+  conversationEnded?: boolean
 }
 
-export default function ChatPanel({ onPetActivityChange }: ChatPanelProps) {
-  const { dispatch } = useFormState()
+export default function ChatPanel({
+  onPetActivityChange,
+  onFinishEarly,
+  canFinishEarly = false,
+  conversationEnded = false,
+}: ChatPanelProps) {
+  const { state, dispatch } = useFormState()
+  const ended = conversationEnded || state.completed
   const [sessionId, setSessionId] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [draft, setDraft] = useState('')
@@ -116,10 +128,15 @@ export default function ChatPanel({ onPetActivityChange }: ChatPanelProps) {
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const [streamError, setStreamError] = useState<StreamErrorEvent | null>(null)
   const [images, setImages] = useState<string[]>([])
+  const [imageMenuOpen, setImageMenuOpen] = useState(false)
   const [speechError, setSpeechError] = useState('')
+  const [imageError, setImageError] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [actionLoading, setActionLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const draftRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
   const sendingRef = useRef(false)
   const controllerRef = useRef<AbortController | null>(null)
   const retryRef = useRef<{ request: ChatStreamRequest; messageId: string } | null>(null)
@@ -264,18 +281,19 @@ export default function ChatPanel({ onPetActivityChange }: ChatPanelProps) {
       }, controller.signal)
     } catch (error) {
       if (controller.signal.aborted) return
+      let requestError = error
       if (error instanceof ChatStreamHttpError && (error.status === 404 || error.status === 405)) {
         try {
           applyDone(await chat(request.session_id, request.message, request.history, request.updates, request.images))
           return
         } catch (fallbackError) {
-          error = fallbackError
+          requestError = fallbackError
         }
       }
-      const message = error instanceof Error ? error.message : String(error)
+      const message = requestError instanceof Error ? requestError.message : String(requestError)
       const streamFailure: StreamErrorEvent = {
         request_id: request.request_id,
-        code: error instanceof ChatStreamInterruptedError ? 'stream_interrupted' : 'llm_unavailable',
+        code: requestError instanceof ChatStreamInterruptedError ? 'stream_interrupted' : 'llm_unavailable',
         message,
         retryable: true,
         phase: 'transport',
@@ -298,7 +316,13 @@ export default function ChatPanel({ onPetActivityChange }: ChatPanelProps) {
   }, [dispatch])
 
   const sendMessage = useCallback((text: string, updates?: FieldUpdate[], msgImages?: string[]) => {
-    if ((!text && !msgImages?.length) || !sessionId || sendingRef.current) return
+    if (
+      (!text && !msgImages?.length)
+      || !sessionId
+      || sendingRef.current
+      || actionLoading
+      || ended
+    ) return
     const history = messages
       .filter((message) => message.text && !message.interrupted)
       .slice(-6)
@@ -313,7 +337,7 @@ export default function ChatPanel({ onPetActivityChange }: ChatPanelProps) {
       updates,
       images: msgImages,
     }, { addUser: true })
-  }, [sessionId, messages, runRequest])
+  }, [sessionId, messages, runRequest, actionLoading, ended])
 
   const stopStreaming = useCallback(() => {
     const controller = controllerRef.current
@@ -340,23 +364,25 @@ export default function ChatPanel({ onPetActivityChange }: ChatPanelProps) {
 
   const handleFiles = useCallback((files: FileList | null) => {
     if (!files || files.length === 0) return
-    const newImages: string[] = []
-    let loaded = 0
-    const total = Math.min(files.length, 5)
-    for (let i = 0; i < total; i++) {
-      const file = files[i]
-      if (!file.type.startsWith('image/')) continue
-      if (file.size > 10 * 1024 * 1024) continue // 单张 ≤10MB
-      const reader = new FileReader()
-      reader.onload = () => {
-        newImages.push(reader.result as string)
-        loaded++
-        if (loaded === total || loaded === newImages.length) {
-          setImages((prev) => [...prev, ...newImages].slice(0, 5))
-        }
-      }
-      reader.readAsDataURL(file)
+    setImageError('')
+    const selected = Array.from(files).slice(0, 5)
+    const valid = selected.filter((file) => (
+      file.type.startsWith('image/')
+      && file.size <= 10 * 1024 * 1024
+    ))
+    if (valid.length !== selected.length) {
+      setImageError('仅支持 10MB 以内的图片文件')
     }
+    void Promise.all(valid.map((file) => new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.onerror = () => reject(new Error('图片读取失败'))
+      reader.readAsDataURL(file)
+    }))).then((loadedImages) => {
+      setImages((previous) => [...previous, ...loadedImages].slice(0, 5))
+    }).catch(() => {
+      setImageError('图片读取失败，请重新选择')
+    })
   }, [])
 
   const removeImage = useCallback((index: number) => {
@@ -416,16 +442,96 @@ export default function ChatPanel({ onPetActivityChange }: ChatPanelProps) {
     : []
   const pickQuickOption = useCallback((option: SuggestionOption) => {
     if (!suggestion) return
-    sendMessage(option.label, [{
-      section_id: suggestion.section_id,
-      field_id: suggestion.field_id,
-      value: option.value,
-    }], undefined)
+    sendMessage(option.label, [suggestionOptionUpdate(suggestion, option)], undefined)
   }, [sendMessage, suggestion])
+
+  const currentSection = SECTIONS.find((section) => (
+    section.id === state.currentSectionId
+  ))
+  const currentField = currentSection?.fields.find((field) => (
+    field.id === state.currentFieldId
+  ))
+  const canSkipField = currentField?.skippable === true
+  const canSkipSection = currentSection?.skippable === true
+  const hasSkipAction = canSkipField || canSkipSection
+
+  const handleSkip = useCallback(async (scope: 'field' | 'section') => {
+    if (!sessionId || sendingRef.current || actionLoading) return
+    if (draft.trim() || images.length > 0) {
+      setActionError('当前还有未发送的回答或图片，请先发送或清空后再跳过。')
+      return
+    }
+    setActionLoading(true)
+    setActionError('')
+    const userText = scope === 'field' ? '跳过当前问题' : '跳过当前模块'
+    try {
+      const result = await skipCurrentQuestion(sessionId, scope)
+      dispatch({ type: 'replace_state', state: result.form_state })
+      setMessages((previous) => [
+        ...previous,
+        { id: newId(), role: 'user', text: userText },
+        { id: newId(), role: 'ai', text: result.reply },
+      ])
+      setDraft('')
+      setImages([])
+      setSuggestions([])
+      setFinished(result.form_complete)
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : '跳过失败，请重试')
+    } finally {
+      setActionLoading(false)
+    }
+  }, [actionLoading, dispatch, draft, images.length, sessionId])
+
+  const handleFinishEarly = useCallback(() => {
+    if (!onFinishEarly) return
+    if (draft.trim() || images.length > 0) {
+      setActionError('当前还有未发送的回答或图片，请先发送或清空后再提前提交。')
+      return
+    }
+    setActionError('')
+    onFinishEarly()
+  }, [draft, images.length, onFinishEarly])
 
   return (
     <div className="h-full flex flex-col pt-1 px-2 pb-2">
       <div className="chat-surface flex-1 flex flex-col rounded-[12px] shadow-xl overflow-hidden">
+        {(hasSkipAction || (canFinishEarly && onFinishEarly)) && !ended && (
+          <div className="flex flex-wrap justify-end gap-2 border-b border-outline/40 px-4 py-2">
+            {canSkipField && (
+              <button
+                type="button"
+                onClick={() => void handleSkip('field')}
+                disabled={loading || sending || listening || actionLoading}
+                className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/60 bg-amber-400/15 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-400/25 disabled:opacity-40 dark:text-amber-300"
+              >
+                <SkipForward size={14} aria-hidden="true" />
+                跳过此题
+              </button>
+            )}
+            {canSkipSection && (
+              <button
+                type="button"
+                onClick={() => void handleSkip('section')}
+                disabled={loading || sending || listening || actionLoading}
+                className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/60 bg-amber-400/15 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-400/25 disabled:opacity-40 dark:text-amber-300"
+              >
+                <SkipForward size={14} aria-hidden="true" />
+                跳过本模块
+              </button>
+            )}
+            {canFinishEarly && onFinishEarly && (
+              <button
+                type="button"
+                onClick={handleFinishEarly}
+                disabled={loading || sending || listening || actionLoading}
+                className="rounded-full border border-outline px-3 py-1.5 text-xs font-medium text-secondary transition hover:border-danger/50 hover:text-danger disabled:opacity-40"
+              >
+                提前结束并提交
+              </button>
+            )}
+          </div>
+        )}
         <div ref={scrollRef} className="chat-scrollbar flex-1 overflow-y-auto p-4">
           {loading && <div className="text-muted text-xs text-center">正在连接顾问…</div>}
           {messages.map((m) => (
@@ -460,9 +566,19 @@ export default function ChatPanel({ onPetActivityChange }: ChatPanelProps) {
               )}
             </div>
           )}
-          {finished && (
+          {actionError && (
+            <div role="alert" className="mt-3 rounded-card border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
+              {actionError}
+            </div>
+          )}
+          {finished && !ended && (
             <div className="text-done text-xs text-center mt-2">
               ✓ 必填信息已采集完成，请查看右上角客户需求表，确认后发送订单
+            </div>
+          )}
+          {ended && (
+            <div className="mt-3 rounded-card border border-done/40 bg-done/10 px-3 py-2 text-center text-xs text-done">
+              本次调研已提交，如需补充请开始新的调研。
             </div>
           )}
         </div>
@@ -470,7 +586,7 @@ export default function ChatPanel({ onPetActivityChange }: ChatPanelProps) {
           <QuickChips
             options={quickOptions}
             onPick={pickQuickOption}
-            disabled={sending || loading || listening}
+            disabled={sending || loading || listening || actionLoading || ended}
           />
 
           {images.length > 0 && (
@@ -499,7 +615,23 @@ export default function ChatPanel({ onPetActivityChange }: ChatPanelProps) {
                 accept="image/png,image/jpeg,image/webp,image/gif"
                 multiple
                 className="hidden"
-                onChange={(e) => { handleFiles(e.target.files); e.target.value = '' }}
+                onChange={(event) => {
+                  handleFiles(event.target.files)
+                  event.target.value = ''
+                  setImageMenuOpen(false)
+                }}
+              />
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                capture="environment"
+                className="hidden"
+                onChange={(event) => {
+                  handleFiles(event.target.files)
+                  event.target.value = ''
+                  setImageMenuOpen(false)
+                }}
               />
               <textarea
                 ref={draftRef}
@@ -531,7 +663,7 @@ export default function ChatPanel({ onPetActivityChange }: ChatPanelProps) {
                       ? `${streamStatus ?? '正在处理'}，请稍候…`
                       : '输入您的回答…'
                 }
-                disabled={sending || loading}
+                disabled={sending || loading || actionLoading || ended}
                 readOnly={listening}
                 className="chat-input block w-full resize-none rounded-bubble py-2.5 pl-3.5 pr-11 text-sm leading-5 text-primary placeholder:text-muted outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
               />
@@ -561,16 +693,53 @@ export default function ChatPanel({ onPetActivityChange }: ChatPanelProps) {
 
             </div>
 
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={loading || sending || listening || images.length >= 5}
-              className="grid h-10 w-9 shrink-0 place-items-center rounded-bubble text-muted hover:text-primary disabled:opacity-30 transition-colors"
-              aria-label="上传图片"
-              title="上传图片（最多 5 张）"
-            >
-              <ImagePlus size={18} aria-hidden="true" />
-            </button>
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setImageMenuOpen((open) => !open)}
+                disabled={loading || sending || listening || actionLoading || ended || images.length >= 5}
+                className="grid h-10 w-9 place-items-center rounded-bubble text-muted hover:text-primary disabled:opacity-30 transition-colors"
+                aria-label="添加图片"
+                aria-haspopup="menu"
+                aria-expanded={imageMenuOpen}
+                title="添加图片（拍照或从相册选择，最多 5 张）"
+              >
+                <ImagePlus size={18} aria-hidden="true" />
+              </button>
+
+              {imageMenuOpen && (
+                <div
+                  role="menu"
+                  aria-label="图片添加方式"
+                  className="absolute bottom-full right-0 z-20 mb-2 min-w-36 overflow-hidden rounded-card border border-outline bg-surface p-1 shadow-xl"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setImageMenuOpen(false)
+                      fileInputRef.current?.click()
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-primary hover:bg-active-surface"
+                  >
+                    <ImagePlus size={16} aria-hidden="true" />
+                    从相册选择
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setImageMenuOpen(false)
+                      cameraInputRef.current?.click()
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-primary hover:bg-active-surface"
+                  >
+                    <Camera size={16} aria-hidden="true" />
+                    拍照
+                  </button>
+                </div>
+              )}
+            </div>
 
             <button
               type="button"
@@ -578,7 +747,8 @@ export default function ChatPanel({ onPetActivityChange }: ChatPanelProps) {
               disabled={
                 loading
                 || sending
-                || !speechSupported
+                || actionLoading
+                || ended
               }
               className={
                 `voice-input-button${listening ? ' is-listening' : ''
@@ -634,6 +804,8 @@ export default function ChatPanel({ onPetActivityChange }: ChatPanelProps) {
               disabled={
                 loading
                 || listening
+                || actionLoading
+                || ended
                 || (
                   !sending
                   && draft.trim() === ''
@@ -677,6 +849,11 @@ export default function ChatPanel({ onPetActivityChange }: ChatPanelProps) {
               className="voice-input-error"
             >
               {speechError}
+            </p>
+          )}
+          {imageError && (
+            <p role="alert" className="voice-input-error">
+              {imageError}
             </p>
           )}
         </div>

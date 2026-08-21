@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from api.app import app
 from store import db
+from survey.state import from_dict, to_dict
 
 
 def _insufficient_balance_error() -> APIStatusError:
@@ -285,6 +286,40 @@ def test_chat_returns_json_response(client, auth_headers):
     assert 'form_state' in data
 
 
+def test_chat_rejects_invalid_direct_updates_without_fake_fill_event(client, auth_headers):
+    sid = client.post('/api/session', headers=auth_headers).json()['session_id']
+
+    with patch('api.app.run_agent') as run_agent_mock:
+        response = client.post(
+            '/api/chat',
+            json={
+                'session_id': sid,
+                'message': '价格带是错误选项',
+                'updates': [{
+                    'section_id': 'industry',
+                    'field_id': 'price_band',
+                    'value': 'wrong-band',
+                }],
+            },
+            headers=auth_headers,
+        )
+
+    assert response.status_code == 422
+    assert '不在 options 内' in response.json()['detail']
+    run_agent_mock.assert_not_called()
+
+
+def test_chat_validates_update_shape_before_endpoint_logic(client, auth_headers):
+    sid = client.post('/api/session', headers=auth_headers).json()['session_id']
+    response = client.post(
+        '/api/chat',
+        json={'session_id': sid, 'message': '测试', 'updates': [{}]},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+    assert '缺少字段' in response.text
+
+
 def test_chat_returns_clear_503_when_llm_balance_is_insufficient(client, auth_headers):
     sid = client.post('/api/session', headers=auth_headers).json()['session_id']
     with patch('api.app.run_agent', side_effect=_insufficient_balance_error()):
@@ -397,8 +432,128 @@ def test_submit_order_rejects_incomplete_form(
     assert response.status_code == 409
     assert (
         response.json()['detail']
-        == '必填信息尚未采集完成：客户名称/品牌名'
+        == '问卷尚未完成：品牌/公司名称'
     )
+
+
+def test_submit_order_allows_explicit_early_finish(client, auth_headers):
+    session_id = client.post('/api/session', headers=auth_headers).json()['session_id']
+
+    response = client.post(
+        '/api/orders',
+        json={'session_id': session_id, 'allow_incomplete': True},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()['message'] == '已提前结束调研并提交需求'
+    restored = client.get(f'/api/session/{session_id}', headers=auth_headers).json()
+    assert restored['form_state']['completed'] is True
+
+    chat_response = client.post(
+        '/api/chat',
+        json={'session_id': session_id, 'message': '继续修改'},
+        headers=auth_headers,
+    )
+    assert chat_response.status_code == 409
+    assert chat_response.json()['detail'] == '该问卷已经提交，不能继续修改'
+
+    skip_response = client.post(
+        f'/api/session/{session_id}/skip',
+        json={'scope': 'field'},
+        headers=auth_headers,
+    )
+    assert skip_response.status_code == 409
+
+
+def test_skip_endpoint_enforces_schema_permissions(client, auth_headers):
+    session_id = client.post('/api/session', headers=auth_headers).json()['session_id']
+
+    core = client.post(
+        f'/api/session/{session_id}/skip',
+        json={'scope': 'field'},
+        headers=auth_headers,
+    )
+    assert core.status_code == 409
+    assert '不能跳过' in core.json()['detail']
+
+    rec = db.get_session(session_id)
+    state = from_dict(rec['form_state'])
+    customer = state.sections['customer'].fields
+    customer['brand'].value = '云裳'
+    customer['contact'].value = '张女士'
+    customer['phone'].value = '13800000000'
+    customer['source'].value = 'douyin'
+    state.skipped_field_ids.extend(['customer.wechat', 'customer.city'])
+    db.save_session(session_id, to_dict(state))
+
+    allowed = client.post(
+        f'/api/session/{session_id}/skip',
+        json={'scope': 'field'},
+        headers=auth_headers,
+    )
+    assert allowed.status_code == 200
+    assert 'industry.category' in allowed.json()['form_state']['skippedFieldIds']
+    assert allowed.json()['form_state']['currentFieldId'] == 'subcategory'
+
+
+def test_equipment_photo_can_replace_unknown_text_inventory(tmp_path, monkeypatch):
+    import store.uploads as uploads
+    from api.app import _apply_uploaded_images
+    from survey.schema_def import SECTION_BY_ID
+    from survey.state import create_initial_state
+    from tests.test_uploads import make_png_data_uri
+
+    monkeypatch.setattr(uploads, 'UPLOADS_ROOT', tmp_path)
+    saved = uploads.save_upload('equipment-session', make_png_data_uri())
+    state = create_initial_state(session_id='equipment-session')
+    state.current_section_id = 'equipment'
+    state.current_field_id = 'inventory'
+    inventory_def = next(
+        field for field in SECTION_BY_ID['equipment'].fields
+        if field.id == 'inventory'
+    )
+
+    with (
+        patch('api.app.sync_current_question'),
+        patch('api.app.next_question_field', return_value=('equipment', inventory_def)),
+        patch('agent.flow.next_question_field', return_value=('equipment', inventory_def)),
+    ):
+        event = _apply_uploaded_images(state, [saved])
+
+    assert event is not None
+    assert event.field_id == 'equipment_photo'
+    assert state.sections['equipment'].fields['equipment_photo'].value == [saved.id]
+    assert state.sections['equipment'].fields['inventory'].value == []
+    assert 'equipment.inventory' in state.skipped_field_ids
+
+
+def test_style_reference_image_is_allowed_without_text_description(tmp_path, monkeypatch):
+    import store.uploads as uploads
+    from api.app import _apply_uploaded_images
+    from survey.schema_def import SECTION_BY_ID
+    from survey.state import create_initial_state
+    from tests.test_uploads import make_png_data_uri
+
+    monkeypatch.setattr(uploads, 'UPLOADS_ROOT', tmp_path)
+    saved = uploads.save_upload('style-session', make_png_data_uri())
+    state = create_initial_state(session_id='style-session')
+    style_text = next(
+        field for field in SECTION_BY_ID['product'].fields
+        if field.id == 'style_ref'
+    )
+
+    with (
+        patch('api.app.sync_current_question'),
+        patch('api.app.next_question_field', return_value=('product', style_text)),
+        patch('agent.flow.next_question_field', return_value=('product', style_text)),
+    ):
+        event = _apply_uploaded_images(state, [saved])
+
+    assert event is not None
+    assert event.field_id == 'style_ref_image'
+    assert state.sections['product'].fields['style_ref_image'].value == [saved.id]
+    assert 'product.style_ref' in state.skipped_field_ids
 
 
 def test_submit_order_persists_once(

@@ -114,6 +114,7 @@ describe('OrderConfirmationModal', () => {
     await waitFor(() => {
       expect(sendOrderMock).toHaveBeenCalledWith(
         'session-1',
+        false,
       )
     })
 
@@ -146,5 +147,31 @@ describe('OrderConfirmationModal', () => {
     )
 
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('提前结束使用单独文案和不完整提交标记', async () => {
+    sendOrderMock.mockResolvedValue({
+      delivery_id: 9,
+      sent: true,
+      message: '已提前结束调研并提交需求',
+    })
+    render(
+      <FormProvider>
+        <OrderConfirmationModal
+          allowIncomplete
+          onClose={vi.fn()}
+          onSent={vi.fn()}
+        />
+      </FormProvider>,
+    )
+
+    expect(screen.getByRole('dialog', { name: '提前结束并提交' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }))
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }))
+    fireEvent.click(screen.getByRole('button', { name: '确认结束并提交' }))
+
+    await waitFor(() => {
+      expect(sendOrderMock).toHaveBeenCalledWith('session-1', true)
+    })
   })
 })

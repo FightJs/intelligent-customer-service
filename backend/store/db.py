@@ -66,6 +66,7 @@ def init_db() -> None:
                 user_id        INTEGER NOT NULL,
                 customer_name  TEXT,
                 markdown       TEXT NOT NULL,
+                submission_kind TEXT NOT NULL DEFAULT 'complete',
                 created_at     TEXT NOT NULL,
                 FOREIGN KEY (session_id) REFERENCES sessions(session_id),
                 FOREIGN KEY (user_id) REFERENCES users(id)
@@ -128,6 +129,15 @@ def init_db() -> None:
         cols = [r[1] for r in conn.execute('PRAGMA table_info(messages)').fetchall()]
         if 'tool_events' not in cols:
             conn.execute('ALTER TABLE messages ADD COLUMN tool_events TEXT')
+
+        delivery_cols = [
+            row[1]
+            for row in conn.execute('PRAGMA table_info(deliveries)').fetchall()
+        ]
+        if 'submission_kind' not in delivery_cols:
+            conn.execute(
+                "ALTER TABLE deliveries ADD COLUMN submission_kind TEXT NOT NULL DEFAULT 'complete'"
+            )
 
         conn.execute('''
             CREATE INDEX IF NOT EXISTS idx_users_role_created
@@ -855,16 +865,69 @@ def create_delivery(
     user_id: int,
     customer_name: str | None,
     markdown: str,
+    submission_kind: str = 'complete',
 ) -> int:
     """落库一条交付物，返回 delivery.id。"""
     now = _now()
     with _connect() as conn:
         cur = conn.execute(
-            '''INSERT INTO deliveries (session_id, user_id, customer_name, markdown, created_at)
-               VALUES (?, ?, ?, ?, ?)''',
-            (session_id, user_id, customer_name, markdown, now),
+            '''INSERT INTO deliveries
+               (session_id, user_id, customer_name, markdown, submission_kind, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)''',
+            (session_id, user_id, customer_name, markdown, submission_kind, now),
         )
         return int(cur.lastrowid)
+
+
+def create_delivery_and_complete_session(
+    session_id: str,
+    user_id: int,
+    customer_name: str | None,
+    markdown: str,
+    submission_kind: str,
+    form_state: dict[str, Any],
+) -> tuple[int, bool]:
+    """在同一事务内创建唯一交付物并把会话标记为已提交。
+
+    ``BEGIN IMMEDIATE`` 让并发提交按顺序执行；后到的请求会读到首条
+    交付记录并直接复用，避免重复订单和“订单已建但问卷未锁定”。
+    """
+    now = _now()
+    serialized_state = json.dumps(form_state, ensure_ascii=False)
+    with _connect() as conn:
+        conn.execute('BEGIN IMMEDIATE')
+        existing = conn.execute(
+            '''SELECT id FROM deliveries
+               WHERE session_id = ?
+               ORDER BY id ASC
+               LIMIT 1''',
+            (session_id,),
+        ).fetchone()
+        if existing is not None:
+            return int(existing['id']), False
+
+        inserted = conn.execute(
+            '''INSERT INTO deliveries
+               (session_id, user_id, customer_name, markdown, submission_kind, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)''',
+            (
+                session_id,
+                user_id,
+                customer_name,
+                markdown,
+                submission_kind,
+                now,
+            ),
+        )
+        updated = conn.execute(
+            '''UPDATE sessions
+               SET form_state = ?, updated_at = ?
+               WHERE session_id = ? AND user_id = ?''',
+            (serialized_state, now, session_id, user_id),
+        )
+        if updated.rowcount != 1:
+            raise RuntimeError('session not found while completing delivery')
+        return int(inserted.lastrowid), True
 
 
 def get_delivery_by_session(
@@ -880,6 +943,7 @@ def get_delivery_by_session(
                 d.user_id,
                 d.customer_name,
                 d.markdown,
+                d.submission_kind,
                 d.created_at,
                 u.username AS owner_username
             FROM deliveries d
@@ -938,7 +1002,8 @@ def list_deliveries(
             params,
         ).fetchone()[0]
         rows = conn.execute(
-            f'''SELECT d.id, d.session_id, d.user_id, d.customer_name, d.created_at,
+            f'''SELECT d.id, d.session_id, d.user_id, d.customer_name,
+                       d.submission_kind, d.created_at,
                       u.username AS owner_username
                FROM deliveries d LEFT JOIN users u ON d.user_id = u.id
                {where}
@@ -952,7 +1017,8 @@ def get_delivery(delivery_id: int) -> dict[str, Any] | None:
     """取单条交付物（含 markdown 正文）。不存在返回 None。"""
     with _connect() as conn:
         row = conn.execute(
-            '''SELECT d.id, d.session_id, d.user_id, d.customer_name, d.markdown, d.created_at,
+            '''SELECT d.id, d.session_id, d.user_id, d.customer_name, d.markdown,
+                      d.submission_kind, d.created_at,
                       u.username AS owner_username
                FROM deliveries d LEFT JOIN users u ON d.user_id = u.id
                WHERE d.id = ?''',

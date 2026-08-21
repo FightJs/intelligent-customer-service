@@ -2,18 +2,90 @@
 from unittest.mock import AsyncMock, patch, MagicMock
 from survey.state import create_initial_state
 from survey.models import TextValue
+from survey.schema_def import SECTION_BY_ID
 from agent.loop import (
     AgentResult,
     AgentStreamResult,
     REFERENCE_IMAGE_INVITATION,
     ROOM_IMAGE_INVITATION,
     _apply_image_invitation,
+    _apply_deterministic_price_range,
+    _apply_deterministic_reference_link,
+    _skip_unknown_equipment_inventory,
     _build_system_prompt,
     _correct_premature_completion,
+    _enforce_collector_reply,
+    _price_band_from_text,
     run_agent,
     run_agent_stream,
 )
-from agent.tools import ToolEvent
+
+BRAND_COLLECTION_REPLY = '收到，我理解您的情况。请问您的品牌或公司名称是什么？'
+CONTACT_COLLECTION_REPLY = '收到，我理解您的情况。方便留下您的姓名和联系电话吗？'
+
+
+def test_benchmark_link_is_saved_deterministically():
+    state = create_initial_state()
+    field = next(
+        item for item in SECTION_BY_ID['benchmark'].fields
+        if item.id == 'account_name'
+    )
+
+    with patch(
+        'agent.loop.flow.next_question_field',
+        return_value=('benchmark', field),
+    ):
+        events = _apply_deterministic_reference_link(
+            state,
+            '参考这个直播间：https://example.com/live/123',
+        )
+
+    assert state.sections['benchmark'].fields['reference_link'].value == (
+        'https://example.com/live/123'
+    )
+    assert events[0].field_id == 'reference_link'
+
+
+def test_unknown_equipment_model_skips_text_and_moves_to_photo():
+    state = create_initial_state()
+    inventory = next(
+        item for item in SECTION_BY_ID['equipment'].fields
+        if item.id == 'inventory'
+    )
+    photo = next(
+        item for item in SECTION_BY_ID['equipment'].fields
+        if item.id == 'equipment_photo'
+    )
+
+    with patch(
+        'agent.loop.flow.next_question_field',
+        side_effect=[('equipment', inventory), ('equipment', inventory), ('equipment', photo)],
+    ):
+        events = _skip_unknown_equipment_inventory(state, '不知道具体型号。')
+
+    assert events[0].kind == 'skip'
+    assert events[0].field_id == 'inventory'
+    assert 'equipment.inventory' in state.skipped_field_ids
+
+
+def test_equipment_details_are_not_discarded_when_model_is_partly_unknown():
+    state = create_initial_state()
+    inventory = next(
+        item for item in SECTION_BY_ID['equipment'].fields
+        if item.id == 'inventory'
+    )
+
+    with patch(
+        'agent.loop.flow.next_question_field',
+        return_value=('equipment', inventory),
+    ):
+        events = _skip_unknown_equipment_inventory(
+            state,
+            '不知道型号，不过有一台索尼相机',
+        )
+
+    assert events == []
+    assert 'equipment.inventory' not in state.skipped_field_ids
 
 
 def _mock_text_response(text: str):
@@ -88,7 +160,7 @@ def test_run_agent_text_only(mock_get_client):
     result = run_agent(state, '你好')
 
     assert isinstance(result, AgentResult)
-    assert result.reply == '您好！品牌名是？'
+    assert result.reply == BRAND_COLLECTION_REPLY
     assert result.tool_events == []
     assert (
         mock_client.messages.create.call_count
@@ -120,9 +192,7 @@ def test_run_agent_capture_without_tool_does_not_crash(
         '你好',
     )
 
-    assert result.reply == (
-        '您好！请问有什么可以帮您？'
-    )
+    assert result.reply == BRAND_COLLECTION_REPLY
 
     assert result.tool_events == []
 
@@ -148,7 +218,7 @@ def test_run_agent_extraction_pass_recovers_missed_fill(mock_get_client):
     state = create_initial_state()
     result = run_agent(state, '我们品牌叫云裳')
 
-    assert result.reply == '云裳这名字真好听！'
+    assert result.reply == CONTACT_COLLECTION_REPLY
     assert state.sections['customer'].fields['brand'].value == '云裳'
     assert len(result.tool_events) == 1
     assert result.tool_events[0].field_id == 'brand'
@@ -267,10 +337,10 @@ def test_run_agent_rechecks_empty_fill_that_claims_information_saved(
 
 
 @patch('agent.loop.get_client')
-def test_run_agent_retries_empty_audit_and_records_quick_height(
+def test_run_agent_retries_empty_audit_and_records_host_profile(
     mock_get_client,
 ):
-    """快速模式里身高虽是选填，用户明确提供后也必须写入。"""
+    """快速模式中，用户主动给出的主播信息仍会被准确记录。"""
     mock_client = MagicMock()
     mock_client.messages.create.side_effect = [
         _mock_text_and_tool_response(
@@ -288,8 +358,8 @@ def test_run_agent_retries_empty_audit_and_records_quick_height(
                 },
                 {
                     'section_id': 'host',
-                    'field_id': 'height',
-                    'value': {'男主播': '175'},
+                    'field_id': 'profile',
+                    'value': '男主播175cm',
                 },
             ],
         }),
@@ -300,9 +370,7 @@ def test_run_agent_retries_empty_audit_and_records_quick_height(
     run_agent(state, '一位男主播175')
 
     assert state.sections['host'].fields['count'].value == '1'
-    assert state.sections['host'].fields['height'].value == {
-        '男主播': '175',
-    }
+    assert state.sections['host'].fields['profile'].value == '男主播175cm'
     assert mock_client.messages.create.call_count == 3
     retry_request = (
         mock_client.messages.create
@@ -336,16 +404,16 @@ def test_run_agent_retries_partially_failed_audit(
                 },
                 {
                     'section_id': 'host',
-                    'field_id': 'height',
-                    'value': '175',
+                    'field_id': 'movement',
+                    'value': 'invalid',
                 },
             ],
         }),
         _mock_tool_response('fill_fields', {
             'updates': [{
                 'section_id': 'host',
-                'field_id': 'height',
-                'value': {'男主播': '175'},
+                'field_id': 'movement',
+                'value': 'frequent',
             }],
         }),
     ]
@@ -355,9 +423,7 @@ def test_run_agent_retries_partially_failed_audit(
     result = run_agent(state, '一位男主播175')
 
     assert state.sections['host'].fields['count'].value == '1'
-    assert state.sections['host'].fields['height'].value == {
-        '男主播': '175',
-    }
+    assert state.sections['host'].fields['movement'].value == 'frequent'
     assert all(
         event.value not in ('', None, {})
         for event in result.tool_events
@@ -374,10 +440,69 @@ def test_premature_completion_claim_is_replaced_by_real_progress():
         '好嘿，必填信息都齐啦！快速体验到这里就完成。',
     )
 
-    assert '必填信息还没有收齐' in reply
+    assert '问答还没有结束' in reply
     assert '目前还差' in reply
-    assert '客户名称/品牌名' in reply
+    assert '品牌/公司名称' in reply
     assert '快速体验到这里就完成' not in reply
+
+
+def test_price_range_500_to_1000_is_deterministically_high():
+    for text in ('500～1000 元', '500-1000元', '500至1000 元'):
+        assert _price_band_from_text(text) == 'high'
+
+
+def test_price_range_keeps_original_text_and_never_maps_to_mid():
+    state = create_initial_state()
+    for field_id, value in (
+        ('brand', '云裳'), ('contact', '张女士'), ('phone', '13800000000'),
+    ):
+        state.sections['customer'].fields[field_id].value = value
+    state.sections['customer'].fields['source'].value = 'douyin'
+    state.skipped_field_ids.extend(['customer.wechat', 'customer.city'])
+    state.skipped_field_ids.extend(['industry.category', 'industry.subcategory'])
+
+    events = _apply_deterministic_price_range(state, '商品价格是500～1000元')
+
+    assert state.sections['industry'].fields['price_band'].value == 'high'
+    assert state.sections['industry'].fields['price_range_raw'].value == '商品价格是500～1000元'
+    assert {event.field_id for event in events} == {'price_band', 'price_range_raw'}
+
+
+def test_non_price_numbers_do_not_fill_price_band():
+    state = create_initial_state()
+    for field_id, value in (
+        ('brand', '云裳'), ('contact', '张女士'), ('phone', '13800000000'),
+    ):
+        state.sections['customer'].fields[field_id].value = value
+    state.sections['customer'].fields['source'].value = 'douyin'
+    state.skipped_field_ids.extend([
+        'customer.wechat', 'customer.city',
+        'industry.category', 'industry.subcategory',
+    ])
+
+    events = _apply_deterministic_price_range(state, '我们有3个SKU，价格还没想好')
+
+    assert events == []
+    assert state.sections['industry'].fields['price_band'].value is None
+
+
+def test_agent_advice_is_replaced_by_short_collection_reply():
+    state = create_initial_state()
+    reply = _enforce_collector_reply(
+        state,
+        '我建议您先买一套高端灯光设备，再把背景墙整体重做。您预算多少？您场地多大？',
+    )
+
+    assert '我建议' not in reply
+    assert reply.count('？') == 1
+    assert reply.endswith('请问您的品牌或公司名称是什么？')
+
+    subtle_advice = _enforce_collector_reply(
+        state,
+        '您最好选暖色灯光，会更适合服装直播。请问您的品牌或公司名称是什么？',
+    )
+    assert '最好' not in subtle_advice
+    assert '更适合' not in subtle_advice
 
 
 @patch('agent.loop.get_client')
@@ -396,7 +521,7 @@ def test_run_agent_fast_path_text_with_fill(mock_get_client):
     state = create_initial_state()
     result = run_agent(state, '品牌叫云裳')
 
-    assert result.reply == '记下了，云裳这个品牌名很好听！主要做哪个品类呀？'
+    assert result.reply == CONTACT_COLLECTION_REPLY
     assert state.sections['customer'].fields['brand'].value == '云裳'
     assert len(result.tool_events) == 1
     assert result.tool_events[0].kind == 'fill'
@@ -441,7 +566,7 @@ def test_run_agent_fill_fields_then_reply(mock_get_client):
 
     state = create_initial_state()
     result = run_agent(state, '品牌叫云裳')
-    assert result.reply == '已记下云裳品牌。'
+    assert result.reply == CONTACT_COLLECTION_REPLY
     assert len(result.tool_events) == 1
     assert result.tool_events[0].kind == 'fill'
     assert result.tool_events[0].field_id == 'brand'
@@ -463,7 +588,7 @@ def test_run_agent_fill_fields_then_reply(mock_get_client):
     assert [
         tool['name']
         for tool in first_request['tools']
-    ] == ['fill_fields', 'skip_section', 'get_progress', 'set_current_section']
+    ] == ['fill_fields', 'skip_field', 'skip_section', 'get_progress', 'set_current_section']
 
 
 @patch('agent.loop.get_client')
@@ -655,7 +780,7 @@ def test_suggestions_filtered_when_reply_does_not_match_choice(
         '下一步',
     )
 
-    assert result.suggestions == []
+    assert result.suggestions[0]['field_id'] == 'category'
 
 
 @patch('agent.loop.get_client')
@@ -739,7 +864,7 @@ def test_run_agent_uses_local_context_and_recent_messages(
         history=history,
     )
 
-    assert result.reply == '好的'
+    assert result.reply == BRAND_COLLECTION_REPLY
 
     # 本地整理历史，不调用 LLM；只有捕获 + 正式回复两次调用。
     assert (
@@ -793,6 +918,7 @@ def test_run_agent_uses_local_context_and_recent_messages(
 
 def test_system_prompt_includes_table_columns():
     state = create_initial_state()
+    state.sections['budget'].fields['has_existing'].value = 'yes'
 
     prompt = _build_system_prompt(state)
 
@@ -800,7 +926,7 @@ def test_system_prompt_includes_table_columns():
     assert 'type=设备类型' in prompt
     assert 'model=品牌型号' in prompt
     assert 'qty=数量' in prompt
-    assert 'note=备注' in prompt
+    assert 'note=备注' not in prompt
 
 
 def test_system_prompt_requires_inventory_when_existing():
@@ -813,18 +939,9 @@ def test_system_prompt_requires_inventory_when_existing():
 
     prompt = _build_system_prompt(state)
 
-    assert '待了解话题' in prompt
-    assert '【八、现有设备情况】现有设备明细' in prompt
-
-    required_part = prompt.split(
-        '当前需要推进的必填字段：',
-        1,
-    )[1].split(
-        '用户主动提及时可记录的选填字段',
-        1,
-    )[0]
-
-    assert 'equipment.inventory' in required_part
+    assert 'equipment.inventory' in prompt
+    assert '现有设备文字明细' in prompt
+    assert '可跳过当前题' in prompt
 
 
 @patch('agent.loop.get_client')
@@ -854,26 +971,11 @@ def test_system_prompt_separates_required_and_optional_fields():
 
     prompt = _build_system_prompt(state)
 
-    required_part = prompt.split(
-        '当前需要推进的必填字段：',
-        1,
-    )[1].split(
-        '用户主动提及时可记录的选填字段',
-        1,
-    )[0]
-
-    optional_part = prompt.split(
-        '用户主动提及时可记录的选填字段',
-        1,
-    )[1].split(
-        '当前进度',
-        1,
-    )[0]
-
-    assert 'customer.brand' in required_part
-    assert 'equipment.inventory' not in required_part
-    assert 'equipment.inventory' in optional_part
-    assert '禁止主动询问选填字段' in prompt
+    assert 'customer.brand' in prompt
+    assert 'customer.wechat' in prompt
+    assert '(text,核心必填)' in prompt
+    assert '(text,可跳过当前题)' in prompt
+    assert '标记“可跳过”的问题仍要在完整版中主动问一次' in prompt
 
 
 @patch('agent.loop.get_client')
@@ -921,11 +1023,12 @@ def test_run_agent_uses_stable_llm_parameters(
 
 def test_system_prompt_handles_no_more_information():
     state = create_initial_state()
+    state.completed = True
 
     prompt = _build_system_prompt(state)
 
-    assert '不用补充' in prompt
-    assert '禁止再次询问' in prompt
+    assert '所有适用问题已回答或合法跳过' in prompt
+    assert '本次问答已完整结束' in prompt
 
 
 def test_system_prompt_defines_security_and_image_invitation_rules():
@@ -940,20 +1043,15 @@ def test_system_prompt_defines_security_and_image_invitation_rules():
 
 def test_existing_room_image_invitation_is_only_added_once():
     state = create_initial_state()
-    state.sections['status'].fields['has_room'].value = 'yes'
+    field = next(item for item in SECTION_BY_ID['status'].fields if item.id == 'room_photo')
 
-    first_reply = _apply_image_invitation(
-        state,
-        '已经有直播间',
-        '好的，现有直播间情况记下了。',
-        [],
-    )
-    second_reply = _apply_image_invitation(
-        state,
-        '继续',
-        '我们继续聊。',
-        [],
-    )
+    with patch('agent.loop.flow.next_question_field', return_value=('status', field)):
+        first_reply = _apply_image_invitation(
+            state, '已经有直播间', '好的，现有直播间情况记下了。', [],
+        )
+        second_reply = _apply_image_invitation(
+            state, '继续', '我们继续聊。', [],
+        )
 
     assert ROOM_IMAGE_INVITATION in first_reply
     assert ROOM_IMAGE_INVITATION not in second_reply
@@ -962,26 +1060,15 @@ def test_existing_room_image_invitation_is_only_added_once():
 
 def test_reference_image_invitation_is_only_added_once():
     state = create_initial_state()
-    state.sections['status'].fields['has_room'].value = 'no'
-    event = ToolEvent(
-        kind='fill',
-        section_id='product',
-        field_id='keywords',
-        value='轻奢',
-    )
+    field = next(item for item in SECTION_BY_ID['product'].fields if item.id == 'style_ref_image')
 
-    first_reply = _apply_image_invitation(
-        state,
-        '想要轻奢风格',
-        '轻奢方向很适合。',
-        [event],
-    )
-    second_reply = _apply_image_invitation(
-        state,
-        '暂时没有图片',
-        '没关系，我们继续。',
-        [],
-    )
+    with patch('agent.loop.flow.next_question_field', return_value=('product', field)):
+        first_reply = _apply_image_invitation(
+            state, '想要轻奢风格', '轻奢方向已记录。', [],
+        )
+        second_reply = _apply_image_invitation(
+            state, '暂时没有图片', '没关系，我们继续。', [],
+        )
 
     assert REFERENCE_IMAGE_INVITATION in first_reply
     assert REFERENCE_IMAGE_INVITATION not in second_reply
@@ -1025,7 +1112,7 @@ def test_run_agent_persists_field_before_reply(
         == '茶叶'
     )
 
-    assert result.reply == '好的，茶叶已经记录。'
+    assert result.reply == BRAND_COLLECTION_REPLY
 
     first_request = (
         mock_client.messages.create
@@ -1038,4 +1125,4 @@ def test_run_agent_persists_field_before_reply(
     assert [
         tool['name']
         for tool in first_request['tools']
-    ] == ['fill_fields', 'skip_section', 'get_progress', 'set_current_section']
+    ] == ['fill_fields', 'skip_field', 'skip_section', 'get_progress', 'set_current_section']

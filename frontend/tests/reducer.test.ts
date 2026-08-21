@@ -45,7 +45,7 @@ describe('reducer', () => {
   it('advance 到末节不再前进', () => {
     let s = createInitialState()
     for (let i = 0; i < 20; i++) s = reducer(s, { type: 'advance' })
-    expect(s.currentSectionId).toBe('notes')
+    expect(s.currentSectionId).toBe('goal')
   })
 
   it('complete 标记完成', () => {

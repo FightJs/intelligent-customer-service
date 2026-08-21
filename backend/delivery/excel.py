@@ -89,28 +89,28 @@ def generate_excel(state: StudioFormState) -> bytes:
     ws1 = wb.active
     ws1.title = '现有设备'
 
-    ws1.merge_cells('A1:D1')
+    ws1.merge_cells('A1:C1')
     ws1['A1'] = f'{data["customer_name"]} — 现有设备明细'
     ws1['A1'].font = _TITLE_FONT
     ws1['A1'].alignment = Alignment(horizontal='center')
 
-    headers = ['设备类型', '品牌型号', '数量', '备注']
+    headers = ['设备类型', '品牌型号', '数量']
     for col, h in enumerate(headers, 1):
         ws1.cell(row=3, column=col, value=h)
-    _style_header_row(ws1, 3, 4)
+    _style_header_row(ws1, 3, 3)
 
     if data['equipment_table']:
         for row_idx, row in enumerate(data['equipment_table'], 4):
-            for col, key in enumerate(['type', 'model', 'qty', 'note'], 1):
+            for col, key in enumerate(['type', 'model', 'qty'], 1):
                 cell = ws1.cell(row=row_idx, column=col, value=row.get(key, ''))
                 _style_body_cell(cell)
     else:
-        ws1.merge_cells('A4:D4')
+        ws1.merge_cells('A4:C4')
         ws1['A4'] = '（无现有设备记录）'
         ws1['A4'].alignment = Alignment(horizontal='center')
         ws1['A4'].font = _BODY_FONT
 
-    for col, width in enumerate([16, 28, 10, 30], 1):
+    for col, width in enumerate([16, 28, 10], 1):
         ws1.column_dimensions[chr(64 + col)].width = width
 
     # ── Sheet 2: 推荐设备清单 ──

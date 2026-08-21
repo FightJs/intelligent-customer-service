@@ -1,6 +1,6 @@
 """Agent tools 定义与执行函数。
 
-4 个工具负责信息采集和进度控制。
+5 个工具负责信息采集和进度控制。
 订单发送由用户在前端明确确认，不由 LLM 工具完成。
 """
 from __future__ import annotations
@@ -12,7 +12,7 @@ from typing import Any
 from agent import flow
 from store.uploads import resolve_image
 from survey.models import StudioFormState, FieldValue
-from survey.schema_def import SECTION_BY_ID, FIELD_BY_ID, SECTION_ORDER, AGENT_GUIDE
+from survey.schema_def import SECTION_BY_ID, SECTION_ORDER, AGENT_GUIDE
 
 
 @dataclass
@@ -24,10 +24,38 @@ class ToolEvent:
     value: Any = None
 
 
+def _normalize_multi_choice(value: object, fdef) -> tuple[list[str] | None, str | None]:
+    """兼容模型或快捷选项把单个多选答案传成字符串。"""
+    if isinstance(value, str):
+        candidates = [value.strip()]
+        for separator in ('、', '，', ',', '；', ';', '/'):
+            if separator in value:
+                candidates = [item.strip() for item in value.split(separator)]
+                break
+    elif isinstance(value, list):
+        candidates = value
+    else:
+        return None, f'需要 list 或 string，收到 {type(value).__name__}'
+
+    valid_values = {option.value for option in (fdef.options or [])}
+    labels = {option.label: option.value for option in (fdef.options or [])}
+    cleaned: list[str] = []
+    for candidate in candidates:
+        if not isinstance(candidate, str) or not candidate.strip():
+            continue
+        normalized = candidate.strip()
+        if valid_values and normalized not in valid_values:
+            normalized = labels.get(normalized, '')
+            if not normalized:
+                return None, f'value={candidate} 不在 options 内'
+        cleaned.append(normalized)
+    return list(dict.fromkeys(cleaned)), None
+
+
 # ── Tool 定义（Anthropic 格式）──────────────────────────────
 
 TOOL_DEFS: list[dict] = [
-        {
+    {
         'name': 'fill_fields',
         'description': (
             '只提取最后一条用户消息中新出现、补充或明确修改的信息。'
@@ -35,13 +63,12 @@ TOOL_DEFS: list[dict] = [
             '不要重新传递历史中已经保存的值。'
             '没有可写入的信息时，必须返回 updates=[]。'
             'choice-single 填选项 value（英文标识），text 填原话。'
+            'choice-multi 必须传选项 value 的字符串数组。'
             'choice-multi、dimension、table 只传本轮新增或补充的内容，'
             '后端会与已有值合并。'
             'dimension 必须传对象，键必须使用字段定义中的 dims。'
-            '主播身高示例：{"男主播":"175"} 或 {"女主播":"165"}，'
-            '数值中不要重复填写 cm。'
             'table 填行对象数组，例如 '
-            '[{"type":"相机","model":"Sony A7M4","qty":"1","note":""}]。'
+            '[{"type":"相机","model":"Sony A7M4","qty":"1"}]。'
             'image 填本轮消息 [图片N id=...] 标记里的 id 字符串数组，'
             '不要编造 id。'
             'text 或 choice-single 修改已有值时，'
@@ -67,9 +94,9 @@ TOOL_DEFS: list[dict] = [
                             'value': {
                                 'description': (
                                     '字段值。dimension 必须传对象，例如 '
-                                    '{"男主播":"175"}；'
+                                    '{"宽":"4.5","深":"5","高":"3"}；'
                                     'table 必须传行对象数组，'
-                                    '列 id 使用 type、model、qty、note'
+                                    '列 id 使用 type、model、qty'
                                 ),
                             },
                             'confirmed': {
@@ -92,8 +119,20 @@ TOOL_DEFS: list[dict] = [
         },
     },
     {
+        'name': 'skip_field',
+        'description': '仅当当前题在 schema 中标记为可跳过时跳过该题；核心必答题会被后端拒绝。',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'section_id': {'type': 'string'},
+                'field_id': {'type': 'string'},
+            },
+            'required': ['section_id', 'field_id'],
+        },
+    },
+    {
         'name': 'skip_section',
-        'description': '条件跳过某章节。如用户说"没有直播间"→ skip status。',
+        'description': '仅当当前模块在 schema 中标记为可跳过时跳过该模块。条件答案“否”应正常记录，不要用本工具代替。',
         'input_schema': {
             'type': 'object',
             'properties': {
@@ -124,7 +163,13 @@ TOOL_DEFS: list[dict] = [
 
 # ── 执行函数 ────────────────────────────────────────────────
 
-def _apply_one(state: StudioFormState,section_id: str,field_id: str,value,confirmed: bool = False,) -> tuple[bool, str | None]:
+def _apply_one(
+    state: StudioFormState,
+    section_id: str,
+    field_id: str,
+    value,
+    confirmed: bool = False,
+) -> tuple[bool, str | None]:
     """应用单个字段值，兼容带前缀的 field_id。
 
     返回 (ok, reason)；失败时 reason 描述原因（section 不存在/字段不存在/类型不匹配/choice 非法值）。
@@ -136,7 +181,12 @@ def _apply_one(state: StudioFormState,section_id: str,field_id: str,value,confir
     current = sec.fields.get(clean_fid)
     if current is None:
         return False, f'字段不存在: {section_id}.{clean_fid}'
-    fdef = FIELD_BY_ID.get(clean_fid)
+    fdef = next(
+        (field for field in SECTION_BY_ID[section_id].fields if field.id == clean_fid),
+        None,
+    )
+    if fdef is None:
+        return False, f'字段定义不存在: {section_id}.{clean_fid}'
     try:
         if current.type == 'text':
             new_value = (
@@ -202,21 +252,9 @@ def _apply_one(state: StudioFormState,section_id: str,field_id: str,value,confir
 
             current.value = value
         elif current.type == 'choice-multi':
-            if not isinstance(value, list):
-                return False, f'{clean_fid} 需要 list，收到 {type(value).__name__}'
-            valid_values = {o.value for o in (fdef.options or [])}
-            cleaned: list[str] = []
-            for v in value:
-                if not isinstance(v, str):
-                    continue
-                if valid_values and v not in valid_values:
-                    label_match = next(
-                        (o.value for o in (fdef.options or []) if o.label == v), None
-                    )
-                    if label_match is None:
-                        return False, f'{clean_fid} value={v} 不在 options 内'
-                    v = label_match
-                cleaned.append(v)
+            cleaned, error = _normalize_multi_choice(value, fdef)
+            if error is not None or cleaned is None:
+                return False, f'{clean_fid} {error}'
             current.value = list(dict.fromkeys([
                 *current.value,
                 *cleaned,
@@ -249,9 +287,11 @@ def _apply_one(state: StudioFormState,section_id: str,field_id: str,value,confir
                 **new_values,
             }
         elif current.type == 'image':
-            if not isinstance(value, list):
+            if isinstance(value, str):
+                value = [value]
+            elif not isinstance(value, list):
                 return False, (
-                    f'{clean_fid} image 需要 list，'
+                    f'{clean_fid} image 需要 list 或 string，'
                     f'收到 {type(value).__name__}'
                 )
 
@@ -260,6 +300,14 @@ def _apply_one(state: StudioFormState,section_id: str,field_id: str,value,confir
                 if item is None or not str(item).strip():
                     continue
                 image_id = str(item)
+                if not state._session_id:
+                    return False, (
+                        f'{clean_fid} 缺少当前会话信息，不能写入图片'
+                    )
+                if not image_id.startswith(f'{state._session_id}/'):
+                    return False, (
+                        f'{clean_fid} 图片不属于当前会话，不能写入: {image_id}'
+                    )
                 # 只接受真实落盘的图片 id，丢弃幻觉引用
                 if resolve_image(image_id) is None:
                     return False, (
@@ -273,9 +321,11 @@ def _apply_one(state: StudioFormState,section_id: str,field_id: str,value,confir
                 *new_images,
             ]))
         elif current.type == 'table':
-            if not isinstance(value, list):
+            if isinstance(value, dict):
+                value = [value]
+            elif not isinstance(value, list):
                 return False, (
-                    f'{clean_fid} table 需要 list，'
+                    f'{clean_fid} table 需要 list 或 object，'
                     f'收到 {type(value).__name__}'
                 )
 
@@ -315,7 +365,12 @@ def _apply_one(state: StudioFormState,section_id: str,field_id: str,value,confir
                 if row not in merged_rows:
                     merged_rows.append(row)
 
-            current.value = merged_rows    
+            current.value = merged_rows
+        skipped_key = f'{section_id}.{clean_fid}'
+        if skipped_key in state.skipped_field_ids:
+            state.skipped_field_ids.remove(skipped_key)
+        if sec.status == 'skipped':
+            sec.status = 'pending'
         return True, None
     except Exception as exc:
         return False, f'异常: {exc}'
@@ -328,18 +383,28 @@ def apply_updates(state: StudioFormState, updates: list[dict]) -> tuple[int, lis
     """
     count = 0
     failures: list[str] = []
-    for upd in updates:
+    for index, upd in enumerate(updates):
+        if not isinstance(upd, dict):
+            failures.append(f'updates[{index}] 需要 object')
+            continue
+        section_id = upd.get('section_id')
+        field_id = upd.get('field_id')
+        if not isinstance(section_id, str) or not isinstance(field_id, str):
+            failures.append(f'updates[{index}] 缺少有效的 section_id 或 field_id')
+            continue
         ok, reason = _apply_one(
             state,
-            upd['section_id'],
-            upd['field_id'],
+            section_id,
+            field_id,
             upd.get('value'),
             confirmed=upd.get('confirmed') is True,
         )
         if ok:
             count += 1
         elif reason:
-            failures.append(f"{upd['section_id']}.{upd['field_id']}: {reason}")
+            failures.append(f'{section_id}.{field_id}: {reason}')
+    flow.recompute_section_status(state)
+    flow.sync_current_question(state)
     return count, failures
 
 
@@ -349,11 +414,19 @@ def execute_tool(name: str, tool_input: dict, state: StudioFormState) -> tuple[s
         count = 0
         details: list[str] = []
         failures: list[str] = []
-        for upd in tool_input.get('updates', []):
+        for index, upd in enumerate(tool_input.get('updates', [])):
+            if not isinstance(upd, dict):
+                failures.append(f'updates[{index}] 需要 object')
+                continue
+            section_id = upd.get('section_id')
+            field_id = upd.get('field_id')
+            if not isinstance(section_id, str) or not isinstance(field_id, str):
+                failures.append(f'updates[{index}] 缺少有效的 section_id 或 field_id')
+                continue
             ok, reason = _apply_one(
                 state,
-                upd['section_id'],
-                upd['field_id'],
+                section_id,
+                field_id,
                 upd.get('value'),
                 confirmed=upd.get('confirmed') is True,
             )
@@ -363,24 +436,32 @@ def execute_tool(name: str, tool_input: dict, state: StudioFormState) -> tuple[s
                 if isinstance(val, str) and val:
                     details.append(val)
             elif reason:
-                failures.append(f"{upd['section_id']}.{upd['field_id']}: {reason}")
+                failures.append(f'{section_id}.{field_id}: {reason}')
         msg = f'已填充 {count} 个字段。'
         if details:
             msg = f'已填充 {count} 个字段（{"、".join(details)}）。'
         if failures:
             msg += f' 失败 {len(failures)} 个：{"; ".join(failures)}。请根据原因修正后最多重试一次。'
+        flow.recompute_section_status(state)
+        flow.sync_current_question(state)
         return msg, not failures
+
+    if name == 'skip_field':
+        sid = tool_input['section_id']
+        fid = tool_input['field_id'].split('.')[-1]
+        ok, message = flow.skip_field(state, sid, fid)
+        return message, ok
 
     if name == 'skip_section':
         sid = tool_input['section_id']
-        flow.skip_section(state, sid)
-        return f'已跳过章节 {sid}。', True
+        ok, message = flow.skip_section(state, sid)
+        return message, ok
 
     if name == 'get_progress':
         progress = flow.section_progress(state)
         filled, total = flow.overall_progress(state)
         lines = [f'总进度：{filled}/{total}']
-        nxt = flow.next_unfilled_field(state)
+        nxt = flow.next_question_field(state)
         for p in progress:
             mark = '✓' if p['complete'] else f"{p['filled']}/{p['total']}"
             tag = ' [skipped]' if p['status'] == 'skipped' else ''

@@ -27,8 +27,12 @@ export function createInitialState(): StudioFormState {
     requiredFieldIds: [],
     sections,
     currentSectionId: SECTION_ORDER[0],
+    currentFieldId: SECTIONS[0]?.fields[0]?.id ?? '',
+    skippedFieldIds: [],
     roomImageInvited: false,
     referenceImageInvited: false,
+    equipmentImageInvited: false,
+    imageInvitedFieldIds: [],
     completed: false,
   }
 }

@@ -8,6 +8,9 @@ from store import db
 
 
 @pytest.fixture(scope='session', autouse=True)
-def _init_db():
+def _init_db(tmp_path_factory):
+    original_path = db.DB_PATH
+    db.DB_PATH = tmp_path_factory.mktemp('session-db') / 'ics-test.db'
     db.init_db()
     yield
+    db.DB_PATH = original_path

@@ -1,5 +1,5 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -10,7 +10,11 @@ const authState = vi.hoisted(() => ({
 vi.mock('../src/components/BreathingScreen', () => ({
   default: () => <div>呼吸页</div>,
 }))
-vi.mock('../src/components/TopBar', () => ({ default: () => <header /> }))
+vi.mock('../src/components/TopBar', () => ({
+  default: ({ onReset }: { onReset: () => void }) => (
+    <header><button type="button" onClick={onReset}>重新开始测试</button></header>
+  ),
+}))
 vi.mock('../src/components/AdminEntryButton', () => ({ default: () => <div>管理后台入口</div> }))
 vi.mock('../src/components/ChatPanel/ChatPanel', () => ({ default: () => <div>工作台内容</div> }))
 vi.mock('../src/components/CenterCard/CenterCard', () => ({
@@ -34,6 +38,7 @@ import Workbench from '../src/screens/Workbench'
 describe('Workbench', () => {
   beforeEach(() => {
     authState.role = 'admin'
+    sessionStorage.clear()
   })
 
   it('直接访问工作台时不重复展示呼吸页', () => {
@@ -59,5 +64,18 @@ describe('Workbench', () => {
     expect(screen.getByText('工作台内容')).toBeInTheDocument()
     expect(screen.queryByText('管理后台入口')).not.toBeInTheDocument()
     expect(screen.queryByText('订单与结构化内容')).not.toBeInTheDocument()
+  })
+
+  it('重新开始会清除旧会话并创建全新调研上下文', () => {
+    sessionStorage.setItem('ics_session_id', 'submitted-session')
+    render(
+      <MemoryRouter initialEntries={['/workbench']}>
+        <Workbench />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '重新开始测试' }))
+
+    expect(sessionStorage.getItem('ics_session_id')).toBeNull()
   })
 })

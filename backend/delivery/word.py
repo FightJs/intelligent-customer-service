@@ -130,12 +130,12 @@ def generate_word(
     # ── 设备明细 ──
     if data['equipment_table']:
         doc.add_heading('附：现有设备明细', level=2)
-        eq_table = doc.add_table(rows=1 + len(data['equipment_table']), cols=4)
+        eq_table = doc.add_table(rows=1 + len(data['equipment_table']), cols=3)
         eq_table.style = 'Light Grid Accent 1'
-        for col, h in enumerate(['设备类型', '品牌型号', '数量', '备注']):
+        for col, h in enumerate(['设备类型', '品牌型号', '数量']):
             _set_cell_font(eq_table.rows[0].cells[col], h, bold=True)
         for i, row in enumerate(data['equipment_table'], 1):
-            for col, key in enumerate(['type', 'model', 'qty', 'note']):
+            for col, key in enumerate(['type', 'model', 'qty']):
                 _set_cell_font(eq_table.rows[i].cells[col], row.get(key, ''))
         doc.add_paragraph('')
 

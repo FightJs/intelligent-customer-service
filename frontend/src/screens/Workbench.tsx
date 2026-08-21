@@ -21,6 +21,7 @@ export default function Workbench() {
   const [centerExpanded, setCenterExpanded] = useState(false)
   const [formPreviewOpen, setFormPreviewOpen] = useState(false)
   const [orderModalOpen, setOrderModalOpen] = useState(false)
+  const [earlySubmit, setEarlySubmit] = useState(false)
   const [orderSent, setOrderSent] = useState(false)
   const [petActivity, setPetActivity] = useState<CameraPetActivity>('idle')
   const { theme, toggleTheme } = useTheme()
@@ -29,10 +30,12 @@ export default function Workbench() {
   )
 
   function handleReset() {
+    sessionStorage.removeItem('ics_session_id')
     setResetKey((key) => key + 1)
     setCenterExpanded(false)
     setFormPreviewOpen(false)
     setOrderModalOpen(false)
+    setEarlySubmit(false)
     setOrderSent(false)
     setPetActivity('idle')
   }
@@ -79,7 +82,15 @@ export default function Workbench() {
                   setCenterExpanded((expanded) => !expanded)
                 }}
               >
-                <ChatPanel onPetActivityChange={setPetActivity} />
+                <ChatPanel
+                  onPetActivityChange={setPetActivity}
+                  canFinishEarly={!isGuest}
+                  conversationEnded={orderSent}
+                  onFinishEarly={() => {
+                    setEarlySubmit(true)
+                    setOrderModalOpen(true)
+                  }}
+                />
               </CenterCard>
             </section>
 
@@ -101,6 +112,7 @@ export default function Workbench() {
                 <DeliverableSlot
                   orderSent={orderSent}
                   onSendOrder={() => {
+                    setEarlySubmit(false)
                     setOrderModalOpen(true)
                   }}
                 />
@@ -119,6 +131,7 @@ export default function Workbench() {
 
           {!isGuest && orderModalOpen && (
             <OrderConfirmationModal
+              allowIncomplete={earlySubmit}
               onClose={() => {
                 setOrderModalOpen(false)
               }}

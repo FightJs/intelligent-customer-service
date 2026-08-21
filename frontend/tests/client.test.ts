@@ -82,8 +82,25 @@ describe('sendOrder', () => {
         },
         body: JSON.stringify({
           session_id: 'session-1',
+          allow_incomplete: false,
         }),
       },
     )
+  })
+
+  it('提前提交时发送 allow_incomplete 标记', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve({ delivery_id: 8, sent: true, message: '已提交' }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await sendOrder('session-early', true)
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      session_id: 'session-early',
+      allow_incomplete: true,
+    })
   })
 })

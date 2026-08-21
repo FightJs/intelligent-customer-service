@@ -167,7 +167,7 @@ export default function AuthScreen() {
           }}
           className="w-full rounded-bubble px-4 py-2.5 text-sm font-medium text-primary ring-1 ring-idle transition-colors hover:bg-idle/40 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          快速使用
+          快速使用（简约版）
         </button>
 
         <p className="mt-2 text-center text-xs text-muted">

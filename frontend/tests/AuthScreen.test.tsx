@@ -47,7 +47,7 @@ describe('AuthScreen visual structure', () => {
     quickLogin.mockResolvedValueOnce(undefined)
     render(<AuthScreen />)
 
-    fireEvent.click(screen.getByRole('button', { name: '快速使用' }))
+    fireEvent.click(screen.getByRole('button', { name: '快速使用（简约版）' }))
 
     await vi.waitFor(() => {
       expect(quickLogin).toHaveBeenCalledTimes(1)

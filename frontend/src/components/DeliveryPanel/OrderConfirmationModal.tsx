@@ -16,6 +16,7 @@ import {
 interface OrderConfirmationModalProps {
   onClose: () => void
   onSent: () => void
+  allowIncomplete?: boolean
 }
 
 const STEPS = [
@@ -27,6 +28,7 @@ const STEPS = [
 export default function OrderConfirmationModal({
   onClose,
   onSent,
+  allowIncomplete = false,
 }: OrderConfirmationModalProps) {
   const { state } = useFormState()
   const [step, setStep] = useState(0)
@@ -96,7 +98,7 @@ export default function OrderConfirmationModal({
     setError('')
 
     try {
-      const result = await sendOrder(sessionId)
+      const result = await sendOrder(sessionId, allowIncomplete)
 
       setSuccessMessage(result.message)
       setSent(true)
@@ -126,10 +128,12 @@ export default function OrderConfirmationModal({
         <header className="order-modal-header">
           <div>
             <h2 id="order-modal-title">
-              发送订单
+              {allowIncomplete ? '提前结束并提交' : '发送订单'}
             </h2>
             <p>
-              确认需求后发送至管理员后台
+              {allowIncomplete
+                ? '已采集内容将按当前状态提交'
+                : '确认需求后发送至管理员后台'}
             </p>
           </div>
 
@@ -262,7 +266,7 @@ export default function OrderConfirmationModal({
               {step === 1 && (
                 <>
                   <p className="order-modal-helper">
-                    当前需求已整理完成，共采集
+                    {allowIncomplete ? '当前已采集' : '当前需求已整理完成，共采集'}
                     {' '}
                     {counts.filled}/{counts.total}
                     {' '}
@@ -290,7 +294,9 @@ export default function OrderConfirmationModal({
               {step === 2 && (
                 <>
                   <p className="order-modal-helper">
-                    确认发送后，管理员后台会新增一条综合交付记录。
+                    {allowIncomplete
+                      ? '确认后将结束本次对话，并以当前已采集内容生成综合需求记录。未回答内容会保持未填写。'
+                      : '确认发送后，管理员后台会新增一条综合交付记录。'}
                   </p>
 
                   <div className="order-modal-summary-list">
@@ -338,7 +344,7 @@ export default function OrderConfirmationModal({
                       发送中
                     </>
                   ) : step === STEPS.length - 1 ? (
-                    '确认发送'
+                    allowIncomplete ? '确认结束并提交' : '确认发送'
                   ) : (
                     <>
                       下一步

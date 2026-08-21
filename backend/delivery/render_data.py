@@ -5,7 +5,14 @@
 """
 from __future__ import annotations
 
-from agent.flow import value_to_text, value_is_empty, is_field_visible
+from agent.flow import (
+    field_key,
+    is_field_required,
+    is_field_visible,
+    is_section_visible,
+    value_is_empty,
+    value_to_text,
+)
 from store.uploads import resolve_image
 from survey.models import FieldValue, StudioFormState
 from survey.schema_def import SECTIONS
@@ -68,6 +75,8 @@ def build_render_data(
 
     for sec_def in SECTIONS:
         sec_state = state.sections[sec_def.id]
+        if not is_section_visible(state, sec_def):
+            continue
         if sec_state.status == 'skipped':
             if filled_only:
                 continue
@@ -93,7 +102,8 @@ def build_render_data(
 
             text = value_to_text(v, f)
             filled = not _render_value_is_empty(v)
-            if filled_only and not filled:
+            skipped = field_key(sec_def.id, f.id) in state.skipped_field_ids
+            if filled_only and not filled and not skipped:
                 continue
             images = []
             if f.type == 'image' and filled:
@@ -105,12 +115,12 @@ def build_render_data(
                 ]
             fields_data.append({
                 'label': f.label,
-                'value': text if filled else '未填写',
+                'value': text if filled else ('已跳过' if skipped else '未填写'),
                 'filled': filled,
                 'images': images,
             })
 
-            if f.required:
+            if is_field_required(state, sec_def.id, f):
                 sec_total += 1
                 if filled:
                     sec_filled += 1
@@ -131,7 +141,8 @@ def build_render_data(
     # 设备明细表
     equipment_table = []
     equip_state = state.sections.get('equipment')
-    if equip_state:
+    equipment_def = next(section for section in SECTIONS if section.id == 'equipment')
+    if equip_state and is_section_visible(state, equipment_def):
         inv = equip_state.fields.get('inventory')
         if inv and inv.type == 'table':
             equipment_table = (

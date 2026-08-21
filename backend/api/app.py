@@ -45,6 +45,10 @@ from agent.gather import initial_greeting
 from agent.flow import (
     form_complete,
     next_unfilled_field,
+    next_question_field,
+    skip_field,
+    skip_section,
+    sync_current_question,
 )
 from agent.loop import (
     AgentStreamDelta,
@@ -60,6 +64,7 @@ from delivery.excel import generate_excel
 from delivery.word import generate_word
 from store import db
 from store.uploads import SavedImage, UploadError, is_data_uri, save_upload
+from survey.models import StudioFormState
 from survey.state import create_initial_state, to_dict, from_dict
 
 load_dotenv()
@@ -204,10 +209,88 @@ def _normalize_image_updates(session_id: str, updates: list[dict] | None) -> Non
             upd['value'] = normalized
 
 
+def _apply_uploaded_images(
+    state: StudioFormState,
+    saved_images: list[SavedImage] | None,
+) -> ToolEvent | None:
+    """把当前图片题收到的上传确定性写入对应字段，设备模块允许先拍后填。"""
+    if not saved_images:
+        return None
+    sync_current_question(state)
+    current = next_question_field(state)
+    if current is None:
+        return None
+    section_id, field = current
+    companion_images = {
+        ('product', 'style_ref'): 'style_ref_image',
+        ('benchmark', 'account_name'): 'screenshot',
+        ('goal', 'other'): 'other_reference',
+    }
+    companion_field_id = companion_images.get((section_id, field.id))
+    if state.current_section_id == 'equipment':
+        section_id, field_id = 'equipment', 'equipment_photo'
+        state.equipment_image_invited = True
+    elif companion_field_id is not None:
+        field_id = companion_field_id
+    elif field.type == 'image':
+        field_id = field.id
+    else:
+        return None
+
+    invitation_key = f'{section_id}.{field_id}'
+    if invitation_key not in state.image_invited_field_ids:
+        state.image_invited_field_ids.append(invitation_key)
+
+    image_field = state.sections[section_id].fields[field_id]
+    existing = list(image_field.value) if image_field.type == 'image' else []
+    image_ids = [*existing, *(image.id for image in saved_images)]
+    _, failures = apply_updates(state, [{
+        'section_id': section_id,
+        'field_id': field_id,
+        'value': image_ids,
+    }])
+    if failures:
+        raise HTTPException(status_code=422, detail='；'.join(failures))
+    source_field_to_skip = (
+        field.id
+        if companion_field_id is not None
+        or (section_id, field.id) == ('equipment', 'inventory')
+        else None
+    )
+    if source_field_to_skip is not None:
+        skipped, reason = skip_field(state, section_id, source_field_to_skip)
+        if not skipped:
+            raise HTTPException(status_code=422, detail=reason)
+    return ToolEvent(
+        kind='fill',
+        section_id=section_id,
+        field_id=field_id,
+        value=state.sections[section_id].fields[field_id].value,
+    )
+
+
 def _validate_images(images: list[str] | None) -> list[str] | None:
     if images is not None and len(images) > 5:
         raise ValueError('每条消息最多上传 5 张图片')
     return images
+
+
+def _validate_field_updates(updates: list[dict] | None) -> list[dict] | None:
+    if updates is None:
+        return None
+    if len(updates) > 100:
+        raise ValueError('每次最多更新 100 个字段')
+    required = {'section_id', 'field_id', 'value'}
+    for index, update in enumerate(updates, start=1):
+        missing = required - set(update)
+        if missing:
+            raise ValueError(
+                f'updates 第 {index} 项缺少字段: {", ".join(sorted(missing))}'
+            )
+        for key in ('section_id', 'field_id'):
+            if not isinstance(update[key], str) or not update[key].strip():
+                raise ValueError(f'updates 第 {index} 项的 {key} 必须是非空字符串')
+    return updates
 
 
 def _reserve_chat_quota(
@@ -264,6 +347,11 @@ class ChatRequest(BaseModel):
     def validate_images(cls, value: list[str] | None) -> list[str] | None:
         return _validate_images(value)
 
+    @field_validator('updates')
+    @classmethod
+    def validate_updates(cls, value: list[dict] | None) -> list[dict] | None:
+        return _validate_field_updates(value)
+
     @model_validator(mode='after')
     def require_message_or_images(self) -> 'ChatRequest':
         if not self.message and not self.images:
@@ -300,6 +388,11 @@ class ChatStreamRequest(BaseModel):
     def validate_images(cls, value: list[str] | None) -> list[str] | None:
         return _validate_images(value)
 
+    @field_validator('updates')
+    @classmethod
+    def validate_updates(cls, value: list[dict] | None) -> list[dict] | None:
+        return _validate_field_updates(value)
+
     @model_validator(mode='after')
     def require_message_or_images(self) -> 'ChatStreamRequest':
         if not self.message.strip() and not self.images:
@@ -309,12 +402,23 @@ class ChatStreamRequest(BaseModel):
 
 class OrderRequest(BaseModel):
     session_id: str
+    allow_incomplete: bool = False
 
 
 class OrderResponse(BaseModel):
     delivery_id: int
     sent: bool
     message: str
+
+
+class SkipRequest(BaseModel):
+    scope: Literal['field', 'section']
+
+
+class SkipResponse(BaseModel):
+    reply: str
+    form_state: dict
+    form_complete: bool
 
 
 # ── Auth 端点 ─────────────────────────────────────────────────
@@ -430,16 +534,76 @@ def get_session(session_id: str, current: dict = Depends(get_current_user)) -> S
         raise HTTPException(status_code=404, detail='session not found')
     if rec['user_id'] != current['id'] and current['role'] != 'admin':
         raise HTTPException(status_code=403, detail='无权访问该会话')
-    state = from_dict(rec['form_state'])
+    state = from_dict(rec['form_state'], session_id=session_id)
+    sync_current_question(state)
+    normalized_state = to_dict(state)
+    if normalized_state != rec['form_state']:
+        db.save_session(session_id, normalized_state)
     messages = [
         SessionMessage(role=m['role'], content=m['content'])
         for m in db.get_messages(session_id)
     ]
     return SessionResponse(
         session_id=session_id,
-        form_state=rec['form_state'],
+        form_state=normalized_state,
         greeting='',
         messages=messages,
+        form_complete=form_complete(state),
+    )
+
+
+@app.post('/api/session/{session_id}/skip', response_model=SkipResponse)
+def skip_current_question(
+    session_id: str,
+    req: SkipRequest,
+    current: dict = Depends(get_current_user),
+) -> SkipResponse:
+    """确定性跳过当前题或当前模块，权限由 schema 校验。"""
+    rec = db.get_session(session_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail='session not found')
+    if rec['user_id'] != current['id'] and current['role'] != 'admin':
+        raise HTTPException(status_code=403, detail='无权操作该会话')
+
+    state = from_dict(rec['form_state'], session_id=session_id)
+    if state.completed:
+        raise HTTPException(status_code=409, detail='该问卷已经提交，不能继续修改')
+    sync_current_question(state)
+    current_question = next_question_field(state)
+    if current_question is None:
+        raise HTTPException(status_code=409, detail='当前问答已经完成')
+
+    section_id, field = current_question
+    if req.scope == 'field':
+        ok, message = skip_field(state, section_id, field.id)
+    else:
+        ok, message = skip_section(state, section_id)
+    if not ok:
+        raise HTTPException(status_code=409, detail=message)
+
+    next_question = next_question_field(state)
+    reply = (
+        f'{message}。{next_question[1].question}'
+        if next_question is not None
+        else f'{message}。本次问答已完成，请核对客户需求表。'
+    )
+    normalized_state = to_dict(state)
+    db.save_session(session_id, normalized_state)
+    user_skip_text = (
+        '跳过当前问题'
+        if req.scope == 'field'
+        else '跳过当前模块'
+    )
+    db.add_message(session_id, 'user', user_skip_text)
+    db.add_message(session_id, 'assistant', reply, [{
+        'kind': 'skip',
+        'section_id': section_id,
+        'field_id': field.id if req.scope == 'field' else '',
+        'value': None,
+    }])
+    return SkipResponse(
+        reply=reply,
+        form_state=normalized_state,
         form_complete=form_complete(state),
     )
 
@@ -457,9 +621,11 @@ def chat(
     if rec['user_id'] != current['id'] and current['role'] != 'admin':
         raise HTTPException(status_code=403, detail='无权操作该会话')
 
-    _reserve_chat_quota(current, request, req.images)
+    state = from_dict(rec['form_state'], session_id=req.session_id)
+    if state.completed:
+        raise HTTPException(status_code=409, detail='该问卷已经提交，不能继续修改')
 
-    state = from_dict(rec['form_state'])
+    _reserve_chat_quota(current, request, req.images)
 
     # 上传图片落盘（缩放），LLM 通过 id 引用；updates 里的 data URI 同样转 id
     saved_images = _save_images(req.session_id, req.images)
@@ -467,12 +633,19 @@ def chat(
 
     # 前端权威 updates（chip 点击）绕过 LLM 抽取，在 run_agent 前直接 apply
     update_events: list[ToolEvent] = []
+    image_event = _apply_uploaded_images(state, saved_images)
+    if image_event is not None:
+        update_events.append(image_event)
     if req.updates:
-        apply_updates(state, req.updates)
+        _, failures = apply_updates(state, req.updates)
+        if failures:
+            raise HTTPException(status_code=422, detail='；'.join(failures))
         for upd in req.updates:
+            field_id = upd['field_id'].split('.')[-1]
             update_events.append(ToolEvent(
                 kind='fill', section_id=upd['section_id'],
-                field_id=upd['field_id'].split('.')[-1], value=upd.get('value'),
+                field_id=field_id,
+                value=state.sections[upd['section_id']].fields[field_id].value,
             ))
 
     # 从 DB 取最近 50 条历史。
@@ -535,6 +708,10 @@ async def chat_stream(
     if rec['user_id'] != current['id'] and current['role'] != 'admin':
         raise HTTPException(status_code=403, detail='无权操作该会话')
 
+    session_state = from_dict(rec['form_state'], session_id=req.session_id)
+    if session_state.completed:
+        raise HTTPException(status_code=409, detail='该问卷已经提交，不能继续修改')
+
     request_id = str(req.request_id)
     request_status, saved_payload = db.begin_chat_request(
         request_id=request_id,
@@ -575,19 +752,44 @@ async def chat_stream(
             yield event('done', saved_payload or {})
             return
 
-        state = from_dict(rec['form_state'])
-        saved_images = _save_images(req.session_id, req.images)
-        _normalize_image_updates(req.session_id, req.updates)
-        update_events: list[ToolEvent] = []
-        if req.updates:
-            apply_updates(state, req.updates)
-            for update in req.updates:
-                update_events.append(ToolEvent(
-                    kind='fill',
-                    section_id=update['section_id'],
-                    field_id=update['field_id'].split('.')[-1],
-                    value=update.get('value'),
-                ))
+        try:
+            state = from_dict(rec['form_state'], session_id=req.session_id)
+            saved_images = _save_images(req.session_id, req.images)
+            _normalize_image_updates(req.session_id, req.updates)
+            update_events: list[ToolEvent] = []
+            image_event = _apply_uploaded_images(state, saved_images)
+            if image_event is not None:
+                update_events.append(image_event)
+            if req.updates:
+                _, failures = apply_updates(state, req.updates)
+                if failures:
+                    db.fail_chat_request(request_id, 'invalid_updates')
+                    yield event('error', {
+                        'request_id': request_id,
+                        'code': 'invalid_updates',
+                        'message': '；'.join(failures),
+                        'retryable': False,
+                        'phase': 'validating',
+                    })
+                    return
+                for update in req.updates:
+                    field_id = update['field_id'].split('.')[-1]
+                    update_events.append(ToolEvent(
+                        kind='fill',
+                        section_id=update['section_id'],
+                        field_id=field_id,
+                        value=state.sections[update['section_id']].fields[field_id].value,
+                    ))
+        except StarletteHTTPException as exc:
+            db.fail_chat_request(request_id, 'invalid_input')
+            yield event('error', {
+                'request_id': request_id,
+                'code': 'invalid_input',
+                'message': str(exc.detail),
+                'retryable': False,
+                'phase': 'validating',
+            })
+            return
         for update_event in update_events:
             yield event('tool_event', asdict(update_event))
         history = db.get_messages(req.session_id, limit=50) or req.history
@@ -739,15 +941,15 @@ def submit_order(
             detail='无权发送该会话的订单',
         )
 
-    state = from_dict(rec['form_state'])
+    state = from_dict(rec['form_state'], session_id=req.session_id)
 
-    if not form_complete(state):
-        missing = next_unfilled_field(
+    if not req.allow_incomplete and not form_complete(state):
+        missing = next_question_field(
             state,
         )
 
         detail = (
-            '必填信息尚未采集完成'
+            '问卷尚未完成'
         )
 
         if missing is not None:
@@ -789,18 +991,39 @@ def submit_order(
 
     # 后台的一条记录保存完整综合需求。
     markdown = generate_markdown(state)
+    submission_kind = 'early' if req.allow_incomplete else 'complete'
+    if req.allow_incomplete:
+        markdown = (
+            '> **提交状态：提前结束调研，以下内容可能不完整。**\n\n'
+            f'{markdown}'
+        )
 
-    delivery_id = db.create_delivery(
+    state.completed = True
+    sync_current_question(state)
+    delivery_id, created = db.create_delivery_and_complete_session(
         req.session_id,
         rec['user_id'],
         customer_name,
         markdown,
+        submission_kind,
+        to_dict(state),
     )
+
+    if not created:
+        return OrderResponse(
+            delivery_id=delivery_id,
+            sent=True,
+            message='订单已经发送，请勿重复提交',
+        )
 
     return OrderResponse(
         delivery_id=delivery_id,
         sent=True,
-        message='订单发送成功',
+        message=(
+            '已提前结束调研并提交需求'
+            if req.allow_incomplete
+            else '订单发送成功'
+        ),
     )
 
 
@@ -823,7 +1046,7 @@ def generate(
     if rec['user_id'] != current['id'] and current['role'] != 'admin':
         raise HTTPException(status_code=403, detail='无权操作该会话')
 
-    state = from_dict(rec['form_state'])
+    state = from_dict(rec['form_state'], session_id=session_id)
 
     # 文件名用品牌名（如有）
     brand = state.sections.get('customer', None)

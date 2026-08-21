@@ -107,3 +107,26 @@ def test_stream_validates_request_before_opening_sse(client, auth_headers):
     )
 
     assert response.status_code == 422
+
+
+def test_stream_rejects_invalid_updates_before_agent_run(client, auth_headers):
+    session_id = _session_id(client, auth_headers)
+    payload = {
+        'request_id': str(uuid4()),
+        'session_id': session_id,
+        'message': '错误价格档位',
+        'updates': [{
+            'section_id': 'industry',
+            'field_id': 'price_band',
+            'value': 'wrong-band',
+        }],
+    }
+
+    with patch('api.app.run_agent_stream') as stream:
+        response = client.post('/api/chat/stream', json=payload, headers=auth_headers)
+
+    assert response.status_code == 200
+    assert 'event: error' in response.text
+    assert 'invalid_updates' in response.text
+    assert 'event: tool_event' not in response.text
+    stream.assert_not_called()

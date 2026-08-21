@@ -7,50 +7,52 @@ import type { SectionDef, SectionId } from '../types/schema'
 export const SECTIONS: SectionDef[] = [
   {
     "id": "customer",
-    "title": "一、客户基础信息",
-    "hint": "",
+    "title": "一、基础信息采集",
+    "hint": "核心必填：用于方案归档与后续对接。",
     "order": 1,
+    "skippable": false,
     "fields": [
       {
         "id": "brand",
-        "label": "客户名称/品牌名",
+        "label": "品牌/公司名称",
         "type": "text",
         "required": true,
-        "placeholder": "如：云裳"
+        "question": "请问您的品牌或公司名称是什么？",
+        "skippable": false,
+        "askInFull": true,
+        "placeholder": "如：云裳",
+        "helpText": "用于方案标题与正式归档。"
       },
       {
         "id": "contact",
-        "label": "联系人姓名",
+        "label": "姓名",
         "type": "text",
         "required": true,
-        "placeholder": "联系人"
+        "question": "方便留下您的姓名和联系电话吗？",
+        "skippable": false,
+        "askInFull": true,
+        "placeholder": "联系人姓名",
+        "helpText": "用于后续方案细节对接。"
       },
       {
         "id": "phone",
         "label": "联系电话",
         "type": "text",
         "required": true,
-        "placeholder": "138****"
-      },
-      {
-        "id": "wechat",
-        "label": "微信号",
-        "type": "text",
-        "required": false,
-        "placeholder": "选填，便于后续沟通"
-      },
-      {
-        "id": "city",
-        "label": "所在城市",
-        "type": "text",
-        "required": false,
-        "placeholder": "选填，如需线下服务可匹配"
+        "question": "联系电话还没有记录，方便再补充一下吗？",
+        "skippable": false,
+        "askInFull": true,
+        "placeholder": "138****",
+        "helpText": "用于后续方案细节对接。"
       },
       {
         "id": "source",
-        "label": "客户来源",
+        "label": "了解渠道",
         "type": "choice-single",
         "required": true,
+        "question": "您是通过哪个渠道了解到我们的？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "douyin",
@@ -71,25 +73,42 @@ export const SECTIONS: SectionDef[] = [
         ]
       },
       {
-        "id": "date",
-        "label": "咨询日期",
+        "id": "wechat",
+        "label": "微信号",
         "type": "text",
         "required": false,
-        "placeholder": "自动填写"
+        "question": "方便留下您的微信号吗？",
+        "skippable": true,
+        "askInFull": true,
+        "placeholder": "选填，便于发送效果图和设备清单"
+      },
+      {
+        "id": "city",
+        "label": "所在城市",
+        "type": "text",
+        "required": false,
+        "question": "请问您所在的城市是哪里？",
+        "skippable": true,
+        "askInFull": true,
+        "placeholder": "选填，如需线下服务可匹配资源"
       }
     ]
   },
   {
     "id": "industry",
     "title": "二、行业与品类信息",
-    "hint": "重要：行业与品类是向量匹配的核心依据，越精准越好。",
+    "hint": "核心信息：用于匹配视觉方向。按当前业务要求，大类和细分品类允许跳过。",
     "order": 2,
+    "skippable": false,
     "fields": [
       {
         "id": "category",
         "label": "行业大类",
         "type": "choice-single",
-        "required": true,
+        "required": false,
+        "question": "您的直播间主营什么行业大类？",
+        "skippable": true,
+        "askInFull": true,
         "options": [
           {
             "value": "women",
@@ -133,7 +152,10 @@ export const SECTIONS: SectionDef[] = [
         "id": "subcategory",
         "label": "细分品类",
         "type": "text",
-        "required": true,
+        "required": false,
+        "question": "更具体的细分品类是什么？",
+        "skippable": true,
+        "askInFull": true,
         "placeholder": "例：高端香云纱女装、黄金珠宝、进口零食"
       },
       {
@@ -141,6 +163,9 @@ export const SECTIONS: SectionDef[] = [
         "label": "商品价格带",
         "type": "choice-single",
         "required": true,
+        "question": "您的商品价格带大致是多少？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "low",
@@ -158,13 +183,27 @@ export const SECTIONS: SectionDef[] = [
             "value": "ultra",
             "label": "超高客单（>2000元）"
           }
-        ]
+        ],
+        "helpText": "用户给出具体区间时必须按边界准确归类，不得猜测或改写。"
+      },
+      {
+        "id": "price_range_raw",
+        "label": "用户原始商品价格范围",
+        "type": "text",
+        "required": false,
+        "question": "（系统自动保留用户给出的具体价格范围）",
+        "skippable": false,
+        "askInFull": false,
+        "helpText": "保留用户原话，避免区间归类后丢失精度。"
       },
       {
         "id": "positioning",
         "label": "品牌定位",
         "type": "choice-single",
         "required": true,
+        "question": "您的品牌定位属于哪一类？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "mass",
@@ -193,6 +232,9 @@ export const SECTIONS: SectionDef[] = [
         "label": "目标客群年龄",
         "type": "choice-single",
         "required": true,
+        "question": "核心目标客群年龄主要集中在哪个区间？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "18-25",
@@ -217,6 +259,9 @@ export const SECTIONS: SectionDef[] = [
         "label": "目标客群性别",
         "type": "choice-single",
         "required": true,
+        "question": "目标客群的性别偏向是怎样的？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "female",
@@ -237,6 +282,9 @@ export const SECTIONS: SectionDef[] = [
         "label": "直播间类型",
         "type": "choice-single",
         "required": true,
+        "question": "您的直播间属于哪种类型？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "influencer",
@@ -265,14 +313,18 @@ export const SECTIONS: SectionDef[] = [
   {
     "id": "status",
     "title": "三、直播间现状",
-    "hint": "",
+    "hint": "选填：已有直播间时补充；没有直播间可直接跳过本模块。",
     "order": 3,
+    "skippable": true,
     "fields": [
       {
         "id": "has_room",
         "label": "是否已有直播间",
         "type": "choice-single",
-        "required": true,
+        "required": false,
+        "question": "您目前已经有正在运营的直播间了吗？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "yes",
@@ -285,11 +337,14 @@ export const SECTIONS: SectionDef[] = [
         ]
       },
       {
-        "id": "account",
-        "label": "当前直播间账号",
-        "type": "text",
+        "id": "room_photo",
+        "label": "直播间照片/风格参考图",
+        "type": "image",
         "required": false,
-        "placeholder": "选填，可提供抖音号用于分析",
+        "question": "方便上传当前直播间照片，或希望对比的直播间样式参考图吗？",
+        "skippable": true,
+        "askInFull": true,
+        "helpText": "支持直接拍摄或从相册上传，无需文字描述。",
         "visibleIf": {
           "fieldId": "has_room",
           "op": "eq",
@@ -301,6 +356,9 @@ export const SECTIONS: SectionDef[] = [
         "label": "开播时长",
         "type": "choice-single",
         "required": false,
+        "question": "目前大约开播多久了？",
+        "skippable": true,
+        "askInFull": true,
         "options": [
           {
             "value": "none",
@@ -334,6 +392,9 @@ export const SECTIONS: SectionDef[] = [
         "label": "当前场均观看",
         "type": "choice-single",
         "required": false,
+        "question": "当前直播间的场均观看人数大概是多少？",
+        "skippable": true,
+        "askInFull": true,
         "options": [
           {
             "value": "<500",
@@ -363,6 +424,9 @@ export const SECTIONS: SectionDef[] = [
         "label": "当前场均GMV",
         "type": "choice-single",
         "required": false,
+        "question": "当前直播间的场均GMV大概是多少？",
+        "skippable": true,
+        "askInFull": true,
         "options": [
           {
             "value": "<5k",
@@ -392,6 +456,9 @@ export const SECTIONS: SectionDef[] = [
         "label": "对现状是否满意",
         "type": "choice-single",
         "required": false,
+        "question": "您对当前直播间的整体现状满意吗？",
+        "skippable": true,
+        "askInFull": true,
         "options": [
           {
             "value": "very_bad",
@@ -425,6 +492,9 @@ export const SECTIONS: SectionDef[] = [
         "label": "主要痛点",
         "type": "choice-multi",
         "required": false,
+        "question": "当前直播间最核心的痛点有哪些？",
+        "skippable": true,
+        "askInFull": true,
         "options": [
           {
             "value": "traffic",
@@ -456,31 +526,24 @@ export const SECTIONS: SectionDef[] = [
           "op": "eq",
           "value": "yes"
         }
-      },
-      {
-        "id": "room_photo",
-        "label": "直播间照片/截图",
-        "type": "image",
-        "required": false,
-        "visibleIf": {
-          "fieldId": "has_room",
-          "op": "eq",
-          "value": "yes"
-        }
       }
     ]
   },
   {
     "id": "venue",
     "title": "四、场地条件信息",
-    "hint": "重要：场地尺寸直接影响设备选型与布局方案，请尽量准确。",
+    "hint": "核心必填：场地条件直接决定设备选型与装修方案。",
     "order": 4,
+    "skippable": false,
     "fields": [
       {
         "id": "area",
         "label": "直播间面积",
         "type": "choice-single",
         "required": true,
+        "question": "您的直播间场地面积大概是多少？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "<10",
@@ -508,43 +571,26 @@ export const SECTIONS: SectionDef[] = [
         "id": "size",
         "label": "具体尺寸（宽×深×高）",
         "type": "dimension",
-        "required": true,
+        "required": false,
+        "question": "方便提供场地的宽、深、高吗？",
+        "skippable": true,
+        "askInFull": true,
         "dims": [
           "宽",
           "深",
           "高"
         ],
-        "unit": "m"
-      },
-      {
-        "id": "shape",
-        "label": "房间形状",
-        "type": "choice-single",
-        "required": false,
-        "options": [
-          {
-            "value": "rect",
-            "label": "长方形"
-          },
-          {
-            "value": "square",
-            "label": "正方形"
-          },
-          {
-            "value": "l-shape",
-            "label": "L型"
-          },
-          {
-            "value": "other",
-            "label": "其他"
-          }
-        ]
+        "unit": "m",
+        "helpText": "不方便测量时可跳过并直接上传场地照片。"
       },
       {
         "id": "window",
         "label": "窗户情况",
         "type": "choice-single",
         "required": true,
+        "question": "场地的窗户情况是怎样的？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "none",
@@ -565,6 +611,9 @@ export const SECTIONS: SectionDef[] = [
         "label": "窗户位置",
         "type": "choice-single",
         "required": false,
+        "question": "如果有窗户，窗户在主播的哪个位置？",
+        "skippable": true,
+        "askInFull": true,
         "options": [
           {
             "value": "behind",
@@ -590,78 +639,13 @@ export const SECTIONS: SectionDef[] = [
         }
       },
       {
-        "id": "wall_color",
-        "label": "墙面颜色",
-        "type": "choice-single",
-        "required": false,
-        "options": [
-          {
-            "value": "white",
-            "label": "白色"
-          },
-          {
-            "value": "gray",
-            "label": "灰色"
-          },
-          {
-            "value": "beige",
-            "label": "米色"
-          },
-          {
-            "value": "other",
-            "label": "其他"
-          }
-        ]
-      },
-      {
-        "id": "floor",
-        "label": "地面材质",
-        "type": "choice-single",
-        "required": false,
-        "options": [
-          {
-            "value": "tile",
-            "label": "地砖"
-          },
-          {
-            "value": "wood",
-            "label": "地板"
-          },
-          {
-            "value": "carpet",
-            "label": "地毯"
-          },
-          {
-            "value": "other",
-            "label": "其他"
-          }
-        ]
-      },
-      {
-        "id": "power",
-        "label": "电源点位",
-        "type": "choice-single",
-        "required": false,
-        "options": [
-          {
-            "value": "enough",
-            "label": "充足（4个以上）"
-          },
-          {
-            "value": "normal",
-            "label": "一般（2-3个）"
-          },
-          {
-            "value": "tight",
-            "label": "紧张（1个）"
-          }
-        ]
-      },
-      {
         "id": "renovation",
         "label": "是否允许装修",
         "type": "choice-single",
         "required": true,
+        "question": "您的场地允许装修改动吗？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "major",
@@ -683,23 +667,31 @@ export const SECTIONS: SectionDef[] = [
       },
       {
         "id": "venue_photo",
-        "label": "场地照片",
+        "label": "场地多角度照片",
         "type": "image",
-        "required": false
+        "required": false,
+        "question": "方便上传场地的多角度照片吗？",
+        "skippable": true,
+        "askInFull": true,
+        "helpText": "支持直接拍摄或从相册上传，无需手动描述细节。"
       }
     ]
   },
   {
     "id": "budget",
     "title": "五、预算范围信息",
-    "hint": "",
+    "hint": "核心必填：用于控制方案成本与设备选型。",
     "order": 5,
+    "skippable": false,
     "fields": [
       {
         "id": "total",
         "label": "总预算范围",
         "type": "choice-single",
         "required": true,
+        "question": "本次直播间搭建或优化的总预算范围是多少？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "<1w",
@@ -729,9 +721,12 @@ export const SECTIONS: SectionDef[] = [
       },
       {
         "id": "equipment",
-        "label": "其中设备预算",
+        "label": "设备采购预算",
         "type": "choice-single",
         "required": true,
+        "question": "总预算中，设备采购大概安排多少？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "<5k",
@@ -757,9 +752,12 @@ export const SECTIONS: SectionDef[] = [
       },
       {
         "id": "decor",
-        "label": "其中装修预算",
+        "label": "装修装饰预算",
         "type": "choice-single",
         "required": true,
+        "question": "总预算中，装修装饰大概安排多少？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "<5k",
@@ -788,6 +786,9 @@ export const SECTIONS: SectionDef[] = [
         "label": "预算弹性",
         "type": "choice-single",
         "required": false,
+        "question": "您的预算弹性如何？",
+        "skippable": true,
+        "askInFull": true,
         "options": [
           {
             "value": "tight",
@@ -808,6 +809,9 @@ export const SECTIONS: SectionDef[] = [
         "label": "是否已有部分设备",
         "type": "choice-single",
         "required": true,
+        "question": "您目前已经有部分直播设备了吗？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "yes",
@@ -824,28 +828,28 @@ export const SECTIONS: SectionDef[] = [
   {
     "id": "product",
     "title": "六、商品与品牌视觉信息",
-    "hint": "重要：商品与品牌信息是场景设计的核心依据。",
+    "hint": "核心必填：商品与品牌信息是场景设计的依据。",
     "order": 6,
+    "skippable": false,
     "fields": [
       {
         "id": "main",
         "label": "主营商品类型",
         "type": "text",
         "required": true,
+        "question": "直播间的主营商品类型是什么？",
+        "skippable": false,
+        "askInFull": true,
         "placeholder": "例：连衣裙、口红、翡翠手镯"
-      },
-      {
-        "id": "material",
-        "label": "商品材质特点",
-        "type": "text",
-        "required": false,
-        "placeholder": "例：丝绸光泽、金属质感、宝石火彩"
       },
       {
         "id": "size_cat",
         "label": "商品尺寸",
         "type": "choice-single",
         "required": true,
+        "question": "您的商品尺寸属于哪一类？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "tiny",
@@ -866,58 +870,280 @@ export const SECTIONS: SectionDef[] = [
         ]
       },
       {
-        "id": "theme_color",
-        "label": "品牌主色调",
-        "type": "text",
-        "required": false,
-        "placeholder": "有VI的请提供色值或参考图"
-      },
-      {
         "id": "keywords",
         "label": "品牌风格关键词",
         "type": "text",
         "required": true,
-        "placeholder": "3-5个关键词，例：国风、高端、雅致、轻奢、简约"
+        "question": "可以说3到5个品牌风格关键词吗？",
+        "skippable": false,
+        "askInFull": true,
+        "placeholder": "例：国风、高端、雅致、轻奢、简约"
       },
       {
         "id": "style_ref",
-        "label": "喜欢的风格参考",
+        "label": "喜欢的直播间风格参考",
         "type": "text",
         "required": false,
-        "placeholder": "可提供参考直播间账号或图片"
+        "question": "有喜欢的直播间风格参考吗？可以描述账号或直接上传截图。",
+        "skippable": true,
+        "askInFull": true,
+        "placeholder": "可填写参考直播间账号或名称"
+      },
+      {
+        "id": "style_ref_image",
+        "label": "风格参考截图",
+        "type": "image",
+        "required": false,
+        "question": "方便上传喜欢的直播间截图吗？",
+        "skippable": true,
+        "askInFull": true,
+        "helpText": "支持直接拍摄或从相册上传。"
       },
       {
         "id": "dislike_style",
-        "label": "不喜欢的风格",
+        "label": "明确不喜欢的风格",
         "type": "text",
         "required": false,
-        "placeholder": "明确避开的方向"
+        "question": "有没有您明确不喜欢的风格？",
+        "skippable": true,
+        "askInFull": true,
+        "placeholder": "明确需要避开的方向"
       },
       {
-        "id": "logo",
-        "label": "品牌Logo/VI",
+        "id": "brand_assets",
+        "label": "品牌Logo/VI与商品样品图",
         "type": "image",
-        "required": false
+        "required": false,
+        "question": "方便上传品牌Logo、VI或商品样品图吗？",
+        "skippable": true,
+        "askInFull": true,
+        "helpText": "支持直接拍摄或从相册上传。"
+      }
+    ]
+  },
+  {
+    "id": "benchmark",
+    "title": "七、对标直播间参考",
+    "hint": "选填：没有对标直播间可直接跳过本模块。",
+    "order": 7,
+    "skippable": true,
+    "fields": [
+      {
+        "id": "has_benchmark",
+        "label": "是否有对标直播间",
+        "type": "choice-single",
+        "required": false,
+        "question": "您有想要对标的直播间吗？",
+        "skippable": false,
+        "askInFull": true,
+        "options": [
+          {
+            "value": "yes",
+            "label": "是"
+          },
+          {
+            "value": "no",
+            "label": "否"
+          }
+        ]
       },
       {
-        "id": "sample_photo",
-        "label": "商品样品图",
+        "id": "account_name",
+        "label": "主对标账号/名称",
+        "type": "text",
+        "required": false,
+        "question": "请发一下主对标直播间的账号、链接或截图。",
+        "skippable": true,
+        "askInFull": true,
+        "visibleIf": {
+          "fieldId": "has_benchmark",
+          "op": "eq",
+          "value": "yes"
+        }
+      },
+      {
+        "id": "platform",
+        "label": "主对标平台",
+        "type": "choice-single",
+        "required": false,
+        "question": "这个主对标直播间在哪个平台？",
+        "skippable": true,
+        "askInFull": true,
+        "options": [
+          {
+            "value": "douyin",
+            "label": "抖音"
+          },
+          {
+            "value": "taobao",
+            "label": "淘宝直播"
+          },
+          {
+            "value": "kuaishou",
+            "label": "快手"
+          },
+          {
+            "value": "wechat",
+            "label": "视频号"
+          },
+          {
+            "value": "xiaohongshu",
+            "label": "小红书"
+          },
+          {
+            "value": "other",
+            "label": "其他"
+          }
+        ],
+        "visibleIf": {
+          "fieldId": "has_benchmark",
+          "op": "eq",
+          "value": "yes"
+        }
+      },
+      {
+        "id": "likes",
+        "label": "喜欢的方面",
+        "type": "choice-multi",
+        "required": false,
+        "question": "您最喜欢这个直播间的哪些方面？",
+        "skippable": true,
+        "askInFull": true,
+        "options": [
+          {
+            "value": "overall",
+            "label": "整体风格"
+          },
+          {
+            "value": "background",
+            "label": "背景装修"
+          },
+          {
+            "value": "lighting",
+            "label": "灯光效果"
+          },
+          {
+            "value": "composition",
+            "label": "机位构图"
+          },
+          {
+            "value": "display",
+            "label": "商品展示"
+          },
+          {
+            "value": "color",
+            "label": "色彩搭配"
+          },
+          {
+            "value": "other",
+            "label": "其他"
+          }
+        ],
+        "visibleIf": {
+          "fieldId": "has_benchmark",
+          "op": "eq",
+          "value": "yes"
+        }
+      },
+      {
+        "id": "screenshot",
+        "label": "对标截图/图片",
         "type": "image",
-        "required": false
+        "required": false,
+        "question": "方便上传对标直播间的截图吗？",
+        "skippable": true,
+        "askInFull": true,
+        "helpText": "支持直接拍摄或从相册上传。链接可在聊天中直接发送。",
+        "visibleIf": {
+          "fieldId": "has_benchmark",
+          "op": "eq",
+          "value": "yes"
+        }
+      },
+      {
+        "id": "reference_link",
+        "label": "对标直播间链接",
+        "type": "text",
+        "required": false,
+        "question": "有对标直播间的链接可以补充吗？",
+        "skippable": true,
+        "askInFull": true,
+        "placeholder": "可粘贴直播间或作品链接",
+        "visibleIf": {
+          "fieldId": "has_benchmark",
+          "op": "eq",
+          "value": "yes"
+        }
+      },
+      {
+        "id": "reference_mode",
+        "label": "参考方式",
+        "type": "choice-single",
+        "required": false,
+        "question": "您希望以哪种方式参考对标直播间？",
+        "skippable": true,
+        "askInFull": true,
+        "options": [
+          {
+            "value": "optimize-primary",
+            "label": "以主对标为基础优化"
+          },
+          {
+            "value": "combine",
+            "label": "综合多个对标优点"
+          },
+          {
+            "value": "elements-only",
+            "label": "只参考元素，不整体模仿"
+          }
+        ],
+        "visibleIf": {
+          "fieldId": "has_benchmark",
+          "op": "eq",
+          "value": "yes"
+        }
+      },
+      {
+        "id": "exact_copy",
+        "label": "是否完全复刻",
+        "type": "choice-single",
+        "required": false,
+        "question": "您需要尽量1:1复刻对标直播间吗？",
+        "skippable": true,
+        "askInFull": true,
+        "options": [
+          {
+            "value": "yes",
+            "label": "是，尽量1:1还原"
+          },
+          {
+            "value": "no",
+            "label": "否，参考风格但要有自己特色"
+          }
+        ],
+        "visibleIf": {
+          "fieldId": "has_benchmark",
+          "op": "eq",
+          "value": "yes"
+        }
       }
     ]
   },
   {
     "id": "host",
-    "title": "七、主播信息",
-    "hint": "",
-    "order": 7,
+    "title": "八、主播信息",
+    "hint": "选填：没有特殊主播适配需求可直接跳过本模块。",
+    "order": 8,
+    "skippable": true,
     "fields": [
       {
         "id": "count",
         "label": "主播人数",
         "type": "choice-single",
-        "required": true,
+        "required": false,
+        "question": "直播间通常有几位主播？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "1",
@@ -934,103 +1160,13 @@ export const SECTIONS: SectionDef[] = [
         ]
       },
       {
-        "id": "height",
-        "label": "主播身高",
-        "type": "dimension",
-        "required": true,
-        "dims": [
-          "女主播",
-          "男主播"
-        ],
-        "unit": "cm"
-      },
-      {
-        "id": "body",
-        "label": "主播体型",
-        "type": "choice-single",
-        "required": false,
-        "options": [
-          {
-            "value": "thin",
-            "label": "偏瘦"
-          },
-          {
-            "value": "standard",
-            "label": "标准"
-          },
-          {
-            "value": "strong",
-            "label": "偏壮"
-          },
-          {
-            "value": "plus",
-            "label": "大码"
-          }
-        ]
-      },
-      {
-        "id": "skin",
-        "label": "主播肤色",
-        "type": "choice-single",
-        "required": false,
-        "options": [
-          {
-            "value": "cool-white",
-            "label": "冷白皮"
-          },
-          {
-            "value": "natural-white",
-            "label": "自然白"
-          },
-          {
-            "value": "wheat",
-            "label": "小麦色"
-          },
-          {
-            "value": "yellowish",
-            "label": "偏黄"
-          },
-          {
-            "value": "dark",
-            "label": "偏黑"
-          }
-        ]
-      },
-      {
-        "id": "hair",
-        "label": "主播发色",
-        "type": "choice-single",
-        "required": false,
-        "options": [
-          {
-            "value": "black",
-            "label": "黑色"
-          },
-          {
-            "value": "brown",
-            "label": "棕色"
-          },
-          {
-            "value": "yellow",
-            "label": "黄色"
-          },
-          {
-            "value": "other",
-            "label": "其他"
-          }
-        ]
-      },
-      {
-        "id": "host_photo",
-        "label": "主播形象照",
-        "type": "image",
-        "required": false
-      },
-      {
         "id": "movement",
-        "label": "直播时是否走动",
+        "label": "主播活动状态",
         "type": "choice-single",
-        "required": true,
+        "required": false,
+        "question": "直播时主播通常是坐着、站起还是会走动？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "sit",
@@ -1049,20 +1185,34 @@ export const SECTIONS: SectionDef[] = [
             "label": "大范围移动"
           }
         ]
+      },
+      {
+        "id": "profile",
+        "label": "主播身高与体型补充",
+        "type": "text",
+        "required": false,
+        "question": "主播的身高、体型等信息方便补充吗？",
+        "skippable": true,
+        "askInFull": true,
+        "placeholder": "选填，用于机位高度和构图适配"
       }
     ]
   },
   {
     "id": "equipment",
-    "title": "八、现有设备情况",
-    "hint": "如果已有部分设备，请详细填写，系统会基于现有设备做参数优化。",
-    "order": 8,
+    "title": "九、现有设备情况",
+    "hint": "选填：认识型号可文字填写；不认识型号可直接拍摄设备照片。",
+    "order": 9,
+    "skippable": true,
     "fields": [
       {
         "id": "inventory",
-        "label": "现有设备明细",
+        "label": "现有设备文字明细",
         "type": "table",
         "required": false,
+        "question": "可以描述现有设备的类型、型号和数量；不清楚型号也可以直接拍照上传。",
+        "skippable": true,
+        "askInFull": true,
         "columns": [
           {
             "id": "type",
@@ -1078,27 +1228,41 @@ export const SECTIONS: SectionDef[] = [
             "id": "qty",
             "label": "数量",
             "placeholder": "数量"
-          },
-          {
-            "id": "note",
-            "label": "备注",
-            "placeholder": "其他说明"
           }
         ]
+      },
+      {
+        "id": "equipment_photo",
+        "label": "现有设备照片",
+        "type": "image",
+        "required": false,
+        "question": "方便再拍摄并上传现有设备照片吗？",
+        "skippable": true,
+        "askInFull": true,
+        "helpText": "支持一键拍摄或从相册上传，后端设备人员会协助核对。"
       }
-    ]
+    ],
+    "visibleIf": {
+      "fieldId": "budget.has_existing",
+      "op": "eq",
+      "value": "yes"
+    }
   },
   {
     "id": "goal",
-    "title": "九、需求与目标",
-    "hint": "",
-    "order": 9,
+    "title": "十、核心需求与目标",
+    "hint": "核心必填：用于明确服务范围与交付标准。",
+    "order": 10,
+    "skippable": false,
     "fields": [
       {
         "id": "core",
         "label": "核心需求",
         "type": "choice-single",
         "required": true,
+        "question": "本次最核心的需求是什么？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "new",
@@ -1126,7 +1290,10 @@ export const SECTIONS: SectionDef[] = [
         "id": "focus",
         "label": "最看重的效果",
         "type": "choice-multi",
-        "required": false,
+        "required": true,
+        "question": "您最看重直播间的哪些效果？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "premium-look",
@@ -1155,17 +1322,13 @@ export const SECTIONS: SectionDef[] = [
         ]
       },
       {
-        "id": "expectation",
-        "label": "预期达到的效果",
-        "type": "text",
-        "required": false,
-        "placeholder": "客户的期望描述"
-      },
-      {
         "id": "need_3d",
         "label": "是否需要3D效果图",
         "type": "choice-single",
         "required": true,
+        "question": "您需要提供3D效果图吗？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "yes",
@@ -1182,6 +1345,9 @@ export const SECTIONS: SectionDef[] = [
         "label": "期望交付时间",
         "type": "choice-single",
         "required": true,
+        "question": "您期望什么时候完成交付？",
+        "skippable": false,
+        "askInFull": true,
         "options": [
           {
             "value": "3d",
@@ -1206,45 +1372,20 @@ export const SECTIONS: SectionDef[] = [
         "label": "其他特殊要求",
         "type": "text",
         "required": false,
-        "placeholder": "任何特殊需求都可以写"
-      }
-    ]
-  },
-  {
-    "id": "notes",
-    "title": "十、客服备注",
-    "hint": "",
-    "order": 10,
-    "fields": [
-      {
-        "id": "communication",
-        "label": "客户沟通要点",
-        "type": "text",
-        "required": false
+        "question": "还有其他特殊要求或参考图需要补充吗？可以文字说明或直接上传。",
+        "skippable": true,
+        "askInFull": true,
+        "placeholder": "选填，任何特殊需求都可以写"
       },
       {
-        "id": "focus_points",
-        "label": "重点关注事项",
-        "type": "text",
-        "required": false
-      },
-      {
-        "id": "judgment",
-        "label": "客服初步判断",
-        "type": "text",
-        "required": false
-      },
-      {
-        "id": "signature",
-        "label": "客服签名",
-        "type": "text",
-        "required": false
-      },
-      {
-        "id": "fill_date",
-        "label": "填写日期",
-        "type": "text",
-        "required": false
+        "id": "other_reference",
+        "label": "特殊要求补充参考图",
+        "type": "image",
+        "required": false,
+        "question": "需要上传补充参考图吗？",
+        "skippable": true,
+        "askInFull": true,
+        "helpText": "支持直接拍摄或从相册上传。"
       }
     ]
   }
@@ -1257,10 +1398,10 @@ export const SECTION_ORDER: SectionId[] = [
   "venue",
   "budget",
   "product",
+  "benchmark",
   "host",
   "equipment",
-  "goal",
-  "notes"
+  "goal"
 ] as SectionId[]
 
 export const SECTION_BY_ID: Record<SectionId, SectionDef> = Object.fromEntries(

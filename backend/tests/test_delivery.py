@@ -22,7 +22,7 @@ def _state_with_venue_image(uploads_root):
 def test_markdown_embeds_images_as_data_uri(uploads_root):
     state, _ = _state_with_venue_image(uploads_root)
     md = generate_markdown(state)
-    assert '![场地照片](data:image/png;base64,' in md
+    assert '![场地多角度照片](data:image/png;base64,' in md
 
 
 def test_word_embeds_images(uploads_root):
@@ -56,17 +56,17 @@ def test_filled_only_render_data_omits_empty_fields_and_sections():
     state.sections['venue'].fields['size'].value = {'宽': '4.5', '深': '', '高': ''}
     state.sections['status'].status = 'skipped'
     state.sections['equipment'].fields['inventory'].value = [
-        {'type': '', 'model': '', 'qty': '', 'note': ''},
+        {'type': '', 'model': '', 'qty': ''},
     ]
 
     data = build_render_data(state, filled_only=True)
 
     assert data['sections'] == [
         {
-            'title': '一、客户基础信息',
+            'title': '一、基础信息采集',
             'fields': [
                 {
-                    'label': '客户名称/品牌名',
+                    'label': '品牌/公司名称',
                     'value': '云裳',
                     'filled': True,
                     'images': [],
@@ -86,8 +86,8 @@ def test_filled_only_render_data_omits_empty_fields_and_sections():
                     'images': [],
                 },
             ],
-            'filled_count': 1,
-            'total_count': 1,
+            'filled_count': 0,
+            'total_count': 0,
             'skipped': False,
         },
     ]
@@ -103,6 +103,6 @@ def test_filled_only_word_preview_excludes_empty_section_titles():
 
     doc = Document(io.BytesIO(content))
     paragraphs = [paragraph.text for paragraph in doc.paragraphs]
-    assert '一、客户基础信息' in paragraphs
+    assert '一、基础信息采集' in paragraphs
     assert '二、行业与品类信息' not in paragraphs
     assert '四、场地条件信息' not in paragraphs

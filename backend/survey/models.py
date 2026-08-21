@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 
 # ──────────────────────────────────────────────────────────────
@@ -93,6 +93,9 @@ class StudioFormState(BaseModel):
     """
     model_config = ConfigDict(extra='forbid', populate_by_name=True)
 
+    # 仅用于运行时校验图片归属，不进入 SQLite/前端 formState。
+    _session_id: str = PrivateAttr(default='')
+
     mode: Literal['full', 'quick'] = 'full'
 
     required_field_ids: list[str] = Field(
@@ -102,6 +105,11 @@ class StudioFormState(BaseModel):
 
     sections: dict[str, SectionState] = Field(default_factory=dict)
     current_section_id: str = Field(default='', alias='currentSectionId')
+    current_field_id: str = Field(default='', alias='currentFieldId')
+    skipped_field_ids: list[str] = Field(
+        default_factory=list,
+        alias='skippedFieldIds',
+    )
     room_image_invited: bool = Field(
         default=False,
         alias='roomImageInvited',
@@ -109,6 +117,14 @@ class StudioFormState(BaseModel):
     reference_image_invited: bool = Field(
         default=False,
         alias='referenceImageInvited',
+    )
+    equipment_image_invited: bool = Field(
+        default=False,
+        alias='equipmentImageInvited',
+    )
+    image_invited_field_ids: list[str] = Field(
+        default_factory=list,
+        alias='imageInvitedFieldIds',
     )
     completed: bool = False
 

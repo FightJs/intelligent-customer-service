@@ -26,8 +26,6 @@ const { sections, sectionOrder } = payload
 const sortedSectionIds = sectionOrder.slice().sort()
 const sectionIdUnion = sortedSectionIds.map((id) => `'${id}'`).join(' | ')
 
-const ts = (strings) => strings[0]
-
 // ─── 1. src/types/schema.ts ─────────────────────────────────
 const typesContent = `/**
  * @generated 由 frontend/scripts/gen-schema.mjs 从 schema.json 生成，勿手改。
@@ -61,12 +59,16 @@ export interface FieldDef {
   label: string
   type: FieldType
   required: boolean
+  question: string
+  skippable: boolean
+  askInFull: boolean
   options?: OptionDef[]
   dims?: string[]              // dimension：['宽','深','高']
   unit?: string                // dimension：'m' / 'cm'
   placeholder?: string         // text
   columns?: TableColumn[]      // table：列定义
   visibleIf?: VisibleIf        // 条件分支
+  helpText?: string            // 采集口径提示
 }
 
 export interface SectionDef {
@@ -74,6 +76,8 @@ export interface SectionDef {
   title: string
   hint: string
   order: number
+  skippable: boolean
+  visibleIf?: VisibleIf
   fields: FieldDef[]
 }
 
@@ -98,6 +102,12 @@ export interface StudioFormState {
   requiredFieldIds: string[]
   sections: Record<SectionId, SectionState>
   currentSectionId: SectionId
+  currentFieldId: string
+  skippedFieldIds: string[]
+  roomImageInvited: boolean
+  referenceImageInvited: boolean
+  equipmentImageInvited: boolean
+  imageInvitedFieldIds: string[]
   completed: boolean
 }
 `

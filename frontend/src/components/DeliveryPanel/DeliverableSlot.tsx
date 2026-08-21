@@ -54,10 +54,8 @@ export default function DeliverableSlot({
     total += progress.total
   }
 
-  const canSend = (
-    total > 0
-    && filled === total
-  )
+  const submitted = orderSent || state.completed
+  const canSend = state.currentFieldId === '' && !submitted
 
   return (
     <section className="workbench-slot deliverable-slot">
@@ -111,9 +109,9 @@ export default function DeliverableSlot({
         type="button"
         className="delivery-order-button"
         onClick={onSendOrder}
-        disabled={!canSend || orderSent}
+        disabled={!canSend}
       >
-        {orderSent ? (
+        {submitted ? (
           <>
             <CheckCircle2 size={15} />
             订单已发送

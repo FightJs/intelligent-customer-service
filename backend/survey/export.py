@@ -37,6 +37,9 @@ def build_sections_json() -> list[dict]:
                 'label': f.label,
                 'type': f.type,
                 'required': f.required,
+                'question': f.question,
+                'skippable': f.skippable,
+                'askInFull': f.ask_in_full,
             }
             if f.options is not None:
                 field_dict['options'] = [{'value': o.value, 'label': o.label} for o in f.options]
@@ -46,6 +49,8 @@ def build_sections_json() -> list[dict]:
                 field_dict['unit'] = f.unit
             if f.placeholder:
                 field_dict['placeholder'] = f.placeholder
+            if f.help_text:
+                field_dict['helpText'] = f.help_text
             if f.columns is not None:
                 field_dict['columns'] = [
                     {'id': c.id, 'label': c.label, 'placeholder': c.placeholder} for c in f.columns
@@ -62,7 +67,15 @@ def build_sections_json() -> list[dict]:
             'title': s.title,
             'hint': s.hint,
             'order': s.order,
+            'skippable': s.skippable,
             'fields': fields,
+            **({
+                'visibleIf': {
+                    'fieldId': s.visible_if.field_id,
+                    'op': s.visible_if.op,
+                    'value': s.visible_if.value,
+                },
+            } if s.visible_if is not None else {}),
         })
     return result
 

@@ -156,6 +156,12 @@ export interface ChatResult {
   suggestions: Suggestion[]
 }
 
+export interface SkipResult {
+  reply: string
+  form_state: StudioFormState
+  form_complete: boolean
+}
+
 export async function createSession(): Promise<SessionData> {
   const r = await request('/session', { method: 'POST' })
   if (!r.ok) throw await responseError(r, `createSession: ${r.status}`)
@@ -190,6 +196,22 @@ export async function chat(
   return r.json()
 }
 
+/** 跳过当前题或当前可跳过模块；权限由后端问卷规则再次校验。 */
+export async function skipCurrentQuestion(
+  sessionId: string,
+  scope: 'field' | 'section',
+): Promise<SkipResult> {
+  const response = await request(`/session/${sessionId}/skip`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scope }),
+  })
+  if (!response.ok) {
+    throw await responseError(response, `skip: ${response.status}`)
+  }
+  return response.json()
+}
+
 export interface OrderResult {
   delivery_id: number
   sent: boolean
@@ -199,6 +221,7 @@ export interface OrderResult {
 /** 确认需求并发送订单。发送成功后管理员后台才会出现记录。 */
 export async function sendOrder(
   sessionId: string,
+  allowIncomplete = false,
 ): Promise<OrderResult> {
   const response = await request('/orders', {
     method: 'POST',
@@ -207,6 +230,7 @@ export async function sendOrder(
     },
     body: JSON.stringify({
       session_id: sessionId,
+      allow_incomplete: allowIncomplete,
     }),
   })
 
@@ -262,6 +286,7 @@ export interface AdminDeliveryListItem {
   customer_name: string | null
   created_at: string
   owner_username: string
+  submission_kind: 'complete' | 'early'
 }
 
 export interface AdminDeliveryDetail extends AdminDeliveryListItem {

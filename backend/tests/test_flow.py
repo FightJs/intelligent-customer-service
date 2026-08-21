@@ -1,82 +1,235 @@
-"""flow.py 状态机测试。"""
-from survey.state import create_initial_state
+"""问卷状态机：顺序、条件、完整性与跳过权限。"""
 from agent.flow import (
-    next_unfilled_field, form_complete, overall_progress,
-    visible_fields, is_field_visible, value_is_empty, skip_section,
+    form_complete,
+    is_field_visible,
+    is_section_visible,
+    next_question_field,
+    next_unfilled_field,
+    overall_progress,
+    question_field_resolved,
+    skip_field,
+    skip_section,
+    value_is_empty,
+    visible_fields,
 )
+from survey.schema_def import SECTION_BY_ID
+from survey.state import create_initial_state
 
 
-def test_empty_state_first_field():
+def _advance_to_industry(state):
+    customer = state.sections['customer'].fields
+    customer['brand'].value = '云裳'
+    customer['contact'].value = '张女士'
+    customer['phone'].value = '13800000000'
+    customer['source'].value = 'douyin'
+    state.skipped_field_ids.extend(['customer.wechat', 'customer.city'])
+
+
+def _advance_to_status(state):
+    _advance_to_industry(state)
+    state.skipped_field_ids.extend(['industry.category', 'industry.subcategory'])
+    industry = state.sections['industry'].fields
+    for field_id in ('price_band', 'positioning', 'target_age', 'target_gender', 'live_type'):
+        industry[field_id].value = 'answered'
+
+
+def _advance_to_question(state, section_id, field_id):
+    """按真实问卷顺序回答或跳过，直到目标题成为当前题。"""
+    for _ in range(100):
+        current = next_question_field(state)
+        assert current is not None
+        current_section_id, field = current
+        if (current_section_id, field.id) == (section_id, field_id):
+            return
+        if field.skippable:
+            ok, message = skip_field(state, current_section_id, field.id)
+            assert ok, message
+            continue
+        value = state.sections[current_section_id].fields[field.id]
+        if value.type == 'text':
+            value.value = '已回答'
+        elif value.type == 'choice-single':
+            value.value = field.options[0].value
+        elif value.type == 'choice-multi':
+            value.value = [field.options[0].value]
+        elif value.type == 'dimension':
+            value.value = {dimension: '1' for dimension in (field.dims or [])}
+        else:
+            raise AssertionError(f'测试辅助方法无法回答 {current_section_id}.{field.id}')
+    raise AssertionError(f'未能推进到 {section_id}.{field_id}')
+
+
+def test_empty_state_starts_from_brand():
     state = create_initial_state()
-    nxt = next_unfilled_field(state)
-    assert nxt is not None
-    sec_id, field = nxt
-    assert sec_id == 'customer'
-    assert field.id == 'brand'
+    assert next_unfilled_field(state)[1].id == 'brand'
+    assert next_question_field(state)[1].id == 'brand'
 
 
-def test_progress_advances_after_fill():
+def test_progress_advances_in_template_order():
     state = create_initial_state()
     state.sections['customer'].fields['brand'].value = '云裳'
-    nxt = next_unfilled_field(state)
-    assert nxt is not None
-    assert nxt[1].id == 'contact'  # brand 后是 contact
+    assert next_question_field(state)[1].id == 'contact'
 
 
-def test_conditional_fields_hidden_when_no_room():
+def test_conditional_status_fields_preserve_no_answer():
     state = create_initial_state()
     state.sections['status'].fields['has_room'].value = 'no'
-    visible = visible_fields(state)
-    status_fields = [f.id for s, f in visible if s == 'status']
-    assert status_fields == ['has_room']  # 只有 has_room 可见
+    status_fields = [field.id for sid, field in visible_fields(state) if sid == 'status']
+    assert status_fields == ['has_room']
+    assert state.sections['status'].fields['has_room'].value == 'no'
 
 
-def test_conditional_fields_shown_when_has_room():
+def test_conditional_status_fields_shown_for_existing_room():
     state = create_initial_state()
     state.sections['status'].fields['has_room'].value = 'yes'
-    visible = visible_fields(state)
-    status_fields = [f.id for s, f in visible if s == 'status']
-    assert 'account' in status_fields
-    assert 'pain_points' in status_fields
-    assert len(status_fields) == 8
+    status_fields = [field.id for sid, field in visible_fields(state) if sid == 'status']
+    assert status_fields == [
+        'has_room', 'room_photo', 'duration', 'viewers', 'gmv',
+        'satisfaction', 'pain_points',
+    ]
 
 
-def test_window_pos_conditional():
-    """window_pos 仅在 window != none 时可见。"""
+def test_existing_room_immediately_asks_for_room_or_comparison_image():
     state = create_initial_state()
-    # window 未填 → window_pos 不可见
-    sec = state.sections['venue']
-    field = next(f for f in __import__('survey.schema_def', fromlist=['SECTIONS']).SECTION_BY_ID['venue'].fields if f.id == 'window_pos')
-    assert not is_field_visible(field, sec)
-    # window=none → window_pos 不可见
-    sec.fields['window'].value = 'none'
-    assert not is_field_visible(field, sec)
-    # window=coverable → window_pos 可见
-    sec.fields['window'].value = 'coverable'
-    assert is_field_visible(field, sec)
+    _advance_to_question(state, 'status', 'has_room')
+    state.sections['status'].fields['has_room'].value = 'yes'
+
+    current = next_question_field(state)
+
+    assert (current[0], current[1].id) == ('status', 'room_photo')
 
 
-def test_overall_progress_counts():
-    f, t = overall_progress(create_initial_state())
-    assert t == 29  # 全局 29 必填
-    assert f == 0
-
-
-def test_form_complete_false_initially():
-    assert not form_complete(create_initial_state())
-
-
-def test_skip_section():
+def test_no_room_immediately_asks_for_favorite_style_reference():
     state = create_initial_state()
-    skip_section(state, 'status')
+    _advance_to_question(state, 'status', 'has_room')
+    state.sections['status'].fields['has_room'].value = 'no'
+
+    current = next_question_field(state)
+
+    assert (current[0], current[1].id) == ('product', 'style_ref')
+    state.sections['product'].fields['style_ref'].value = '轻奢珠宝直播间'
+    assert next_question_field(state)[1].id == 'style_ref_image'
+
+
+def test_proactively_answered_room_status_does_not_skip_earlier_questions():
+    state = create_initial_state()
+    state.sections['status'].fields['has_room'].value = 'no'
+
+    current = next_question_field(state)
+
+    assert (current[0], current[1].id) == ('customer', 'brand')
+
+
+def test_window_position_condition():
+    state = create_initial_state()
+    section = state.sections['venue']
+    field = next(field for field in SECTION_BY_ID['venue'].fields if field.id == 'window_pos')
+    assert not is_field_visible(field, section)
+    section.fields['window'].value = 'none'
+    assert not is_field_visible(field, section)
+    section.fields['window'].value = 'coverable'
+    assert is_field_visible(field, section)
+
+
+def test_equipment_module_visibility_does_not_break_question_order():
+    state = create_initial_state()
+    equipment = SECTION_BY_ID['equipment']
+    assert not is_section_visible(state, equipment)
+
+    state.sections['budget'].fields['has_existing'].value = 'yes'
+    assert is_section_visible(state, equipment)
+    assert next_question_field(state)[1].id == 'brand'
+    assert overall_progress(state) == (1, 23)
+
+    state.sections['budget'].fields['has_existing'].value = 'no'
+    assert not is_section_visible(state, equipment)
+
+
+def test_existing_equipment_immediately_asks_inventory_then_photo():
+    state = create_initial_state()
+    _advance_to_question(state, 'budget', 'has_existing')
+    state.sections['budget'].fields['has_existing'].value = 'yes'
+
+    current = next_question_field(state)
+    assert (current[0], current[1].id) == ('equipment', 'inventory')
+
+    state.sections['equipment'].fields['inventory'].value = [{
+        'type': '相机', 'model': 'Sony A7M4', 'qty': '1',
+    }]
+    current = next_question_field(state)
+    assert (current[0], current[1].id) == ('equipment', 'equipment_photo')
+
+
+def test_no_existing_equipment_continues_normal_question_order():
+    state = create_initial_state()
+    _advance_to_question(state, 'budget', 'has_existing')
+    state.sections['budget'].fields['has_existing'].value = 'no'
+
+    current = next_question_field(state)
+
+    assert (current[0], current[1].id) == ('product', 'main')
+
+
+def test_progress_counts_match_final_template():
+    assert overall_progress(create_initial_state()) == (0, 23)
+    assert overall_progress(create_initial_state(mode='quick')) == (0, 12)
+
+
+def test_only_explicit_fields_and_modules_can_skip():
+    state = create_initial_state()
+    ok, message = skip_field(state, 'industry', 'category')
+    assert not ok
+    assert '当前' in message
+
+    _advance_to_industry(state)
+    ok, _ = skip_field(state, 'industry', 'category')
+    assert ok
+    assert 'industry.category' in state.skipped_field_ids
+
+    ok, _ = skip_field(state, 'industry', 'subcategory')
+    assert ok
+
+    ok, message = skip_field(state, 'customer', 'brand')
+    assert not ok
+    assert '不能跳过' in message
+
+    industry = state.sections['industry'].fields
+    for field_id in ('price_band', 'positioning', 'target_age', 'target_gender', 'live_type'):
+        industry[field_id].value = 'answered'
+    ok, _ = skip_section(state, 'status')
+    assert ok
     assert state.sections['status'].status == 'skipped'
-    visible = visible_fields(state)
-    status_fields = [f.id for s, f in visible if s == 'status']
-    assert status_fields == []  # 跳过的章节无可见字段
+
+    ok, message = skip_section(state, 'customer')
+    assert not ok
+    assert '核心模块' in message
 
 
-def test_value_is_empty():
-    from survey.models import TextValue, SingleChoiceValue, MultiChoiceValue, DimensionValue
+def test_malicious_core_skipped_status_cannot_complete_form():
+    state = create_initial_state()
+    state.sections['customer'].status = 'skipped'
+    assert not form_complete(state)
+    assert any(sid == 'customer' for sid, _ in visible_fields(state))
+
+
+def test_skipped_optional_section_has_no_visible_questions():
+    state = create_initial_state()
+    _advance_to_status(state)
+    ok, _ = skip_section(state, 'status')
+    assert ok
+    assert not [field for sid, field in visible_fields(state) if sid == 'status']
+
+
+def test_completed_state_has_no_next_question():
+    state = create_initial_state()
+    state.completed = True
+    assert next_question_field(state) is None
+    assert form_complete(state)
+
+
+def test_value_is_empty_for_supported_types():
+    from survey.models import DimensionValue, MultiChoiceValue, SingleChoiceValue, TextValue
+
     assert value_is_empty(TextValue(value=''))
     assert not value_is_empty(TextValue(value='x'))
     assert value_is_empty(SingleChoiceValue(value=None))
@@ -87,72 +240,19 @@ def test_value_is_empty():
     assert not value_is_empty(DimensionValue(value={'宽': '4', '深': ''}))
 
 
-def test_existing_equipment_requires_inventory_immediately():
-    """用户确认有设备后，设备明细立即成为下一个必填字段。"""
+def test_text_and_image_questions_are_resolved_independently():
     state = create_initial_state()
+    product = state.sections['product']
+    style_text = next(
+        field for field in SECTION_BY_ID['product'].fields
+        if field.id == 'style_ref'
+    )
+    style_image = next(
+        field for field in SECTION_BY_ID['product'].fields
+        if field.id == 'style_ref_image'
+    )
 
-    state.sections['budget'].fields[
-        'has_existing'
-    ].value = 'yes'
+    product.fields['style_ref_image'].value = ['session/reference.png']
 
-    nxt = next_unfilled_field(state)
-
-    assert nxt is not None
-    assert nxt[0] == 'equipment'
-    assert nxt[1].id == 'inventory'
-
-    _, total = overall_progress(state)
-    assert total == 30
-
-
-def test_no_existing_equipment_does_not_require_inventory():
-    """用户确认没有设备时，不要求填写设备明细。"""
-    state = create_initial_state()
-
-    state.sections['budget'].fields[
-        'has_existing'
-    ].value = 'no'
-
-    nxt = next_unfilled_field(state)
-
-    assert nxt is not None
-    assert nxt[0] == 'customer'
-    assert nxt[1].id == 'brand'
-
-    _, total = overall_progress(state)
-    assert total == 29
-
-
-def test_inventory_completed_resumes_normal_flow():
-    """设备明细填写后，恢复原来的字段采集顺序。"""
-    state = create_initial_state()
-
-    state.sections['budget'].fields[
-        'has_existing'
-    ].value = 'yes'
-
-    state.sections['equipment'].fields[
-        'inventory'
-    ].value = [{
-        'type': '相机',
-        'model': 'Sony A7M4',
-        'qty': '1',
-        'note': '',
-    }]
-
-    nxt = next_unfilled_field(state)
-
-    assert nxt is not None
-    assert nxt[0] == 'customer'
-    assert nxt[1].id == 'brand'
-
-
-def test_quick_mode_has_twelve_required_fields():
-    state = create_initial_state(mode='quick')
-
-    assert overall_progress(state) == (0, 12)
-
-    nxt = next_unfilled_field(state)
-    assert nxt is not None
-    assert nxt[0] == 'customer'
-    assert nxt[1].id == 'brand'
+    assert not question_field_resolved(state, 'product', style_text)
+    assert question_field_resolved(state, 'product', style_image)

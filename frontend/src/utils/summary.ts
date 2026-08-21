@@ -10,12 +10,31 @@ import type {
 export function isFieldVisible(field: FieldDef, section: SectionState): boolean {
   if (!field.visibleIf) return true
   const dep = section.fields[field.visibleIf.fieldId]
-  if (!dep || dep.type !== 'choice-single') return true
+  if (!dep || dep.type !== 'choice-single') return false
   const depValue = dep.value
   if (depValue === null) return false
   return field.visibleIf.op === 'eq'
     ? depValue === field.visibleIf.value
     : depValue !== field.visibleIf.value
+}
+
+/** 章节是否满足跨章节条件（例如仅“有现有设备”时显示设备模块）。 */
+export function isSectionVisible(
+  state: StudioFormState,
+  def: SectionDef,
+): boolean {
+  if (!def.visibleIf) return true
+  const [sectionId, fieldId] = def.visibleIf.fieldId.includes('.')
+    ? def.visibleIf.fieldId.split('.', 2)
+    : [def.id, def.visibleIf.fieldId]
+  const dependency = state.sections[sectionId as keyof typeof state.sections]
+    ?.fields[fieldId]
+  if (!dependency || dependency.type !== 'choice-single' || dependency.value === null) {
+    return false
+  }
+  return def.visibleIf.op === 'eq'
+    ? dependency.value === def.visibleIf.value
+    : dependency.value !== def.visibleIf.value
 }
 
 export function valueToText(v: FieldValue, def?: { label?: string; options?: { value: string; label: string }[] }): string {
@@ -69,28 +88,7 @@ export function isFieldRequired(
     )
   }
 
-  if (field.required) {
-    return true
-  }
-
-  if (
-    sectionId === 'equipment'
-    && field.id === 'inventory'
-  ) {
-    const hasExisting = (
-      state.sections.budget
-        .fields.has_existing
-    )
-
-    return (
-      hasExisting?.type
-        === 'choice-single'
-      && hasExisting.value
-        === 'yes'
-    )
-  }
-
-  return false
+  return field.required
 }
 
 export function filledCount(
@@ -103,6 +101,10 @@ export function filledCount(
   const section = (
     state.sections[def.id]
   )
+
+  if (!isSectionVisible(state, def)) {
+    return { filled: 0, total: 0 }
+  }
 
   let filled = 0
   let total = 0
@@ -134,11 +136,14 @@ export function filledCount(
     )
 
     if (
-      value
-      && valueToText(
-        value,
-        field,
-      ) !== ''
+      state.skippedFieldIds.includes(`${def.id}.${field.id}`)
+      || (
+        value
+        && valueToText(
+          value,
+          field,
+        ) !== ''
+      )
     ) {
       filled += 1
     }
