@@ -6,6 +6,16 @@ type ErrorHandler = (
   event: { error: string },
 ) => void
 
+type ResultHandler = (event: {
+  results: {
+    length: number
+    [index: number]: {
+      isFinal: boolean
+      [index: number]: { transcript: string }
+    }
+  }
+}) => void
+
 class MockSpeechRecognition {
   static instances: MockSpeechRecognition[] = []
 
@@ -13,9 +23,10 @@ class MockSpeechRecognition {
   continuous = false
   interimResults = false
   maxAlternatives = 1
-  onresult = null
+  onresult: ResultHandler | null = null
   onerror: ErrorHandler | null = null
   onend: (() => void) | null = null
+  onstart: (() => void) | null = null
   start = vi.fn()
   stop = vi.fn()
   abort = vi.fn()
@@ -57,6 +68,12 @@ describe('useSpeechRecognition', () => {
     })
 
     expect(MockSpeechRecognition.instances).toHaveLength(1)
+    expect(result.current.listening).toBe(false)
+
+    act(() => {
+      MockSpeechRecognition.instances[0].onstart?.()
+    })
+
     expect(result.current.listening).toBe(true)
 
     act(() => {
@@ -70,9 +87,9 @@ describe('useSpeechRecognition', () => {
     expect(onError).not.toHaveBeenCalled()
 
     act(() => {
-      MockSpeechRecognition.instances[1].onerror?.({
-        error: 'network',
-      })
+      MockSpeechRecognition.instances[1].onerror?.({ error: 'network' })
+      vi.advanceTimersByTime(600)
+      MockSpeechRecognition.instances[2].onerror?.({ error: 'network' })
     })
 
     expect(result.current.listening).toBe(false)
@@ -105,5 +122,38 @@ describe('useSpeechRecognition', () => {
 
     expect(MockSpeechRecognition.instances).toHaveLength(1)
     expect(result.current.listening).toBe(false)
+  })
+
+  it('识别器自动重启后保留前一段文字', () => {
+    vi.useFakeTimers()
+    const onTranscript = vi.fn()
+    ;(window as SpeechTestWindow).webkitSpeechRecognition = MockSpeechRecognition
+
+    const { result } = renderHook(() => useSpeechRecognition({
+      onTranscript,
+      onError: vi.fn(),
+    }))
+
+    act(() => {
+      result.current.startListening()
+      MockSpeechRecognition.instances[0].onstart?.()
+      MockSpeechRecognition.instances[0].onresult?.({
+        results: {
+          0: { 0: { transcript: '第一段' }, isFinal: true },
+          length: 1,
+        },
+      })
+      MockSpeechRecognition.instances[0].onend?.()
+      vi.advanceTimersByTime(300)
+      MockSpeechRecognition.instances[1].onstart?.()
+      MockSpeechRecognition.instances[1].onresult?.({
+        results: {
+          0: { 0: { transcript: '第二段' }, isFinal: true },
+          length: 1,
+        },
+      })
+    })
+
+    expect(onTranscript).toHaveBeenLastCalledWith('第一段 第二段')
   })
 })

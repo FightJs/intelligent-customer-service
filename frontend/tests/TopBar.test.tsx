@@ -13,8 +13,7 @@ function renderBar(overrides: Partial<React.ComponentProps<typeof TopBar>> = {})
     onReset: vi.fn(),
     onLogout: vi.fn(),
     role: 'user',
-    deliveryOpen: false,
-    onToggleDelivery: vi.fn(),
+    onRestoreCenterCard: vi.fn(),
     ...overrides,
   }
   return { props, ...render(<TopBar {...props} />) }
@@ -70,11 +69,14 @@ describe('TopBar', () => {
     expect(header.textContent).not.toContain('重新开始')
   })
 
-  it('右侧主卡放大态图标使用同样的亮度与缩放反馈', () => {
-    renderBar()
-    const button = screen.getByRole('button', { name: '放大主卡' })
+  it('右侧图标恢复问答窗口并保留亮度与缩放反馈', () => {
+    const onRestoreCenterCard = vi.fn()
+    renderBar({ onRestoreCenterCard })
+    const button = screen.getByRole('button', { name: '恢复问答窗口初始位置' })
     expect(button).toHaveClass('top-bar-icon-button')
     expect(button).not.toHaveClass('hover:bg-active-surface')
     expect(button).toHaveAttribute('data-icon-feedback', 'scale-brightness')
+    fireEvent.click(button)
+    expect(onRestoreCenterCard).toHaveBeenCalledTimes(1)
   })
 })

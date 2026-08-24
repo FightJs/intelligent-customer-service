@@ -13,7 +13,7 @@ from survey.models import StudioFormState
 _TEMPLATE = Template("""\
 # {{ customer_name }} — 直播间搭建需求方案
 
-> 采集进度：{{ progress.filled }}/{{ progress.total }}（{{ progress.pct }}%）
+> 必填信息采集进度：{{ progress.filled }}/{{ progress.total }}（{{ progress.pct }}%）
 
 ---
 

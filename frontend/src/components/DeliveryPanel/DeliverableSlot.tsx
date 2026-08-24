@@ -62,11 +62,11 @@ export default function DeliverableSlot({
       <div className="delivery-panel-scroll flex-1 min-h-0 space-y-4 pr-1">
         <section>
           <h3 className="text-secondary text-xs mb-2">
-            AI 结构化内容（{filled}/{total}）
+            AI 结构化内容（必填信息 {filled}/{total}）
           </h3>
 
           <p className="mb-3 text-[11px] leading-5 text-muted">
-            以下内容由系统根据客户需求表统一整理，无需单独操作。
+            进度仅统计必填信息；选填内容也会同步进入需求预览。
           </p>
 
           <div className="deliverable-file-grid">

@@ -145,7 +145,7 @@ def test_choice_multi_accepts_single_or_delimited_label_string(
     assert '失败' not in msg
 
 
-def test_choice_multi_accepts_focus_label_string_and_rejects_unknown_value():
+def test_choice_multi_accepts_focus_label_and_preserves_custom_answer():
     state = create_initial_state()
 
     msg, ok = execute_tool('fill_fields', {
@@ -166,8 +166,11 @@ def test_choice_multi_accepts_focus_label_string_and_rejects_unknown_value():
             'value': '随便变好看',
         }],
     }, state)
-    assert not ok
-    assert '不在 options 内' in msg
+    assert ok
+    assert state.sections['goal'].fields['focus'].value == [
+        'product-quality',
+        '随便变好看',
+    ]
 
 
 def test_apply_updates_helper_returns_counts():

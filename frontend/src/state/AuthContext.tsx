@@ -9,6 +9,7 @@ import {
   getToken,
   type AuthUser,
 } from '../api/client'
+import { clearAllConversationSessions } from '../utils/conversationSession'
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -64,12 +65,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (username: string, password: string) => {
     const { token, user: u } = await apiLogin(username, password)
+    clearAllConversationSessions()
     setAuth(token, u)
     setUser(u)
   }, [])
 
   const register = useCallback(async (username: string, password: string) => {
     const { token, user: u } = await apiRegister(username, password)
+    clearAllConversationSessions()
     setAuth(token, u)
     setUser(u)
   }, [])
@@ -81,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: guest,
       } = await apiGuestLogin()
 
+      clearAllConversationSessions()
       setAuth(
         token,
         guest,
@@ -92,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const logout = useCallback(() => {
+    clearAllConversationSessions()
     clearAuth()
     setUser(null)
   }, [])

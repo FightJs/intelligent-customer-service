@@ -352,29 +352,32 @@ SECTIONS: list[SectionDef] = [
             FieldDef(
                 id='brand', label='品牌/公司名称', question='请问您的品牌或公司名称是什么？',
                 type='text', required=True, placeholder='如：云裳',
-                help_text='用于方案标题与正式归档。',
+                help_text='填写说明：用于方案标题与正式归档，是生成专属方案的核心标识。',
             ),
             FieldDef(
                 id='contact', label='姓名', question='方便留下您的姓名和联系电话吗？',
                 type='text', required=True, placeholder='联系人姓名',
-                help_text='用于后续方案细节对接。',
+                help_text='填写说明：方便我们后续对接方案细节，确保能第一时间给到您完整的方案内容。',
             ),
             FieldDef(
                 id='phone', label='联系电话', question='联系电话还没有记录，方便再补充一下吗？',
                 type='text', required=True, placeholder='138****',
-                help_text='用于后续方案细节对接。',
+                help_text='填写说明：方便我们后续对接方案细节，确保能第一时间给到您完整的方案内容。',
             ),
             FieldDef(
                 id='source', label='了解渠道', question='您是通过哪个渠道了解到我们的？',
                 type='choice-single', required=True, options=_CUSTOMER_SOURCE,
+                help_text='填写说明：用于我们统计客户来源，优化服务渠道，也能帮您匹配对应渠道的专属服务资源。',
             ),
             FieldDef(
                 id='wechat', label='微信号', question='方便留下您的微信号吗？',
                 type='text', skippable=True, placeholder='选填，便于发送效果图和设备清单',
+                help_text='填写说明：方便后续微信端给您发送方案效果图、设备清单等详细资料。',
             ),
             FieldDef(
                 id='city', label='所在城市', question='请问您所在的城市是哪里？',
                 type='text', skippable=True, placeholder='选填，如需线下服务可匹配资源',
+                help_text='填写说明：如果您有线下服务需求，我们可以帮您匹配对应城市的落地资源。',
             ),
         ],
     ),
@@ -388,16 +391,18 @@ SECTIONS: list[SectionDef] = [
             FieldDef(
                 id='category', label='行业大类', question='您的直播间主营什么行业大类？',
                 type='choice-single', skippable=True, options=_INDUSTRY_CATEGORIES,
+                help_text='填写说明：不同行业的直播间视觉逻辑、商品展示方式差异极大，明确行业能帮您匹配最贴合的方案模板。',
             ),
             FieldDef(
                 id='subcategory', label='细分品类', question='更具体的细分品类是什么？',
                 type='text', skippable=True,
                 placeholder='例：高端香云纱女装、黄金珠宝、进口零食',
+                help_text='填写示例：高端香云纱女装、黄金珠宝、进口零食，越具体，生成的方案越精准。',
             ),
             FieldDef(
                 id='price_band', label='商品价格带', question='您的商品价格带大致是多少？',
                 type='choice-single', required=True, options=_PRICE_BAND,
-                help_text='用户给出具体区间时必须按边界准确归类，不得猜测或改写。',
+                help_text='填写说明：价格带直接决定直播间的档次定位、视觉风格方向，是方案设计的核心参考。',
             ),
             FieldDef(
                 id='price_range_raw', label='用户原始商品价格范围',
@@ -408,18 +413,22 @@ SECTIONS: list[SectionDef] = [
             FieldDef(
                 id='positioning', label='品牌定位', question='您的品牌定位属于哪一类？',
                 type='choice-single', required=True, options=_POSITIONING,
+                help_text='填写说明：品牌定位决定了直播间的视觉基调，避免方案风格和品牌调性脱节。',
             ),
             FieldDef(
                 id='target_age', label='目标客群年龄', question='核心目标客群年龄主要集中在哪个区间？',
                 type='choice-single', required=True, options=_AGE_GROUP,
+                help_text='填写说明：不同年龄层的色彩偏好、视觉审美差异很大，能帮您优化直播间的视觉吸引力。',
             ),
             FieldDef(
                 id='target_gender', label='目标客群性别', question='目标客群的性别偏向是怎样的？',
                 type='choice-single', required=True, options=_GENDER,
+                help_text='填写说明：针对性别优化视觉风格，能有效提升目标用户的停留意愿。',
             ),
             FieldDef(
                 id='live_type', label='直播间类型', question='您的直播间属于哪种类型？',
                 type='choice-single', required=True, options=_LIVE_TYPE,
+                help_text='填写说明：不同类型的直播间，视觉设计、设备选型的标准完全不同，明确类型能避免方案跑偏。',
             ),
         ],
     ),
@@ -434,38 +443,44 @@ SECTIONS: list[SectionDef] = [
             FieldDef(
                 id='has_room', label='是否已有直播间', question='您目前已经有正在运营的直播间了吗？',
                 type='choice-single', options=_YES_NO,
+                help_text='填写说明：用于判断是否继续了解现有直播间情况；没有直播间时将直接进入后续模块。',
             ),
             # 以下字段仅在 has_room=yes 时可见
             FieldDef(
                 id='room_photo', label='直播间照片/风格参考图',
                 question='方便上传当前直播间照片，或希望对比的直播间样式参考图吗？',
                 type='image', skippable=True,
-                help_text='支持直接拍摄或从相册上传，无需文字描述。',
+                help_text='填写说明：可直接用于方案优化校准，让生成的方案更贴合您的实际情况，无需文字描述，拍照即可。',
                 visible_if=VisibleIf(field_id='has_room', value='yes'),
             ),
             FieldDef(
                 id='duration', label='开播时长', question='目前大约开播多久了？',
                 type='choice-single', skippable=True, options=_BROADCAST_DURATION,
+                help_text='填写说明：了解直播间运营阶段，辅助判断优化侧重点。',
                 visible_if=VisibleIf(field_id='has_room', value='yes'),
             ),
             FieldDef(
                 id='viewers', label='当前场均观看', question='当前直播间的场均观看人数大概是多少？',
                 type='choice-single', skippable=True, options=_VIEWERS,
+                help_text='填写说明：帮您判断当前流量层级，针对性优化视觉引流方案。',
                 visible_if=VisibleIf(field_id='has_room', value='yes'),
             ),
             FieldDef(
                 id='gmv', label='当前场均GMV', question='当前直播间的场均GMV大概是多少？',
                 type='choice-single', skippable=True, options=_GMV,
+                help_text='填写说明：结合经营数据，匹配适配的视觉投入方案。',
                 visible_if=VisibleIf(field_id='has_room', value='yes'),
             ),
             FieldDef(
                 id='satisfaction', label='对现状是否满意', question='您对当前直播间的整体现状满意吗？',
                 type='choice-single', skippable=True, options=_SATISFACTION,
+                help_text='填写说明：了解主观感受，找准优化方向。',
                 visible_if=VisibleIf(field_id='has_room', value='yes'),
             ),
             FieldDef(
                 id='pain_points', label='主要痛点', question='当前直播间最核心的痛点有哪些？',
                 type='choice-multi', skippable=True, options=_PAIN_POINTS,
+                help_text='填写说明：明确痛点后，我们的方案会优先针对您的问题做优化，精准解决您的需求。',
                 visible_if=VisibleIf(field_id='has_room', value='yes'),
             ),
         ],
@@ -480,29 +495,33 @@ SECTIONS: list[SectionDef] = [
             FieldDef(
                 id='area', label='直播间面积', question='您的直播间场地面积大概是多少？',
                 type='choice-single', required=True, options=_AREA,
+                help_text='填写说明：面积是直播间布局、设备选型的核心基础，能帮您规划最合理的空间利用方案。',
             ),
             FieldDef(
                 id='size', label='具体尺寸（宽×深×高）', question='方便提供场地的宽、深、高吗？',
                 type='dimension', skippable=True, dims=['宽', '深', '高'], unit='m',
-                help_text='不方便测量时可跳过并直接上传场地照片。',
+                help_text='填写示例：宽__m × 深__m × 高__m，尺寸越精准，方案的落地性越强；不方便测量可直接拍照上传。',
             ),
             FieldDef(
                 id='window', label='窗户情况', question='场地的窗户情况是怎样的？',
                 type='choice-single', required=True, options=_WINDOW,
+                help_text='填写说明：窗户情况直接影响灯光方案的设计，避免自然光干扰直播画面效果。',
             ),
             FieldDef(
                 id='window_pos', label='窗户位置', question='如果有窗户，窗户在主播的哪个位置？',
                 type='choice-single', skippable=True, options=_WINDOW_POS,
+                help_text='填写说明：用于灯光布光方案设计，规避逆光、杂光问题。',
                 visible_if=VisibleIf(field_id='window', op='ne', value='none'),
             ),
             FieldDef(
                 id='renovation', label='是否允许装修', question='您的场地允许装修改动吗？',
                 type='choice-single', required=True, options=_RENOVATION,
+                help_text='填写说明：明确装修权限，能帮您制定完全贴合场地情况的方案，避免方案无法落地。',
             ),
             FieldDef(
                 id='venue_photo', label='场地多角度照片', question='方便上传场地的多角度照片吗？',
                 type='image', skippable=True,
-                help_text='支持直接拍摄或从相册上传，无需手动描述细节。',
+                help_text='填写说明：能让我们更直观地了解场地情况，避免方案和实际场地不符，直接拍照上传即可，不用手动描述细节。',
             ),
         ],
     ),
@@ -516,22 +535,27 @@ SECTIONS: list[SectionDef] = [
             FieldDef(
                 id='total', label='总预算范围', question='本次直播间搭建或优化的总预算范围是多少？',
                 type='choice-single', required=True, options=_TOTAL_BUDGET,
+                help_text='填写说明：预算是方案设计的核心边界，能帮您制定性价比最高的方案，避免超支。',
             ),
             FieldDef(
                 id='equipment', label='设备采购预算', question='总预算中，设备采购大概安排多少？',
                 type='choice-single', required=True, options=_EQUIP_BUDGET,
+                help_text='填写说明：用于相机、灯光等核心设备的选型匹配，确保设备预算和总预算匹配。',
             ),
             FieldDef(
                 id='decor', label='装修装饰预算', question='总预算中，装修装饰大概安排多少？',
                 type='choice-single', required=True, options=_DECOR_BUDGET,
+                help_text='填写说明：用于背景墙、装饰等装修内容的规划，确保装修方案在预算范围内。',
             ),
             FieldDef(
                 id='flex', label='预算弹性', question='您的预算弹性如何？',
                 type='choice-single', skippable=True, options=_BUDGET_FLEX,
+                help_text='填写说明：便于我们在方案中预留调整空间。',
             ),
             FieldDef(
                 id='has_existing', label='是否已有部分设备', question='您目前已经有部分直播设备了吗？',
                 type='choice-single', required=True, options=_YES_NO,
+                help_text='填写说明：有设备的话我们会基于现有设备做优化，不用重复采购，帮您节省成本。',
             ),
         ],
     ),
@@ -545,35 +569,40 @@ SECTIONS: list[SectionDef] = [
             FieldDef(
                 id='main', label='主营商品类型', question='直播间的主营商品类型是什么？',
                 type='text', required=True, placeholder='例：连衣裙、口红、翡翠手镯',
+                help_text='填写示例：连衣裙、口红、翡翠手镯，越具体越好。',
             ),
             FieldDef(
                 id='size_cat', label='商品尺寸', question='您的商品尺寸属于哪一类？',
                 type='choice-single', required=True, options=_PRODUCT_SIZE,
+                help_text='填写说明：商品尺寸直接决定了展示方式、机位构图，能帮您优化商品的呈现效果。',
             ),
             FieldDef(
                 id='keywords', label='品牌风格关键词', question='可以说3到5个品牌风格关键词吗？',
                 type='text', required=True,
                 placeholder='例：国风、高端、雅致、轻奢、简约',
+                help_text='填写示例：国风、高端、雅致、轻奢、简约，越具体，方案风格越贴合。',
             ),
             FieldDef(
                 id='style_ref', label='喜欢的直播间风格参考',
                 question='有喜欢的直播间风格参考吗？可以描述账号或直接上传截图。',
                 type='text', skippable=True, placeholder='可填写参考直播间账号或名称',
+                help_text='填写说明：可提供参考直播间账号或截图图片，能让我们更精准地匹配您的审美偏好。',
             ),
             FieldDef(
                 id='style_ref_image', label='风格参考截图', question='方便上传喜欢的直播间截图吗？',
                 type='image', skippable=True,
-                help_text='支持直接拍摄或从相册上传。',
+                help_text='填写说明：可提供参考直播间账号或截图图片，能让我们更精准地匹配您的审美偏好。',
             ),
             FieldDef(
                 id='dislike_style', label='明确不喜欢的风格', question='有没有您明确不喜欢的风格？',
                 type='text', skippable=True, placeholder='明确需要避开的方向',
+                help_text='填写说明：明确避开的方向，避免生成的方案不符合您的审美。',
             ),
             FieldDef(
                 id='brand_assets', label='品牌Logo/VI与商品样品图',
                 question='方便上传品牌Logo、VI或商品样品图吗？',
                 type='image', skippable=True,
-                help_text='支持直接拍摄或从相册上传。',
+                help_text='填写说明：可将品牌元素融入背景设计，同时针对商品做专属的展示优化，让方案更贴合品牌，直接上传图片即可。',
             ),
         ],
     ),
@@ -588,27 +617,31 @@ SECTIONS: list[SectionDef] = [
             FieldDef(
                 id='has_benchmark', label='是否有对标直播间', question='您有想要对标的直播间吗？',
                 type='choice-single', options=_YES_NO,
+                help_text='填写说明：用于判断是否继续采集对标信息；没有对标直播间时将直接进入后续模块。',
             ),
             FieldDef(
                 id='account_name', label='主对标账号/名称',
                 question='请发一下主对标直播间的账号、链接或截图。',
                 type='text', skippable=True,
+                help_text='填写说明：对标直播间是视觉风格匹配的核心参考，信息越完整，生成的方案越精准。',
                 visible_if=VisibleIf(field_id='has_benchmark', value='yes'),
             ),
             FieldDef(
                 id='platform', label='主对标平台', question='这个主对标直播间在哪个平台？',
                 type='choice-single', skippable=True, options=_BENCHMARK_PLATFORM,
+                help_text='填写说明：不同平台的直播间风格差异很大，明确平台能避免方案和平台生态脱节。',
                 visible_if=VisibleIf(field_id='has_benchmark', value='yes'),
             ),
             FieldDef(
                 id='likes', label='喜欢的方面', question='您最喜欢这个直播间的哪些方面？',
                 type='choice-multi', skippable=True, options=_BENCHMARK_LIKES,
+                help_text='填写说明：明确喜欢的点，我们会把这些优势融入到您的方案中，同时避免照搬短板。',
                 visible_if=VisibleIf(field_id='has_benchmark', value='yes'),
             ),
             FieldDef(
                 id='screenshot', label='对标截图/图片', question='方便上传对标直播间的截图吗？',
                 type='image', skippable=True,
-                help_text='支持直接拍摄或从相册上传。链接可在聊天中直接发送。',
+                help_text='填写说明：可直接用于向量化分析，提取核心视觉特征，让方案更贴合您的对标需求，截图拍照上传即可。',
                 visible_if=VisibleIf(field_id='has_benchmark', value='yes'),
             ),
             FieldDef(
@@ -616,16 +649,19 @@ SECTIONS: list[SectionDef] = [
                 question='有对标直播间的链接可以补充吗？',
                 type='text', skippable=True,
                 placeholder='可粘贴直播间或作品链接',
+                help_text='填写说明：可直接用于向量化分析，提取核心视觉特征，让方案更贴合您的对标需求。',
                 visible_if=VisibleIf(field_id='has_benchmark', value='yes'),
             ),
             FieldDef(
                 id='reference_mode', label='参考方式', question='您希望以哪种方式参考对标直播间？',
                 type='choice-single', skippable=True, options=_REFERENCE_MODE,
+                help_text='填写说明：确定借鉴逻辑，控制方案原创程度。',
                 visible_if=VisibleIf(field_id='has_benchmark', value='yes'),
             ),
             FieldDef(
                 id='exact_copy', label='是否完全复刻', question='您需要尽量1:1复刻对标直播间吗？',
                 type='choice-single', skippable=True, options=_EXACT_COPY,
+                help_text='填写说明：区分复刻还是借鉴，把控方案输出方向。',
                 visible_if=VisibleIf(field_id='has_benchmark', value='yes'),
             ),
         ],
@@ -641,15 +677,18 @@ SECTIONS: list[SectionDef] = [
             FieldDef(
                 id='count', label='主播人数', question='直播间通常有几位主播？',
                 type='choice-single', options=_HOST_COUNT,
+                help_text='填写说明：主播人数会影响机位布局、构图设计，确保直播画面能适配所有主播。',
             ),
             FieldDef(
                 id='movement', label='主播活动状态', question='直播时主播通常是坐着、站起还是会走动？',
                 type='choice-single', options=_MOVEMENT,
+                help_text='填写说明：影响镜头选型、空间布局，确保主播活动时画面始终稳定清晰。',
             ),
             FieldDef(
                 id='profile', label='主播身高与体型补充', question='主播的身高、体型等信息方便补充吗？',
                 type='text', skippable=True,
                 placeholder='选填，用于机位高度和构图适配',
+                help_text='填写说明：帮您优化机位高度、构图角度，让主播在画面里呈现更好的状态。',
             ),
         ],
     ),
@@ -666,12 +705,13 @@ SECTIONS: list[SectionDef] = [
                 id='inventory', label='现有设备文字明细',
                 question='可以描述现有设备的类型、型号和数量；不清楚型号也可以直接拍照上传。',
                 type='table', skippable=True, columns=_EQUIPMENT_COLUMNS,
+                help_text='填写指引：认识设备型号就填写品牌型号和数量；不认识型号无需猜测，可以直接拍摄上传设备照片，后端设备人员会帮您核对检测。',
             ),
             FieldDef(
                 id='equipment_photo', label='现有设备照片',
                 question='方便再拍摄并上传现有设备照片吗？',
                 type='image', skippable=True,
-                help_text='支持一键拍摄或从相册上传，后端设备人员会协助核对。',
+                help_text='填写指引：不认识设备型号无需猜测，可以直接拍摄上传设备照片，后端设备人员会帮您核对检测。',
             ),
         ],
     ),
@@ -685,28 +725,33 @@ SECTIONS: list[SectionDef] = [
             FieldDef(
                 id='core', label='核心需求', question='本次最核心的需求是什么？',
                 type='choice-single', required=True, options=_CORE_NEED,
+                help_text='填写说明：明确服务范围，确保我们给到的方案完全匹配您的需求，不做无效内容。',
             ),
             FieldDef(
                 id='focus', label='最看重的效果', question='您最看重直播间的哪些效果？',
                 type='choice-multi', required=True, options=_FOCUS_EFFECT,
+                help_text='填写说明：明确核心优先级，我们会优先保障您最看重的效果落地。',
             ),
             FieldDef(
                 id='need_3d', label='是否需要3D效果图', question='您需要提供3D效果图吗？',
                 type='choice-single', required=True, options=_NEED_3D,
+                help_text='填写说明：影响最终的交付内容，需要的话我们会同步生成多视角3D效果图。',
             ),
             FieldDef(
                 id='deadline', label='期望交付时间', question='您期望什么时候完成交付？',
                 type='choice-single', required=True, options=_DEADLINE,
+                help_text='填写说明：便于项目排期，按时输出方案。',
             ),
             FieldDef(
                 id='other', label='其他特殊要求',
                 question='还有其他特殊要求或参考图需要补充吗？可以文字说明或直接上传。',
                 type='text', skippable=True, placeholder='选填，任何特殊需求都可以写',
+                help_text='填写说明：任何特殊需求都可以在这里说明，也可以直接上传参考图片，我们会在方案里优先满足。',
             ),
             FieldDef(
                 id='other_reference', label='特殊要求补充参考图',
                 question='需要上传补充参考图吗？', type='image', skippable=True,
-                help_text='支持直接拍摄或从相册上传。',
+                help_text='填写说明：任何特殊需求都可以在这里说明，也可以直接上传参考图片，我们会在方案里优先满足。',
             ),
         ],
     ),

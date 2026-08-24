@@ -45,9 +45,7 @@ def _normalize_multi_choice(value: object, fdef) -> tuple[list[str] | None, str 
             continue
         normalized = candidate.strip()
         if valid_values and normalized not in valid_values:
-            normalized = labels.get(normalized, '')
-            if not normalized:
-                return None, f'value={candidate} 不在 options 内'
+            normalized = labels.get(normalized, normalized)
         cleaned.append(normalized)
     return list(dict.fromkeys(cleaned)), None
 

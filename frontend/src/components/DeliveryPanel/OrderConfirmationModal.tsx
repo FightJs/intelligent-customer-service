@@ -14,6 +14,7 @@ import {
 } from '../../utils/summary'
 
 interface OrderConfirmationModalProps {
+  sessionId: string
   onClose: () => void
   onSent: () => void
   allowIncomplete?: boolean
@@ -26,6 +27,7 @@ const STEPS = [
 ]
 
 export default function OrderConfirmationModal({
+  sessionId,
   onClose,
   onSent,
   allowIncomplete = false,
@@ -84,10 +86,6 @@ export default function OrderConfirmationModal({
       setError('')
       return
     }
-
-    const sessionId = sessionStorage.getItem(
-      'ics_session_id',
-    )
 
     if (!sessionId) {
       setError('未找到当前会话，请重新开始对话')

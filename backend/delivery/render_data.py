@@ -10,6 +10,7 @@ from agent.flow import (
     is_field_required,
     is_field_visible,
     is_section_visible,
+    overall_progress,
     value_is_empty,
     value_to_text,
 )
@@ -70,8 +71,7 @@ def build_render_data(
     }
     """
     sections_data = []
-    total_filled = 0
-    total_count = 0
+    total_filled, total_count = overall_progress(state)
 
     for sec_def in SECTIONS:
         sec_state = state.sections[sec_def.id]
@@ -122,11 +122,9 @@ def build_render_data(
 
             if is_field_required(state, sec_def.id, f):
                 sec_total += 1
-                if filled:
+                if filled or skipped:
                     sec_filled += 1
 
-        total_filled += sec_filled
-        total_count += sec_total
         if filled_only and not fields_data:
             continue
 

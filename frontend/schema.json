@@ -16,7 +16,7 @@
           "skippable": false,
           "askInFull": true,
           "placeholder": "如：云裳",
-          "helpText": "用于方案标题与正式归档。"
+          "helpText": "填写说明：用于方案标题与正式归档，是生成专属方案的核心标识。"
         },
         {
           "id": "contact",
@@ -27,7 +27,7 @@
           "skippable": false,
           "askInFull": true,
           "placeholder": "联系人姓名",
-          "helpText": "用于后续方案细节对接。"
+          "helpText": "填写说明：方便我们后续对接方案细节，确保能第一时间给到您完整的方案内容。"
         },
         {
           "id": "phone",
@@ -38,7 +38,7 @@
           "skippable": false,
           "askInFull": true,
           "placeholder": "138****",
-          "helpText": "用于后续方案细节对接。"
+          "helpText": "填写说明：方便我们后续对接方案细节，确保能第一时间给到您完整的方案内容。"
         },
         {
           "id": "source",
@@ -65,7 +65,8 @@
               "value": "other",
               "label": "其他"
             }
-          ]
+          ],
+          "helpText": "填写说明：用于我们统计客户来源，优化服务渠道，也能帮您匹配对应渠道的专属服务资源。"
         },
         {
           "id": "wechat",
@@ -75,7 +76,8 @@
           "question": "方便留下您的微信号吗？",
           "skippable": true,
           "askInFull": true,
-          "placeholder": "选填，便于发送效果图和设备清单"
+          "placeholder": "选填，便于发送效果图和设备清单",
+          "helpText": "填写说明：方便后续微信端给您发送方案效果图、设备清单等详细资料。"
         },
         {
           "id": "city",
@@ -85,7 +87,8 @@
           "question": "请问您所在的城市是哪里？",
           "skippable": true,
           "askInFull": true,
-          "placeholder": "选填，如需线下服务可匹配资源"
+          "placeholder": "选填，如需线下服务可匹配资源",
+          "helpText": "填写说明：如果您有线下服务需求，我们可以帮您匹配对应城市的落地资源。"
         }
       ]
     },
@@ -141,7 +144,8 @@
               "value": "other",
               "label": "其他"
             }
-          ]
+          ],
+          "helpText": "填写说明：不同行业的直播间视觉逻辑、商品展示方式差异极大，明确行业能帮您匹配最贴合的方案模板。"
         },
         {
           "id": "subcategory",
@@ -151,7 +155,8 @@
           "question": "更具体的细分品类是什么？",
           "skippable": true,
           "askInFull": true,
-          "placeholder": "例：高端香云纱女装、黄金珠宝、进口零食"
+          "placeholder": "例：高端香云纱女装、黄金珠宝、进口零食",
+          "helpText": "填写示例：高端香云纱女装、黄金珠宝、进口零食，越具体，生成的方案越精准。"
         },
         {
           "id": "price_band",
@@ -179,7 +184,7 @@
               "label": "超高客单（>2000元）"
             }
           ],
-          "helpText": "用户给出具体区间时必须按边界准确归类，不得猜测或改写。"
+          "helpText": "填写说明：价格带直接决定直播间的档次定位、视觉风格方向，是方案设计的核心参考。"
         },
         {
           "id": "price_range_raw",
@@ -220,7 +225,8 @@
               "value": "premium",
               "label": "奢侈品"
             }
-          ]
+          ],
+          "helpText": "填写说明：品牌定位决定了直播间的视觉基调，避免方案风格和品牌调性脱节。"
         },
         {
           "id": "target_age",
@@ -247,7 +253,8 @@
               "value": "45+",
               "label": "45岁以上"
             }
-          ]
+          ],
+          "helpText": "填写说明：不同年龄层的色彩偏好、视觉审美差异很大，能帮您优化直播间的视觉吸引力。"
         },
         {
           "id": "target_gender",
@@ -270,7 +277,8 @@
               "value": "balanced",
               "label": "男女均衡"
             }
-          ]
+          ],
+          "helpText": "填写说明：针对性别优化视觉风格，能有效提升目标用户的停留意愿。"
         },
         {
           "id": "live_type",
@@ -301,7 +309,8 @@
               "value": "other",
               "label": "其他"
             }
-          ]
+          ],
+          "helpText": "填写说明：不同类型的直播间，视觉设计、设备选型的标准完全不同，明确类型能避免方案跑偏。"
         }
       ]
     },
@@ -329,7 +338,8 @@
               "value": "no",
               "label": "否"
             }
-          ]
+          ],
+          "helpText": "填写说明：用于判断是否继续了解现有直播间情况；没有直播间时将直接进入后续模块。"
         },
         {
           "id": "room_photo",
@@ -339,7 +349,7 @@
           "question": "方便上传当前直播间照片，或希望对比的直播间样式参考图吗？",
           "skippable": true,
           "askInFull": true,
-          "helpText": "支持直接拍摄或从相册上传，无需文字描述。",
+          "helpText": "填写说明：可直接用于方案优化校准，让生成的方案更贴合您的实际情况，无需文字描述，拍照即可。",
           "visibleIf": {
             "fieldId": "has_room",
             "op": "eq",
@@ -376,6 +386,7 @@
               "label": "6个月以上"
             }
           ],
+          "helpText": "填写说明：了解直播间运营阶段，辅助判断优化侧重点。",
           "visibleIf": {
             "fieldId": "has_room",
             "op": "eq",
@@ -408,6 +419,7 @@
               "label": "1万人以上"
             }
           ],
+          "helpText": "填写说明：帮您判断当前流量层级，针对性优化视觉引流方案。",
           "visibleIf": {
             "fieldId": "has_room",
             "op": "eq",
@@ -440,6 +452,7 @@
               "label": "10万以上"
             }
           ],
+          "helpText": "填写说明：结合经营数据，匹配适配的视觉投入方案。",
           "visibleIf": {
             "fieldId": "has_room",
             "op": "eq",
@@ -476,6 +489,7 @@
               "label": "非常满意"
             }
           ],
+          "helpText": "填写说明：了解主观感受，找准优化方向。",
           "visibleIf": {
             "fieldId": "has_room",
             "op": "eq",
@@ -516,6 +530,7 @@
               "label": "其他"
             }
           ],
+          "helpText": "填写说明：明确痛点后，我们的方案会优先针对您的问题做优化，精准解决您的需求。",
           "visibleIf": {
             "fieldId": "has_room",
             "op": "eq",
@@ -560,7 +575,8 @@
               "value": "50+",
               "label": "50㎡以上"
             }
-          ]
+          ],
+          "helpText": "填写说明：面积是直播间布局、设备选型的核心基础，能帮您规划最合理的空间利用方案。"
         },
         {
           "id": "size",
@@ -576,7 +592,7 @@
             "高"
           ],
           "unit": "m",
-          "helpText": "不方便测量时可跳过并直接上传场地照片。"
+          "helpText": "填写示例：宽__m × 深__m × 高__m，尺寸越精准，方案的落地性越强；不方便测量可直接拍照上传。"
         },
         {
           "id": "window",
@@ -599,7 +615,8 @@
               "value": "uncoverable",
               "label": "有窗户无法遮挡"
             }
-          ]
+          ],
+          "helpText": "填写说明：窗户情况直接影响灯光方案的设计，避免自然光干扰直播画面效果。"
         },
         {
           "id": "window_pos",
@@ -627,6 +644,7 @@
               "label": "主播右侧"
             }
           ],
+          "helpText": "填写说明：用于灯光布光方案设计，规避逆光、杂光问题。",
           "visibleIf": {
             "fieldId": "window",
             "op": "ne",
@@ -658,7 +676,8 @@
               "value": "unsure",
               "label": "不确定"
             }
-          ]
+          ],
+          "helpText": "填写说明：明确装修权限，能帮您制定完全贴合场地情况的方案，避免方案无法落地。"
         },
         {
           "id": "venue_photo",
@@ -668,7 +687,7 @@
           "question": "方便上传场地的多角度照片吗？",
           "skippable": true,
           "askInFull": true,
-          "helpText": "支持直接拍摄或从相册上传，无需手动描述细节。"
+          "helpText": "填写说明：能让我们更直观地了解场地情况，避免方案和实际场地不符，直接拍照上传即可，不用手动描述细节。"
         }
       ]
     },
@@ -712,7 +731,8 @@
               "value": "20w+",
               "label": "20万以上"
             }
-          ]
+          ],
+          "helpText": "填写说明：预算是方案设计的核心边界，能帮您制定性价比最高的方案，避免超支。"
         },
         {
           "id": "equipment",
@@ -743,7 +763,8 @@
               "value": "5w+",
               "label": "5万以上"
             }
-          ]
+          ],
+          "helpText": "填写说明：用于相机、灯光等核心设备的选型匹配，确保设备预算和总预算匹配。"
         },
         {
           "id": "decor",
@@ -774,7 +795,8 @@
               "value": "5w+",
               "label": "5万以上"
             }
-          ]
+          ],
+          "helpText": "填写说明：用于背景墙、装饰等装修内容的规划，确保装修方案在预算范围内。"
         },
         {
           "id": "flex",
@@ -797,7 +819,8 @@
               "value": "flexible",
               "label": "比较灵活，效果优先"
             }
-          ]
+          ],
+          "helpText": "填写说明：便于我们在方案中预留调整空间。"
         },
         {
           "id": "has_existing",
@@ -816,7 +839,8 @@
               "value": "no",
               "label": "否"
             }
-          ]
+          ],
+          "helpText": "填写说明：有设备的话我们会基于现有设备做优化，不用重复采购，帮您节省成本。"
         }
       ]
     },
@@ -835,7 +859,8 @@
           "question": "直播间的主营商品类型是什么？",
           "skippable": false,
           "askInFull": true,
-          "placeholder": "例：连衣裙、口红、翡翠手镯"
+          "placeholder": "例：连衣裙、口红、翡翠手镯",
+          "helpText": "填写示例：连衣裙、口红、翡翠手镯，越具体越好。"
         },
         {
           "id": "size_cat",
@@ -862,7 +887,8 @@
               "value": "large",
               "label": "大（家居类）"
             }
-          ]
+          ],
+          "helpText": "填写说明：商品尺寸直接决定了展示方式、机位构图，能帮您优化商品的呈现效果。"
         },
         {
           "id": "keywords",
@@ -872,7 +898,8 @@
           "question": "可以说3到5个品牌风格关键词吗？",
           "skippable": false,
           "askInFull": true,
-          "placeholder": "例：国风、高端、雅致、轻奢、简约"
+          "placeholder": "例：国风、高端、雅致、轻奢、简约",
+          "helpText": "填写示例：国风、高端、雅致、轻奢、简约，越具体，方案风格越贴合。"
         },
         {
           "id": "style_ref",
@@ -882,7 +909,8 @@
           "question": "有喜欢的直播间风格参考吗？可以描述账号或直接上传截图。",
           "skippable": true,
           "askInFull": true,
-          "placeholder": "可填写参考直播间账号或名称"
+          "placeholder": "可填写参考直播间账号或名称",
+          "helpText": "填写说明：可提供参考直播间账号或截图图片，能让我们更精准地匹配您的审美偏好。"
         },
         {
           "id": "style_ref_image",
@@ -892,7 +920,7 @@
           "question": "方便上传喜欢的直播间截图吗？",
           "skippable": true,
           "askInFull": true,
-          "helpText": "支持直接拍摄或从相册上传。"
+          "helpText": "填写说明：可提供参考直播间账号或截图图片，能让我们更精准地匹配您的审美偏好。"
         },
         {
           "id": "dislike_style",
@@ -902,7 +930,8 @@
           "question": "有没有您明确不喜欢的风格？",
           "skippable": true,
           "askInFull": true,
-          "placeholder": "明确需要避开的方向"
+          "placeholder": "明确需要避开的方向",
+          "helpText": "填写说明：明确避开的方向，避免生成的方案不符合您的审美。"
         },
         {
           "id": "brand_assets",
@@ -912,7 +941,7 @@
           "question": "方便上传品牌Logo、VI或商品样品图吗？",
           "skippable": true,
           "askInFull": true,
-          "helpText": "支持直接拍摄或从相册上传。"
+          "helpText": "填写说明：可将品牌元素融入背景设计，同时针对商品做专属的展示优化，让方案更贴合品牌，直接上传图片即可。"
         }
       ]
     },
@@ -940,7 +969,8 @@
               "value": "no",
               "label": "否"
             }
-          ]
+          ],
+          "helpText": "填写说明：用于判断是否继续采集对标信息；没有对标直播间时将直接进入后续模块。"
         },
         {
           "id": "account_name",
@@ -950,6 +980,7 @@
           "question": "请发一下主对标直播间的账号、链接或截图。",
           "skippable": true,
           "askInFull": true,
+          "helpText": "填写说明：对标直播间是视觉风格匹配的核心参考，信息越完整，生成的方案越精准。",
           "visibleIf": {
             "fieldId": "has_benchmark",
             "op": "eq",
@@ -990,6 +1021,7 @@
               "label": "其他"
             }
           ],
+          "helpText": "填写说明：不同平台的直播间风格差异很大，明确平台能避免方案和平台生态脱节。",
           "visibleIf": {
             "fieldId": "has_benchmark",
             "op": "eq",
@@ -1034,6 +1066,7 @@
               "label": "其他"
             }
           ],
+          "helpText": "填写说明：明确喜欢的点，我们会把这些优势融入到您的方案中，同时避免照搬短板。",
           "visibleIf": {
             "fieldId": "has_benchmark",
             "op": "eq",
@@ -1048,7 +1081,7 @@
           "question": "方便上传对标直播间的截图吗？",
           "skippable": true,
           "askInFull": true,
-          "helpText": "支持直接拍摄或从相册上传。链接可在聊天中直接发送。",
+          "helpText": "填写说明：可直接用于向量化分析，提取核心视觉特征，让方案更贴合您的对标需求，截图拍照上传即可。",
           "visibleIf": {
             "fieldId": "has_benchmark",
             "op": "eq",
@@ -1064,6 +1097,7 @@
           "skippable": true,
           "askInFull": true,
           "placeholder": "可粘贴直播间或作品链接",
+          "helpText": "填写说明：可直接用于向量化分析，提取核心视觉特征，让方案更贴合您的对标需求。",
           "visibleIf": {
             "fieldId": "has_benchmark",
             "op": "eq",
@@ -1092,6 +1126,7 @@
               "label": "只参考元素，不整体模仿"
             }
           ],
+          "helpText": "填写说明：确定借鉴逻辑，控制方案原创程度。",
           "visibleIf": {
             "fieldId": "has_benchmark",
             "op": "eq",
@@ -1116,6 +1151,7 @@
               "label": "否，参考风格但要有自己特色"
             }
           ],
+          "helpText": "填写说明：区分复刻还是借鉴，把控方案输出方向。",
           "visibleIf": {
             "fieldId": "has_benchmark",
             "op": "eq",
@@ -1152,7 +1188,8 @@
               "value": "3+",
               "label": "3人及以上"
             }
-          ]
+          ],
+          "helpText": "填写说明：主播人数会影响机位布局、构图设计，确保直播画面能适配所有主播。"
         },
         {
           "id": "movement",
@@ -1179,7 +1216,8 @@
               "value": "wide",
               "label": "大范围移动"
             }
-          ]
+          ],
+          "helpText": "填写说明：影响镜头选型、空间布局，确保主播活动时画面始终稳定清晰。"
         },
         {
           "id": "profile",
@@ -1189,7 +1227,8 @@
           "question": "主播的身高、体型等信息方便补充吗？",
           "skippable": true,
           "askInFull": true,
-          "placeholder": "选填，用于机位高度和构图适配"
+          "placeholder": "选填，用于机位高度和构图适配",
+          "helpText": "填写说明：帮您优化机位高度、构图角度，让主播在画面里呈现更好的状态。"
         }
       ]
     },
@@ -1208,6 +1247,7 @@
           "question": "可以描述现有设备的类型、型号和数量；不清楚型号也可以直接拍照上传。",
           "skippable": true,
           "askInFull": true,
+          "helpText": "填写指引：认识设备型号就填写品牌型号和数量；不认识型号无需猜测，可以直接拍摄上传设备照片，后端设备人员会帮您核对检测。",
           "columns": [
             {
               "id": "type",
@@ -1234,7 +1274,7 @@
           "question": "方便再拍摄并上传现有设备照片吗？",
           "skippable": true,
           "askInFull": true,
-          "helpText": "支持一键拍摄或从相册上传，后端设备人员会协助核对。"
+          "helpText": "填写指引：不认识设备型号无需猜测，可以直接拍摄上传设备照片，后端设备人员会帮您核对检测。"
         }
       ],
       "visibleIf": {
@@ -1279,7 +1319,8 @@
               "value": "full",
               "label": "全套方案"
             }
-          ]
+          ],
+          "helpText": "填写说明：明确服务范围，确保我们给到的方案完全匹配您的需求，不做无效内容。"
         },
         {
           "id": "focus",
@@ -1314,7 +1355,8 @@
               "value": "other",
               "label": "其他"
             }
-          ]
+          ],
+          "helpText": "填写说明：明确核心优先级，我们会优先保障您最看重的效果落地。"
         },
         {
           "id": "need_3d",
@@ -1333,7 +1375,8 @@
               "value": "no",
               "label": "不需要"
             }
-          ]
+          ],
+          "helpText": "填写说明：影响最终的交付内容，需要的话我们会同步生成多视角3D效果图。"
         },
         {
           "id": "deadline",
@@ -1360,7 +1403,8 @@
               "value": "flexible",
               "label": "不着急"
             }
-          ]
+          ],
+          "helpText": "填写说明：便于项目排期，按时输出方案。"
         },
         {
           "id": "other",
@@ -1370,7 +1414,8 @@
           "question": "还有其他特殊要求或参考图需要补充吗？可以文字说明或直接上传。",
           "skippable": true,
           "askInFull": true,
-          "placeholder": "选填，任何特殊需求都可以写"
+          "placeholder": "选填，任何特殊需求都可以写",
+          "helpText": "填写说明：任何特殊需求都可以在这里说明，也可以直接上传参考图片，我们会在方案里优先满足。"
         },
         {
           "id": "other_reference",
@@ -1380,7 +1425,7 @@
           "question": "需要上传补充参考图吗？",
           "skippable": true,
           "askInFull": true,
-          "helpText": "支持直接拍摄或从相册上传。"
+          "helpText": "填写说明：任何特殊需求都可以在这里说明，也可以直接上传参考图片，我们会在方案里优先满足。"
         }
       ]
     }

@@ -10,13 +10,12 @@ interface Props {
   onLogout: () => void
   /** 当前用户角色，用于头像环色区分；undefined 时用默认色 */
   role?: string
-  deliveryOpen: boolean
-  onToggleDelivery: () => void
+  onRestoreCenterCard: () => void
 }
 
 export default function TopBar({
   theme, onToggleTheme, onReset, onLogout, role,
-  deliveryOpen, onToggleDelivery,
+  onRestoreCenterCard,
 }: Props) {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
 
@@ -83,24 +82,15 @@ export default function TopBar({
         <div className="flex-1 flex items-center justify-end gap-3.5">
           <button
             type="button"
-            onClick={onToggleDelivery}
+            onClick={onRestoreCenterCard}
             className="top-bar-icon-button"
             data-icon-feedback="scale-brightness"
-            aria-label={deliveryOpen ? '还原主卡' : '放大主卡'}
-            title={deliveryOpen ? '还原主卡' : '放大主卡'}
+            aria-label="恢复问答窗口初始位置"
+            title="恢复问答窗口初始大小和位置"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              {deliveryOpen ? (
-                <>
-                  <rect x="11" y="4" width="11" height="16" rx="2" />
-                  <path d="M2 12h5M5 9l3 3-3 3" />
-                </>
-              ) : (
-                <>
-                  <rect x="11" y="4" width="11" height="16" rx="2" />
-                  <path d="M2 12h9M2 9l3 3-3 3" />
-                </>
-              )}
+              <rect x="11" y="4" width="11" height="16" rx="2" />
+              <path d="M2 12h9M2 9l3 3-3 3" />
             </svg>
           </button>
         </div>

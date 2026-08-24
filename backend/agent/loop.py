@@ -23,6 +23,7 @@ from agent.llm import (
 )
 from agent.tools import TOOL_DEFS, execute_tool, ToolEvent
 from agent import flow
+from agent.question_copy import ensure_current_question_help
 from store.uploads import SavedImage
 from survey.models import StudioFormState
 from survey.schema_def import (
@@ -66,6 +67,14 @@ EQUIPMENT_IMAGE_INVITATION = (
     '如果手边有设备照片，可以直接拍摄或从相册上传；'
     '暂时不方便也可以点击跳过。'
 )
+
+_SKIP_INTENT_RE = re.compile(
+    r'^(?:我说)?(?:暂时)?(?:没有|没了|无|暂无|不需要|不用|无需|不想|不方便)'
+    r'(?:再|了|啦|补充|提供|上传|回答|填写|图片|照片|参考图|内容|其他|特殊要求|其他要求)*[。！!]*$'
+)
+_UNKNOWN_ANSWER_WORDS = ('不知道', '不清楚', '不确定', '随便', '没想好')
+_YES_WORDS = ('有', '有的', '是', '是的', '需要', '要', '已经有', '目前有')
+_NO_WORDS = ('没有', '没', '无', '不是', '不需要', '不要', '目前没有')
 
 logger = logging.getLogger(__name__)
 
@@ -479,6 +488,84 @@ def _execute_tool_with_events(
             )
 
     return ' '.join(results), all_ok, events
+
+
+def _apply_deterministic_current_answer(
+    state: StudioFormState,
+    user_message: str,
+) -> list[ToolEvent]:
+    """优先处理明确的自然回答，避免简单答案依赖模型猜工具参数。"""
+    current = flow.next_question_field(state)
+    if current is None:
+        return []
+
+    section_id, field = current
+    answer = user_message.strip()
+    compact = re.sub(r'[\s，,。！？!?；;]', '', answer)
+    if not compact:
+        return []
+
+    if field.skippable and _SKIP_INTENT_RE.fullmatch(compact):
+        ok, _ = flow.skip_field(state, section_id, field.id)
+        if ok:
+            return [ToolEvent(
+                kind='skip',
+                section_id=section_id,
+                field_id=field.id,
+            )]
+
+    if field.type == 'choice-single':
+        options = field.options or []
+        option_values = {option.value for option in options}
+        value = next(
+            (
+                option.value
+                for option in options
+                if compact == re.sub(r'\s', '', option.label)
+            ),
+            None,
+        )
+        if value is None and {'yes', 'no'} <= option_values:
+            if compact in _NO_WORDS or re.fullmatch(r'(?:没有|不需要|不要)(?:的|了|啊|呀)?', compact):
+                value = 'no'
+            elif compact in _YES_WORDS or re.fullmatch(r'(?:有|需要|要)(?:的|了|啊|呀)?', compact):
+                value = 'yes'
+        if value is None:
+            return []
+        _, ok, events = _execute_tool_with_events(
+            'fill_fields',
+            {'updates': [{
+                'section_id': section_id,
+                'field_id': field.id,
+                'value': value,
+            }]},
+            state,
+        )
+        return events if ok else []
+
+    if field.type == 'choice-multi':
+        if any(word in compact for word in _UNKNOWN_ANSWER_WORDS):
+            return []
+        matched = [
+            option.value
+            for option in (field.options or [])
+            if option.label in answer
+        ]
+        value: list[str] = matched or ([answer] if len(answer) <= 80 else [])
+        if not value:
+            return []
+        _, ok, events = _execute_tool_with_events(
+            'fill_fields',
+            {'updates': [{
+                'section_id': section_id,
+                'field_id': field.id,
+                'value': value,
+            }]},
+            state,
+        )
+        return events if ok else []
+
+    return []
 
 
 def _correct_premature_completion(
@@ -1011,7 +1098,7 @@ def _build_system_prompt(
 {topic_hint}
 
 回复规则：
-- 每轮只写 1-2 个短句：一句简短承接 + 一个问题
+- 每轮只写一句简短承接 + 一个问题；不要自行输出“填写说明/填写示例/填写指引”，系统会统一展示
 - 不输出判断、原因分析、优化建议、设备建议或预算方案
 - 优先使用 schema 的标准问法，衔接自然但不改动问题含义
 - 用户没说清的信息不要猜
@@ -1120,6 +1207,7 @@ def run_agent(
     events.extend(_apply_deterministic_price_range(state, user_message))
     events.extend(_apply_deterministic_reference_link(state, user_message))
     events.extend(_skip_unknown_equipment_inventory(state, user_message))
+    events.extend(_apply_deterministic_current_answer(state, user_message))
     flow.sync_current_question(state)
 
     # 历史拆分为“较早摘要 + 近期原文”。
@@ -1251,6 +1339,14 @@ def run_agent(
         reply,
     )
     reply = _enforce_collector_reply(state, reply)
+    current = flow.next_question_field(state)
+    if current is not None:
+        section_id, field = current
+        reply = ensure_current_question_help(
+            field,
+            reply,
+            skippable=(field.skippable or SECTION_BY_ID[section_id].skippable),
+        )
     reply = _apply_image_invitation(
         state,
         user_message,
@@ -1344,6 +1440,7 @@ async def run_agent_stream(
     events.extend(_apply_deterministic_price_range(state, user_message))
     events.extend(_apply_deterministic_reference_link(state, user_message))
     events.extend(_skip_unknown_equipment_inventory(state, user_message))
+    events.extend(_apply_deterministic_current_answer(state, user_message))
     flow.sync_current_question(state)
     try:
         full_history = history or []
@@ -1463,6 +1560,14 @@ async def run_agent_stream(
             reply,
         )
         reply = _enforce_collector_reply(state, reply)
+        current = flow.next_question_field(state)
+        if current is not None:
+            section_id, field = current
+            reply = ensure_current_question_help(
+                field,
+                reply,
+                skippable=(field.skippable or SECTION_BY_ID[section_id].skippable),
+            )
         reply = _apply_image_invitation(
             state,
             user_message,

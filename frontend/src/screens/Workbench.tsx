@@ -14,11 +14,15 @@ import { ZStackProvider } from '../hooks/useZStack'
 import { FormProvider } from '../state/FormContext'
 import { useTheme } from '../state/theme'
 import { useAuth } from '../state/AuthContext'
+import {
+  clearAllConversationSessions,
+  getConversationSessionId,
+} from '../utils/conversationSession'
 
 export default function Workbench() {
   const { user, logout } = useAuth()
   const [resetKey, setResetKey] = useState(0)
-  const [centerExpanded, setCenterExpanded] = useState(false)
+  const [centerResetToken, setCenterResetToken] = useState(0)
   const [formPreviewOpen, setFormPreviewOpen] = useState(false)
   const [orderModalOpen, setOrderModalOpen] = useState(false)
   const [earlySubmit, setEarlySubmit] = useState(false)
@@ -30,9 +34,9 @@ export default function Workbench() {
   )
 
   function handleReset() {
-    sessionStorage.removeItem('ics_session_id')
+    clearAllConversationSessions()
     setResetKey((key) => key + 1)
-    setCenterExpanded(false)
+    setCenterResetToken((token) => token + 1)
     setFormPreviewOpen(false)
     setOrderModalOpen(false)
     setEarlySubmit(false)
@@ -50,9 +54,8 @@ export default function Workbench() {
             onReset={handleReset}
             onLogout={logout}
             role={user?.role}
-            deliveryOpen={centerExpanded}
-            onToggleDelivery={() => {
-              setCenterExpanded((expanded) => !expanded)
+            onRestoreCenterCard={() => {
+              setCenterResetToken((token) => token + 1)
             }}
           />
 
@@ -61,13 +64,7 @@ export default function Workbench() {
           )}
 
           <main
-            className={
-              `workbench-stage${
-                centerExpanded
-                  ? ' is-center-expanded'
-                  : ''
-              }`
-            }
+            className="workbench-stage"
           >
             <GridBackground />
 
@@ -77,12 +74,11 @@ export default function Workbench() {
 
             <section className="workbench-center-zone">
               <CenterCard
-                expanded={centerExpanded}
-                onToggleExpand={() => {
-                  setCenterExpanded((expanded) => !expanded)
-                }}
+                resetToken={centerResetToken}
               >
                 <ChatPanel
+                  userId={user?.id}
+                  userRole={user?.role}
                   onPetActivityChange={setPetActivity}
                   canFinishEarly={!isGuest}
                   conversationEnded={orderSent}
@@ -96,8 +92,6 @@ export default function Workbench() {
 
             <aside
               className="workbench-slots"
-              aria-hidden={centerExpanded}
-              inert={centerExpanded}
             >
               <section className="form-preview-slot">
                 <FormPreviewSlot
@@ -122,7 +116,7 @@ export default function Workbench() {
 
           {formPreviewOpen && (
             <WordPreviewModal
-              sessionId={sessionStorage.getItem('ics_session_id') ?? ''}
+              sessionId={user ? getConversationSessionId(user.id) ?? '' : ''}
               onClose={() => {
                 setFormPreviewOpen(false)
               }}
@@ -131,6 +125,7 @@ export default function Workbench() {
 
           {!isGuest && orderModalOpen && (
             <OrderConfirmationModal
+              sessionId={user ? getConversationSessionId(user.id) ?? '' : ''}
               allowIncomplete={earlySubmit}
               onClose={() => {
                 setOrderModalOpen(false)

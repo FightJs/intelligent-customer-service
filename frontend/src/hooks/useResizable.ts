@@ -24,9 +24,12 @@ export function useResizable(opts: {
   minSize: Size
   maxSize: Size
   ratio: number | null
-}): { size: Size; resizing: boolean; onResizeStart: (e: React.MouseEvent) => void } {
-  const { storageKey, defaultSize, minSize, maxSize, ratio } = opts
-  const [size, setSize] = useState<Size>(() => loadInitial(storageKey, defaultSize))
+  persist?: boolean
+}): { size: Size; resizing: boolean; onResizeStart: (e: React.MouseEvent) => void; resetSize: () => void } {
+  const { storageKey, defaultSize, minSize, maxSize, ratio, persist = true } = opts
+  const [size, setSize] = useState<Size>(() => (
+    persist ? loadInitial(storageKey, defaultSize) : defaultSize
+  ))
   const [resizing, setResizing] = useState(false)
   // 起始锚点:拖拽期间不再依赖 state,避免监听器身份在每次 setSize 后变化导致监听器丢失
   const startRef = useRef<{ mouseX: number; mouseY: number; w: number; h: number } | null>(null)
@@ -63,10 +66,20 @@ export function useResizable(opts: {
     document.addEventListener('mouseup', onUp)
   }, [size.w, size.h, onMove, onUp])
 
+  const resetSize = useCallback(() => {
+    startRef.current = null
+    setResizing(false)
+    setSize(defaultSize)
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+    if (persist) localStorage.setItem(storageKey, JSON.stringify(defaultSize))
+    else localStorage.removeItem(storageKey)
+  }, [defaultSize, persist, storageKey])
+
   // 持久化:resizing 从 true → false 时写 localStorage
   useEffect(() => {
-    if (!resizing) localStorage.setItem(storageKey, JSON.stringify(size))
-  }, [resizing, size, storageKey])
+    if (persist && !resizing) localStorage.setItem(storageKey, JSON.stringify(size))
+  }, [persist, resizing, size, storageKey])
 
   // 卸载时清理
   useEffect(() => {
@@ -76,5 +89,5 @@ export function useResizable(opts: {
     }
   }, [onMove, onUp])
 
-  return { size, resizing, onResizeStart }
+  return { size, resizing, onResizeStart, resetSize }
 }

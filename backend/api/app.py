@@ -42,6 +42,7 @@ from agent.auth import (
     verify_password,
 )
 from agent.gather import initial_greeting
+from agent.question_copy import normalize_help_format, question_with_help
 from agent.flow import (
     form_complete,
     next_unfilled_field,
@@ -65,6 +66,7 @@ from delivery.word import generate_word
 from store import db
 from store.uploads import SavedImage, UploadError, is_data_uri, save_upload
 from survey.models import StudioFormState
+from survey.schema_def import SECTION_BY_ID
 from survey.state import create_initial_state, to_dict, from_dict
 
 load_dotenv()
@@ -72,6 +74,16 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 LLM_BALANCE_ERROR = 'LLM 服务余额不足，请联系管理员充值后重试。'
 LLM_CONNECTION_ERROR = 'LLM 服务暂时无法连接，请检查网络或联系管理员。'
+
+
+def _get_owned_session(session_id: str, current: dict, action: str) -> dict:
+    """工作台会话只允许创建者使用；管理员跨用户查看走后台专用接口。"""
+    rec = db.get_session(session_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail='session not found')
+    if rec['user_id'] != current['id']:
+        raise HTTPException(status_code=403, detail=f'无权{action}该会话')
+    return rec
 
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
 ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123456')  # 仅测试期默认，生产必改 env
@@ -528,25 +540,28 @@ def create_session(current: dict = Depends(get_current_user)) -> SessionResponse
 
 @app.get('/api/session/{session_id}', response_model=SessionResponse)
 def get_session(session_id: str, current: dict = Depends(get_current_user)) -> SessionResponse:
-    """取回会话 form_state（跨会话恢复）。校验归属：本人或 admin。"""
-    rec = db.get_session(session_id)
-    if rec is None:
-        raise HTTPException(status_code=404, detail='session not found')
-    if rec['user_id'] != current['id'] and current['role'] != 'admin':
-        raise HTTPException(status_code=403, detail='无权访问该会话')
+    """取回当前用户自己的会话 form_state。"""
+    rec = _get_owned_session(session_id, current, '访问')
     state = from_dict(rec['form_state'], session_id=session_id)
     sync_current_question(state)
     normalized_state = to_dict(state)
     if normalized_state != rec['form_state']:
         db.save_session(session_id, normalized_state)
     messages = [
-        SessionMessage(role=m['role'], content=m['content'])
+        SessionMessage(
+            role=m['role'],
+            content=(
+                normalize_help_format(m['content'])
+                if m['role'] == 'assistant' and isinstance(m['content'], str)
+                else m['content']
+            ),
+        )
         for m in db.get_messages(session_id)
     ]
     return SessionResponse(
         session_id=session_id,
         form_state=normalized_state,
-        greeting='',
+        greeting=initial_greeting(state) if not messages else '',
         messages=messages,
         form_complete=form_complete(state),
     )
@@ -559,11 +574,7 @@ def skip_current_question(
     current: dict = Depends(get_current_user),
 ) -> SkipResponse:
     """确定性跳过当前题或当前模块，权限由 schema 校验。"""
-    rec = db.get_session(session_id)
-    if rec is None:
-        raise HTTPException(status_code=404, detail='session not found')
-    if rec['user_id'] != current['id'] and current['role'] != 'admin':
-        raise HTTPException(status_code=403, detail='无权操作该会话')
+    rec = _get_owned_session(session_id, current, '操作')
 
     state = from_dict(rec['form_state'], session_id=session_id)
     if state.completed:
@@ -582,8 +593,18 @@ def skip_current_question(
         raise HTTPException(status_code=409, detail=message)
 
     next_question = next_question_field(state)
+    next_copy = ''
+    if next_question is not None:
+        next_section_id, next_field = next_question
+        next_copy = question_with_help(
+            next_field,
+            skippable=(
+                next_field.skippable
+                or SECTION_BY_ID[next_section_id].skippable
+            ),
+        )
     reply = (
-        f'{message}。{next_question[1].question}'
+        f'{message}。{next_copy}'
         if next_question is not None
         else f'{message}。本次问答已完成，请核对客户需求表。'
     )
@@ -615,11 +636,7 @@ def chat(
     current: dict = Depends(get_current_user),
 ) -> ChatResponse:
     """普通 POST 对话（非 SSE）。校验 session 归属。"""
-    rec = db.get_session(req.session_id)
-    if rec is None:
-        raise HTTPException(status_code=404, detail='session not found')
-    if rec['user_id'] != current['id'] and current['role'] != 'admin':
-        raise HTTPException(status_code=403, detail='无权操作该会话')
+    rec = _get_owned_session(req.session_id, current, '操作')
 
     state = from_dict(rec['form_state'], session_id=req.session_id)
     if state.completed:
@@ -702,11 +719,7 @@ async def chat_stream(
     current: dict = Depends(get_current_user),
 ) -> StreamingResponse:
     """真实 LLM stream 的 SSE 聊天接口，支持 request_id 幂等回放。"""
-    rec = db.get_session(req.session_id)
-    if rec is None:
-        raise HTTPException(status_code=404, detail='session not found')
-    if rec['user_id'] != current['id'] and current['role'] != 'admin':
-        raise HTTPException(status_code=403, detail='无权操作该会话')
+    rec = _get_owned_session(req.session_id, current, '操作')
 
     session_state = from_dict(rec['form_state'], session_id=req.session_id)
     if session_state.completed:
@@ -924,22 +937,7 @@ def submit_order(
             ),
         )
 
-    rec = db.get_session(req.session_id)
-
-    if rec is None:
-        raise HTTPException(
-            status_code=404,
-            detail='session not found',
-        )
-
-    if (
-        rec['user_id'] != current['id']
-        and current['role'] != 'admin'
-    ):
-        raise HTTPException(
-            status_code=403,
-            detail='无权发送该会话的订单',
-        )
+    rec = _get_owned_session(req.session_id, current, '发送')
 
     state = from_dict(rec['form_state'], session_id=req.session_id)
 
@@ -1040,11 +1038,7 @@ def generate(
     - excel:   application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
     - word:    application/vnd.openxmlformats-officedocument.wordprocessingml.document
     """
-    rec = db.get_session(session_id)
-    if rec is None:
-        raise HTTPException(status_code=404, detail='session not found')
-    if rec['user_id'] != current['id'] and current['role'] != 'admin':
-        raise HTTPException(status_code=403, detail='无权操作该会话')
+    rec = _get_owned_session(session_id, current, '操作')
 
     state = from_dict(rec['form_state'], session_id=session_id)
 

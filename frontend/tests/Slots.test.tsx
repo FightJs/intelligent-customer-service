@@ -111,6 +111,17 @@ describe('FormPreviewSlot', () => {
 })
 
 describe('DeliverableSlot', () => {
+  it('明确标注必填信息进度口径', () => {
+    render(
+      <FormProvider>
+        <DeliverableSlot />
+      </FormProvider>,
+    )
+
+    expect(screen.getByText(/必填信息 0\/23/)).toBeInTheDocument()
+    expect(screen.getByText(/进度仅统计必填信息/)).toBeInTheDocument()
+  })
+
   it('三类结构化内容不可交互', () => {
     render(
       <FormProvider>

@@ -8,7 +8,7 @@ import ChatPanel, {
 import { suggestionOptionUpdate } from '../src/components/ChatPanel/suggestionUpdate'
 import { FormProvider } from '../src/state/FormContext'
 import { createInitialState } from '../src/state/initialState'
-import { createSession, skipCurrentQuestion } from '../src/api/client'
+import { createSession, getSession, skipCurrentQuestion } from '../src/api/client'
 import { streamChat } from '../src/api/chatStream'
 
 vi.mock('../src/api/client', () => ({
@@ -48,6 +48,37 @@ beforeEach(() => {
 })
 
 describe('ChatPanel 输入与流式回复', () => {
+  it('保留填写说明和填写示例之间的单换行', async () => {
+    vi.mocked(createSession).mockResolvedValue({
+      ...sessionData(),
+      greeting: (
+        '更具体的细分品类是什么？\n\n'
+        + '填写说明：可按实际情况补充（可跳过）\n'
+        + '填写示例：高端香云纱女装、黄金珠宝'
+      ),
+    })
+
+    renderPanel()
+
+    const helpParagraph = await screen.findByText((_, element) => (
+      element?.tagName === 'P'
+      && element.textContent?.includes('填写说明：可按实际情况补充（可跳过）') === true
+      && element.textContent?.includes('填写示例：高端香云纱女装、黄金珠宝') === true
+    ))
+    expect(helpParagraph).toHaveClass('whitespace-pre-line')
+  })
+
+  it('按用户隔离恢复会话，不读取旧的全局会话键', async () => {
+    sessionStorage.setItem('ics_session_id', 'guest-session')
+    sessionStorage.setItem('ics_session_id:42', 'user-session')
+
+    renderPanel({ userId: 42 })
+    await screen.findByPlaceholderText('输入您的回答…')
+
+    expect(getSession).toHaveBeenCalledWith('user-session')
+    expect(getSession).not.toHaveBeenCalledWith('guest-session')
+  })
+
   it('使用多行输入框并允许清空草稿', async () => {
     renderPanel()
     const input = await screen.findByPlaceholderText('输入您的回答…')
@@ -77,6 +108,30 @@ describe('ChatPanel 输入与流式回复', () => {
     await screen.findByText('最终回复')
     expect(screen.queryByText('临时')).not.toBeInTheDocument()
     expect(screen.getAllByText('最终回复')).toHaveLength(1)
+  })
+
+  it('简约版完成后引导查看右上角需求表和登录正式账号', async () => {
+    vi.mocked(streamChat).mockImplementation(async (_request, handlers) => {
+      handlers.onStart({ request_id: 'quick-done', status: 'started' })
+      handlers.onDone({
+        request_id: 'quick-done', reply: '本次采集完成', tool_events: [],
+        form_state: createInitialState(), form_complete: true,
+        suggestions: [], assistant_message_id: 1,
+      })
+    })
+
+    renderPanel({ userRole: 'guest' })
+    const input = await screen.findByPlaceholderText('输入您的回答…')
+    fireEvent.change(input, { target: { value: '最后一项' } })
+    fireEvent.click(screen.getByRole('button', { name: '发送' }))
+
+    expect(await screen.findByText(/简约体验已完成/)).toHaveTextContent(
+      '右上角客户需求表',
+    )
+    expect(screen.getByText(/简约体验已完成/)).toHaveTextContent(
+      '登录或注册正式账号',
+    )
+    expect(screen.queryByText(/确认后发送订单/)).not.toBeInTheDocument()
   })
 
   it('生成期间禁用输入并显示当前处理阶段', async () => {
@@ -234,6 +289,7 @@ describe('ChatPanel 语音输入', () => {
       onresult: ((event: ResultEvent) => void) | null = null
       onerror: ((event: { error: string }) => void) | null = null
       onend: (() => void) | null = null
+      onstart: (() => void) | null = null
       start = vi.fn()
       stop = vi.fn()
       abort = vi.fn()
@@ -249,6 +305,7 @@ describe('ChatPanel 语音输入', () => {
     fireEvent.click(screen.getByRole('button', { name: '开始语音输入' }))
     const recognition = recognitions[0]
     expect(recognition.start).toHaveBeenCalledTimes(1)
+    act(() => recognition.onstart?.())
     expect(screen.getByTestId('voice-listening-indicator')).toBeInTheDocument()
     act(() => {
       recognition.onresult?.({

@@ -1,50 +1,62 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import CenterCard from '../src/components/CenterCard/CenterCard'
 import { ZStackProvider } from '../src/hooks/useZStack'
 
 describe('CenterCard', () => {
-  it('默认态渲染卡片和放大按钮', () => {
-    render(<CenterCard expanded={false} onToggleExpand={() => {}} />)
-    const expandButton = screen.getByRole('button', { name: '放大' })
-    expect(expandButton).toBeInTheDocument()
-    expect(expandButton).not.toHaveClass('hover:bg-active-surface')
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('进入界面使用适配三栏的初始尺寸和复位按钮', () => {
+    const { container } = render(<CenterCard />)
+    const restoreButton = screen.getByRole('button', { name: '恢复问答窗口初始位置' })
+    const card = container.querySelector('[data-center-card]') as HTMLElement
+
+    expect(restoreButton).toBeInTheDocument()
+    expect(restoreButton).not.toHaveClass('hover:bg-active-surface')
+    expect(card).toHaveStyle({ width: '930px', height: '800px' })
+    expect(card.style.transform).toBe('translate3d(0px, 0px, 0)')
     expect(screen.queryByText('中央卡片 4:3')).not.toBeInTheDocument()
   })
 
-  it('点击放大按钮触发 onToggleExpand', () => {
-    const onToggleExpand = vi.fn()
-    render(<CenterCard expanded={false} onToggleExpand={onToggleExpand} />)
-    fireEvent.click(screen.getByRole('button', { name: '放大' }))
-    expect(onToggleExpand).toHaveBeenCalled()
+  it('拖动和缩放后点击图标恢复初始大小与位置', () => {
+    const { container } = render(<CenterCard />)
+    const card = container.querySelector('[data-center-card]') as HTMLElement
+    const handle = container.querySelector('[data-card-handle]') as HTMLElement
+    const resizeHandle = container.querySelector('[data-resize-handle]') as HTMLElement
+
+    fireEvent.mouseDown(handle, { clientX: 0, clientY: 0 })
+    fireEvent.mouseMove(document, { clientX: 45, clientY: 30 })
+    fireEvent.mouseUp(document)
+    fireEvent.mouseDown(resizeHandle, { clientX: 0, clientY: 0 })
+    fireEvent.mouseMove(document, { clientX: 80, clientY: 40 })
+    fireEvent.mouseUp(document)
+
+    expect(card.style.transform).toBe('translate3d(45px, 30px, 0)')
+    expect(card).toHaveStyle({ width: '1010px', height: '840px' })
+
+    fireEvent.click(screen.getByRole('button', { name: '恢复问答窗口初始位置' }))
+    expect(card.style.transform).toBe('translate3d(0px, 0px, 0)')
+    expect(card).toHaveStyle({ width: '930px', height: '800px' })
   })
 
-  it('放大态显示还原按钮，不显示放大按钮', () => {
-    render(<CenterCard expanded={true} onToggleExpand={() => {}} />)
-    expect(screen.getByRole('button', { name: '还原' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '放大' })).not.toBeInTheDocument()
-  })
+  it('忽略旧缓存，每次进入均从初始布局开始', () => {
+    localStorage.setItem('centercard.pos.v2', JSON.stringify({ x: 120, y: 80 }))
+    localStorage.setItem('centercard.size.v2', JSON.stringify({ w: 380, h: 430 }))
 
-  it('放大态根元素标记 data-expanded=true', () => {
-    const { container } = render(<CenterCard expanded={true} onToggleExpand={() => {}} />)
-    expect(container.querySelector('[data-center-card]')).toHaveAttribute('data-expanded', 'true')
-  })
+    const { container } = render(<CenterCard />)
+    const card = container.querySelector('[data-center-card]') as HTMLElement
 
-  it('默认态根元素标记 data-expanded=false', () => {
-    const { container } = render(<CenterCard expanded={false} onToggleExpand={() => {}} />)
-    expect(container.querySelector('[data-center-card]')).toHaveAttribute('data-expanded', 'false')
-  })
-
-  it('两种状态均锚定在中央 Grid 区，避免缩放时切换定位坐标系', () => {
-    const { container } = render(<CenterCard expanded={false} onToggleExpand={() => {}} />)
-    expect(container.querySelector('[data-center-card]')).toHaveStyle({ inset: '0' })
+    expect(card.style.transform).toBe('translate3d(0px, 0px, 0)')
+    expect(card).toHaveStyle({ width: '930px', height: '800px' })
   })
 
   it('对话框内部控件获得焦点时同步置顶', () => {
     const { container } = render(
       <ZStackProvider>
-        <CenterCard expanded={false} onToggleExpand={() => {}}>
+        <CenterCard>
           <input aria-label="对话框输入" />
         </CenterCard>
       </ZStackProvider>,

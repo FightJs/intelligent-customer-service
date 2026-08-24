@@ -106,3 +106,22 @@ def test_filled_only_word_preview_excludes_empty_section_titles():
     assert '一、基础信息采集' in paragraphs
     assert '二、行业与品类信息' not in paragraphs
     assert '四、场地条件信息' not in paragraphs
+
+
+def test_filled_only_preview_keeps_full_required_progress_denominator():
+    state = create_initial_state()
+    customer = state.sections['customer'].fields
+    customer['brand'].value = '云裳'
+    customer['contact'].value = '小云'
+    customer['phone'].value = '13800000000'
+    customer['source'].value = 'douyin'
+    industry = state.sections['industry'].fields
+    industry['price_band'].value = '100-500'
+    industry['positioning'].value = 'mid-high'
+    industry['target_age'].value = '25-35'
+    industry['target_gender'].value = 'balanced'
+    industry['live_type'].value = 'brand'
+
+    data = build_render_data(state, filled_only=True)
+
+    assert data['progress'] == {'filled': 9, 'total': 23, 'pct': 39}

@@ -76,7 +76,7 @@ def generate_word(
     info.alignment = WD_ALIGN_PARAGRAPH.CENTER
     info_run = info.add_run(
         f'生成日期：{date.today().strftime("%Y-%m-%d")}    '
-        f'采集进度：{data["progress"]["filled"]}/{data["progress"]["total"]}（{data["progress"]["pct"]}%）'
+        f'必填信息采集进度：{data["progress"]["filled"]}/{data["progress"]["total"]}（{data["progress"]["pct"]}%）'
     )
     info_run.font.size = Pt(9)
     info_run.font.color.rgb = RGBColor(0x88, 0x88, 0x88)

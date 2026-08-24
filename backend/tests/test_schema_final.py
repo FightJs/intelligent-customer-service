@@ -50,3 +50,18 @@ def test_every_active_question_has_approved_question_copy():
         for field in section.fields
         if field.ask_in_full
     )
+
+
+def test_every_active_question_has_user_visible_filling_guidance():
+    active_fields = [
+        field
+        for section in SECTIONS
+        for field in section.fields
+        if field.ask_in_full
+    ]
+
+    assert all(field.help_text.strip() for field in active_fields)
+    assert all(
+        field.help_text.startswith(('填写说明：', '填写示例：', '填写指引：'))
+        for field in active_fields
+    )

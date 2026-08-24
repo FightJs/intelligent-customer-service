@@ -27,9 +27,15 @@ export function useDraggable(opts: {
   disabled?: boolean
   clamp?: boolean
   clampPosition?: PositionClamp
-}): { pos: Pos; dragging: boolean; onDragStart: (e: React.MouseEvent) => void } {
-  const { storageKey, defaultPos, bounds, disabled = false, clamp: shouldClamp = true, clampPosition } = opts
-  const [pos, setPos] = useState<Pos>(() => loadInitial(storageKey, defaultPos))
+  persist?: boolean
+}): { pos: Pos; dragging: boolean; onDragStart: (e: React.MouseEvent) => void; resetPosition: (position?: Pos) => void } {
+  const {
+    storageKey, defaultPos, bounds, disabled = false,
+    clamp: shouldClamp = true, clampPosition, persist = true,
+  } = opts
+  const [pos, setPos] = useState<Pos>(() => (
+    persist ? loadInitial(storageKey, defaultPos) : defaultPos
+  ))
   const [dragging, setDragging] = useState(false)
   const startRef = useRef<{ mouseX: number; mouseY: number; posX: number; posY: number } | null>(null)
 
@@ -80,10 +86,20 @@ export function useDraggable(opts: {
     document.addEventListener('mouseup', onUp)
   }, [disabled, pos, onMove, onUp])
 
+  const resetPosition = useCallback((position: Pos = defaultPos) => {
+    startRef.current = null
+    setDragging(false)
+    setPos(position)
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+    if (persist) localStorage.setItem(storageKey, JSON.stringify(position))
+    else localStorage.removeItem(storageKey)
+  }, [defaultPos, persist, storageKey])
+
   // 持久化:dragging 从 true → false 时写 localStorage
   useEffect(() => {
-    if (!dragging) localStorage.setItem(storageKey, JSON.stringify(pos))
-  }, [dragging, pos, storageKey])
+    if (persist && !dragging) localStorage.setItem(storageKey, JSON.stringify(pos))
+  }, [dragging, persist, pos, storageKey])
 
   // 窗口缩放重新 clamp（clamp=false 时不动）
   useEffect(() => {
@@ -107,5 +123,5 @@ export function useDraggable(opts: {
     }
   }, [onMove, onUp])
 
-  return { pos, dragging, onDragStart }
+  return { pos, dragging, onDragStart, resetPosition }
 }

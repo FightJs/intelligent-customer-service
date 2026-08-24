@@ -37,6 +37,7 @@ describe('OrderConfirmationModal', () => {
     render(
       <FormProvider>
         <OrderConfirmationModal
+          sessionId="session-1"
           onClose={vi.fn()}
           onSent={vi.fn()}
         />
@@ -78,6 +79,7 @@ describe('OrderConfirmationModal', () => {
     render(
       <FormProvider>
         <OrderConfirmationModal
+          sessionId="session-1"
           onClose={vi.fn()}
           onSent={onSent}
         />
@@ -131,6 +133,7 @@ describe('OrderConfirmationModal', () => {
     render(
       <FormProvider>
         <OrderConfirmationModal
+          sessionId="session-1"
           onClose={onClose}
           onSent={vi.fn()}
         />
@@ -158,6 +161,7 @@ describe('OrderConfirmationModal', () => {
     render(
       <FormProvider>
         <OrderConfirmationModal
+          sessionId="session-1"
           allowIncomplete
           onClose={vi.fn()}
           onSent={vi.fn()}

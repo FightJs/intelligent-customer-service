@@ -212,8 +212,9 @@ def test_create_session_uses_static_greeting_without_llm(client, auth_headers):
     assert r.status_code == 200
     assert r.json()['greeting'] == (
         '嗨，欢迎来聊直播间搭建～我是小搭，'
-        '会边聊边帮你把需求整理好。'
-        '先跟我说说你的品牌叫什么、主要做哪类产品吧？'
+        '会边聊边帮你把需求整理好。\n\n'
+        '请问您的品牌或公司名称是什么？\n\n'
+        '填写说明：用于方案标题与正式归档，是生成专属方案的核心标识'
     )
 
 
@@ -222,6 +223,19 @@ def test_get_session_recovers_state(client, auth_headers):
     r = client.get(f'/api/session/{sid}', headers=auth_headers)
     assert r.status_code == 200
     assert r.json()['session_id'] == sid
+
+
+def test_get_empty_session_restores_greeting(client, auth_headers):
+    created = client.post('/api/session', headers=auth_headers).json()
+
+    restored = client.get(
+        f'/api/session/{created["session_id"]}',
+        headers=auth_headers,
+    ).json()
+
+    assert restored['messages'] == []
+    assert restored['greeting'] == created['greeting']
+    assert restored['greeting']
 
 
 def test_get_session_returns_messages_and_form_complete(client, auth_headers):
@@ -248,6 +262,30 @@ def test_get_session_returns_messages_and_form_complete(client, auth_headers):
     assert data['messages'][1]['content'] == '收到云裳品牌'
 
 
+def test_get_session_normalizes_historical_help_format(client, auth_headers):
+    from store import db
+
+    sid = client.post('/api/session', headers=auth_headers).json()['session_id']
+    db.add_message(
+        sid,
+        'assistant',
+        '请补充信息？\n\n'
+        '填写说明：可按实际情况补充。（可跳过）\n'
+        '填写示例：高端香云纱女装。',
+    )
+
+    restored = client.get(
+        f'/api/session/{sid}',
+        headers=auth_headers,
+    ).json()
+
+    assert restored['messages'][0]['content'] == (
+        '请补充信息？\n\n'
+        '填写说明：可按实际情况补充（可跳过）\n'
+        '填写示例：高端香云纱女装'
+    )
+
+
 def test_get_missing_session_404(client, auth_headers):
     r = client.get('/api/session/nonexistent', headers=auth_headers)
     assert r.status_code == 404
@@ -261,6 +299,23 @@ def test_session_owner_isolation(client, auth_headers):
     other_headers = {'Authorization': f'Bearer {r.json()["token"]}'}
     r2 = client.get(f'/api/session/{sid}', headers=other_headers)
     assert r2.status_code == 403
+
+
+def test_admin_workbench_cannot_reuse_guest_session(client, admin_headers):
+    guest = client.post('/api/auth/guest').json()
+    guest_headers = {'Authorization': f'Bearer {guest["token"]}'}
+    session_id = client.post('/api/session', headers=guest_headers).json()['session_id']
+
+    restored = client.get(f'/api/session/{session_id}', headers=admin_headers)
+    submitted = client.post(
+        '/api/orders',
+        headers=admin_headers,
+        json={'session_id': session_id, 'allow_incomplete': True},
+    )
+
+    assert restored.status_code == 403
+    assert submitted.status_code == 403
+    assert db.get_delivery_by_session(session_id) is None
 
 
 def test_chat_returns_json_response(client, auth_headers):
@@ -495,6 +550,7 @@ def test_skip_endpoint_enforces_schema_permissions(client, auth_headers):
     assert allowed.status_code == 200
     assert 'industry.category' in allowed.json()['form_state']['skippedFieldIds']
     assert allowed.json()['form_state']['currentFieldId'] == 'subcategory'
+    assert '填写示例：高端香云纱女装' in allowed.json()['reply']
 
 
 def test_equipment_photo_can_replace_unknown_text_inventory(tmp_path, monkeypatch):

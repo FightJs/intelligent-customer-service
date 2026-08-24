@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
   ArrowUp,
@@ -31,12 +31,21 @@ import { SECTIONS } from '../../data/sections'
 import MessageBubble from './MessageBubble'
 import QuickChips from './QuickChips'
 import { suggestionOptionUpdate } from './suggestionUpdate'
+import {
+  getConversationSessionId,
+  setConversationSessionId,
+} from '../../utils/conversationSession'
 
 
 const MAX_INPUT_HEIGHT = 136
 
 const VOICE_WAVE_BARS = [8, 15, 11, 16]
 const WAITING_STREAM_STATUSES = ['正在更新表单', '正在整理需求', '正在生成交付物']
+const CHAT_MARKDOWN_COMPONENTS: Components = {
+  p: ({ children }) => (
+    <p className="whitespace-pre-line">{children}</p>
+  ),
+}
 
 interface ChatMessage {
   id: string
@@ -104,6 +113,8 @@ export function toolEventStatus(kind: 'fill' | 'skip' | 'deliverable'): string {
 }
 
 interface ChatPanelProps {
+  userId?: number
+  userRole?: 'user' | 'admin' | 'guest'
   onPetActivityChange?: (activity: CameraPetActivity) => void
   onFinishEarly?: () => void
   canFinishEarly?: boolean
@@ -111,6 +122,8 @@ interface ChatPanelProps {
 }
 
 export default function ChatPanel({
+  userId = 0,
+  userRole = 'user',
   onPetActivityChange,
   onFinishEarly,
   canFinishEarly = false,
@@ -166,7 +179,7 @@ export default function ChatPanel({
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    const savedId = sessionStorage.getItem('ics_session_id')
+    const savedId = getConversationSessionId(userId)
     const restore = savedId
       ? getSession(savedId).catch(() => createSession())
       : createSession()
@@ -175,7 +188,7 @@ export default function ChatPanel({
         if (cancelled) return
         setSessionId(data.session_id)
         dispatch({ type: 'replace_state', state: data.form_state })
-        sessionStorage.setItem('ics_session_id', data.session_id)
+        setConversationSessionId(userId, data.session_id)
         if (data.messages?.length) {
           setMessages(data.messages.map(toChatMessage))
           setFinished(data.form_complete ?? false)
@@ -189,7 +202,7 @@ export default function ChatPanel({
       })
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
-  }, [dispatch])
+  }, [dispatch, userId])
 
   useEffect(() => {
     const el = scrollRef.current
@@ -538,7 +551,12 @@ export default function ChatPanel({
             <MessageBubble key={m.id} role={m.role} text={m.text} aiAvatarSrc="/logo.svg">
               {m.role === 'ai' ? (
                 <div className="prose-chat" aria-live={m.partial ? 'polite' : undefined}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={CHAT_MARKDOWN_COMPONENTS}
+                  >
+                    {m.text}
+                  </ReactMarkdown>
                   {m.interrupted && <p className="mt-2 text-xs text-muted">回复未完成</p>}
                 </div>
               ) : (
@@ -571,7 +589,12 @@ export default function ChatPanel({
               {actionError}
             </div>
           )}
-          {finished && !ended && (
+          {finished && !ended && userRole === 'guest' && (
+            <div className="text-done text-xs text-center mt-2">
+              ✓ 简约体验已完成，可点击右上角客户需求表查看结果；登录或注册正式账号可体验订单提交等完整功能
+            </div>
+          )}
+          {finished && !ended && userRole !== 'guest' && (
             <div className="text-done text-xs text-center mt-2">
               ✓ 必填信息已采集完成，请查看右上角客户需求表，确认后发送订单
             </div>

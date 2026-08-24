@@ -11,6 +11,7 @@ from agent.loop import (
     _apply_image_invitation,
     _apply_deterministic_price_range,
     _apply_deterministic_reference_link,
+    _apply_deterministic_current_answer,
     _skip_unknown_equipment_inventory,
     _build_system_prompt,
     _correct_premature_completion,
@@ -20,8 +21,56 @@ from agent.loop import (
     run_agent_stream,
 )
 
-BRAND_COLLECTION_REPLY = '收到，我理解您的情况。请问您的品牌或公司名称是什么？'
-CONTACT_COLLECTION_REPLY = '收到，我理解您的情况。方便留下您的姓名和联系电话吗？'
+BRAND_COLLECTION_REPLY = (
+    '收到，我理解您的情况。请问您的品牌或公司名称是什么？\n\n'
+    '填写说明：用于方案标题与正式归档，是生成专属方案的核心标识'
+)
+
+
+def test_natural_yes_answer_advances_yes_no_field_without_llm_guessing():
+    state = create_initial_state()
+    field = next(
+        item for item in SECTION_BY_ID['status'].fields
+        if item.id == 'has_room'
+    )
+
+    with patch('agent.loop.flow.next_question_field', return_value=('status', field)):
+        events = _apply_deterministic_current_answer(state, '有')
+
+    assert state.sections['status'].fields['has_room'].value == 'yes'
+    assert [(event.kind, event.field_id) for event in events] == [('fill', 'has_room')]
+
+
+def test_natural_no_more_answer_skips_current_optional_field():
+    state = create_initial_state()
+    field = next(
+        item for item in SECTION_BY_ID['goal'].fields
+        if item.id == 'other'
+    )
+
+    with patch('agent.loop.flow.next_question_field', return_value=('goal', field)):
+        events = _apply_deterministic_current_answer(state, '我说不需要补充了')
+
+    assert 'goal.other' in state.skipped_field_ids
+    assert [(event.kind, event.field_id) for event in events] == [('skip', 'other')]
+
+
+def test_custom_multi_answer_is_preserved_and_advances():
+    state = create_initial_state()
+    field = next(
+        item for item in SECTION_BY_ID['status'].fields
+        if item.id == 'pain_points'
+    )
+
+    with patch('agent.loop.flow.next_question_field', return_value=('status', field)):
+        events = _apply_deterministic_current_answer(state, '想要优化')
+
+    assert state.sections['status'].fields['pain_points'].value == ['想要优化']
+    assert [(event.kind, event.field_id) for event in events] == [('fill', 'pain_points')]
+CONTACT_COLLECTION_REPLY = (
+    '收到，我理解您的情况。方便留下您的姓名和联系电话吗？\n\n'
+    '填写说明：方便我们后续对接方案细节，确保能第一时间给到您完整的方案内容'
+)
 
 
 def test_benchmark_link_is_saved_deterministically():

@@ -40,6 +40,7 @@ interface SpeechRecognitionLike {
     | ((event: SpeechErrorEventLike) => void)
     | null
   onend: (() => void) | null
+  onstart: (() => void) | null
   start: () => void
   stop: () => void
   abort: () => void
@@ -137,6 +138,9 @@ export function useSpeechRecognition({
   const restartTimerRef = useRef<number | null>(null)
   const retryCountRef = useRef(0)
   const unexpectedEndCountRef = useRef(0)
+  const startupTimerRef = useRef<number | null>(null)
+  const committedTranscriptRef = useRef('')
+  const cycleTranscriptRef = useRef('')
 
   useEffect(() => {
     onTranscriptRef.current = onTranscript
@@ -150,6 +154,11 @@ export function useSpeechRecognition({
       if (restartTimerRef.current !== null) {
         window.clearTimeout(restartTimerRef.current)
         restartTimerRef.current = null
+      }
+
+      if (startupTimerRef.current !== null) {
+        window.clearTimeout(startupTimerRef.current)
+        startupTimerRef.current = null
       }
 
       recognitionRef.current?.abort()
@@ -168,6 +177,11 @@ export function useSpeechRecognition({
     if (restartTimerRef.current !== null) {
       window.clearTimeout(restartTimerRef.current)
       restartTimerRef.current = null
+    }
+
+    if (startupTimerRef.current !== null) {
+      window.clearTimeout(startupTimerRef.current)
+      startupTimerRef.current = null
     }
 
     const recognition = recognitionRef.current
@@ -200,7 +214,8 @@ export function useSpeechRecognition({
     shouldListenRef.current = true
     retryCountRef.current = 0
     unexpectedEndCountRef.current = 0
-    setListening(true)
+    committedTranscriptRef.current = ''
+    cycleTranscriptRef.current = ''
 
     const scheduleRestart = (
       startRecognition: () => void,
@@ -231,6 +246,15 @@ export function useSpeechRecognition({
       recognition.interimResults = true
       recognition.maxAlternatives = 1
 
+      recognition.onstart = () => {
+        if (recognitionRef.current !== recognition) return
+        if (startupTimerRef.current !== null) {
+          window.clearTimeout(startupTimerRef.current)
+          startupTimerRef.current = null
+        }
+        setListening(true)
+      }
+
       recognition.onresult = (event) => {
         if (recognitionRef.current !== recognition) {
           return
@@ -252,9 +276,11 @@ export function useSpeechRecognition({
           )
         }
 
-        onTranscriptRef.current(
-          transcript.trim(),
-        )
+        cycleTranscriptRef.current = transcript.trim()
+        onTranscriptRef.current([
+          committedTranscriptRef.current,
+          cycleTranscriptRef.current,
+        ].filter(Boolean).join(' '))
       }
 
       recognition.onerror = (event) => {
@@ -270,6 +296,10 @@ export function useSpeechRecognition({
         }
 
         recognitionRef.current = null
+        if (startupTimerRef.current !== null) {
+          window.clearTimeout(startupTimerRef.current)
+          startupTimerRef.current = null
+        }
 
         const retryable = (
           event.error === 'network'
@@ -279,9 +309,17 @@ export function useSpeechRecognition({
         if (
           retryable
           && shouldListenRef.current
-          && retryCountRef.current < 1
+          && retryCountRef.current < 2
         ) {
+          if (cycleTranscriptRef.current) {
+            committedTranscriptRef.current = [
+              committedTranscriptRef.current,
+              cycleTranscriptRef.current,
+            ].filter(Boolean).join(' ')
+            cycleTranscriptRef.current = ''
+          }
           retryCountRef.current += 1
+          recognition.abort()
           scheduleRestart(
             startRecognition,
             600,
@@ -305,6 +343,10 @@ export function useSpeechRecognition({
         }
 
         recognitionRef.current = null
+        if (startupTimerRef.current !== null) {
+          window.clearTimeout(startupTimerRef.current)
+          startupTimerRef.current = null
+        }
 
         if (!shouldListenRef.current) {
           setListening(false)
@@ -313,9 +355,17 @@ export function useSpeechRecognition({
 
         unexpectedEndCountRef.current += 1
 
+        if (cycleTranscriptRef.current) {
+          committedTranscriptRef.current = [
+            committedTranscriptRef.current,
+            cycleTranscriptRef.current,
+          ].filter(Boolean).join(' ')
+          cycleTranscriptRef.current = ''
+        }
+
         if (
           unexpectedEndCountRef.current
-          <= 2
+          <= 3
         ) {
           scheduleRestart(
             startRecognition,
@@ -335,6 +385,14 @@ export function useSpeechRecognition({
 
       try {
         recognition.start()
+        startupTimerRef.current = window.setTimeout(() => {
+          if (recognitionRef.current !== recognition) return
+          recognitionRef.current = null
+          shouldListenRef.current = false
+          recognition.abort()
+          setListening(false)
+          onErrorRef.current('麦克风启动超时，请检查浏览器权限后重试')
+        }, 5000)
       } catch {
         recognitionRef.current = null
         shouldListenRef.current = false
