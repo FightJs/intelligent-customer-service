@@ -5,7 +5,10 @@ import ChatPanel, {
   suggestionMatchesReply,
   toolEventStatus,
 } from '../src/components/ChatPanel/ChatPanel'
-import { suggestionOptionUpdate } from '../src/components/ChatPanel/suggestionUpdate'
+import {
+  suggestionOptionUpdate,
+  suggestionOptionsUpdate,
+} from '../src/components/ChatPanel/suggestionUpdate'
 import { FormProvider } from '../src/state/FormContext'
 import { createInitialState } from '../src/state/initialState'
 import { createSession, getSession, skipCurrentQuestion } from '../src/api/client'
@@ -334,7 +337,7 @@ describe('ChatPanel 语音输入', () => {
     delete speechWindow.webkitSpeechRecognition
     renderPanel()
     const button = await screen.findByRole('button', { name: '开始语音输入' })
-    expect(button).toBeEnabled()
+    await waitFor(() => expect(button).toBeEnabled())
     fireEvent.click(button)
     expect(await screen.findByRole('alert')).toHaveTextContent('当前浏览器不支持语音输入')
   })
@@ -370,6 +373,16 @@ describe('suggestionOptionUpdate', () => {
     expect(suggestionOptionUpdate({
       section_id: 'status', field_id: 'has_room', options: [{ label: '有', value: 'yes' }],
     }, { label: '有', value: 'yes' }).value).toBe('yes')
+  })
+
+  it('多选快捷项可以一次提交多个选项', () => {
+    const options = [
+      { label: '主理人（老板）', value: 'owner' },
+      { label: '主播', value: 'host' },
+    ]
+    expect(suggestionOptionsUpdate({
+      section_id: 'customer', field_id: 'identity', options,
+    }, options).value).toEqual(['owner', 'host'])
   })
 })
 

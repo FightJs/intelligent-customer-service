@@ -142,7 +142,8 @@ def test_guest_login_creates_quick_session(client):
 
     form_state = session_response.json()['form_state']
     assert form_state['mode'] == 'quick'
-    assert len(form_state['requiredFieldIds']) == 12
+    assert len(form_state['requiredFieldIds']) == 13
+    assert 'customer.identity' in form_state['requiredFieldIds']
 
 
 def test_guest_cannot_submit_order(client):
@@ -536,6 +537,7 @@ def test_skip_endpoint_enforces_schema_permissions(client, auth_headers):
     state = from_dict(rec['form_state'])
     customer = state.sections['customer'].fields
     customer['brand'].value = '云裳'
+    customer['identity'].value = ['owner']
     customer['contact'].value = '张女士'
     customer['phone'].value = '13800000000'
     customer['source'].value = 'douyin'

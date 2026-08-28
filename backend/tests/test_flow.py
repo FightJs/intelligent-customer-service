@@ -19,6 +19,7 @@ from survey.state import create_initial_state
 def _advance_to_industry(state):
     customer = state.sections['customer'].fields
     customer['brand'].value = '云裳'
+    customer['identity'].value = ['owner']
     customer['contact'].value = '张女士'
     customer['phone'].value = '13800000000'
     customer['source'].value = 'douyin'
@@ -68,6 +69,8 @@ def test_empty_state_starts_from_brand():
 def test_progress_advances_in_template_order():
     state = create_initial_state()
     state.sections['customer'].fields['brand'].value = '云裳'
+    assert next_question_field(state)[1].id == 'identity'
+    state.sections['customer'].fields['identity'].value = ['owner', 'host']
     assert next_question_field(state)[1].id == 'contact'
 
 
@@ -139,7 +142,7 @@ def test_equipment_module_visibility_does_not_break_question_order():
     state.sections['budget'].fields['has_existing'].value = 'yes'
     assert is_section_visible(state, equipment)
     assert next_question_field(state)[1].id == 'brand'
-    assert overall_progress(state) == (1, 23)
+    assert overall_progress(state) == (1, 24)
 
     state.sections['budget'].fields['has_existing'].value = 'no'
     assert not is_section_visible(state, equipment)
@@ -171,8 +174,18 @@ def test_no_existing_equipment_continues_normal_question_order():
 
 
 def test_progress_counts_match_final_template():
-    assert overall_progress(create_initial_state()) == (0, 23)
-    assert overall_progress(create_initial_state(mode='quick')) == (0, 12)
+    assert overall_progress(create_initial_state()) == (0, 24)
+    assert overall_progress(create_initial_state(mode='quick')) == (0, 13)
+
+
+def test_identity_follows_brand_in_full_and_quick_modes():
+    for mode in ('full', 'quick'):
+        state = create_initial_state(mode=mode)
+        state.sections['customer'].fields['brand'].value = '云裳'
+
+        current = next_question_field(state)
+
+        assert (current[0], current[1].id) == ('customer', 'identity')
 
 
 def test_only_explicit_fields_and_modules_can_skip():

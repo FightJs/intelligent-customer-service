@@ -428,3 +428,21 @@ def test_fill_fields_writes_host_profile_text():
         'profile'
     ].value == '男主播175cm，中等体型'
     assert '失败' not in msg
+
+
+def test_fill_fields_writes_multiple_customer_identities_from_labels():
+    state = create_initial_state()
+
+    msg, ok = execute_tool('fill_fields', {
+        'updates': [{
+            'section_id': 'customer',
+            'field_id': 'identity',
+            'value': ['主理人（老板）', '主播'],
+        }],
+    }, state)
+
+    assert ok
+    assert state.sections['customer'].fields['identity'].value == [
+        'owner', 'host',
+    ]
+    assert '失败' not in msg

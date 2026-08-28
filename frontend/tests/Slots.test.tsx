@@ -118,7 +118,7 @@ describe('DeliverableSlot', () => {
       </FormProvider>,
     )
 
-    expect(screen.getByText(/必填信息 0\/23/)).toBeInTheDocument()
+    expect(screen.getByText(/必填信息 0\/24/)).toBeInTheDocument()
     expect(screen.getByText(/进度仅统计必填信息/)).toBeInTheDocument()
   })
 

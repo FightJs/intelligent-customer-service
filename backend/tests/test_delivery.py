@@ -108,6 +108,20 @@ def test_filled_only_word_preview_excludes_empty_section_titles():
     assert '四、场地条件信息' not in paragraphs
 
 
+def test_customer_identity_uses_chinese_labels_in_delivery_preview():
+    state = create_initial_state()
+    state.sections['customer'].fields['identity'].value = ['owner', 'host']
+
+    data = build_render_data(state, filled_only=True)
+    identity = next(
+        field
+        for field in data['sections'][0]['fields']
+        if field['label'] == '客户身份'
+    )
+
+    assert identity['value'] == '主理人（老板）、主播'
+
+
 def test_filled_only_preview_keeps_full_required_progress_denominator():
     state = create_initial_state()
     customer = state.sections['customer'].fields
@@ -124,4 +138,4 @@ def test_filled_only_preview_keeps_full_required_progress_denominator():
 
     data = build_render_data(state, filled_only=True)
 
-    assert data['progress'] == {'filled': 9, 'total': 23, 'pct': 39}
+    assert data['progress'] == {'filled': 9, 'total': 24, 'pct': 38}

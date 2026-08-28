@@ -14,12 +14,16 @@ describe('reducer', () => {
 
   it('update_field 填完必填后该节 status 变 complete', () => {
     let s = createInitialState()
-    // customer 必填：brand / contact / phone / source
+    // customer 必填：brand / identity / contact / phone / source
     s = reducer(s, {
       type: 'update_field', sectionId: 'customer', fieldId: 'brand',
       value: { type: 'text', value: '云裳' },
     })
     expect(s.sections.customer.status).toBe('active')
+    s = reducer(s, {
+      type: 'update_field', sectionId: 'customer', fieldId: 'identity',
+      value: { type: 'choice-multi', value: ['owner', 'host'] },
+    })
     s = reducer(s, {
       type: 'update_field', sectionId: 'customer', fieldId: 'contact',
       value: { type: 'text', value: '张三' },

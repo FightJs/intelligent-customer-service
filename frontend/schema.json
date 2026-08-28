@@ -19,6 +19,34 @@
           "helpText": "填写说明：用于方案标题与正式归档，是生成专属方案的核心标识。"
         },
         {
+          "id": "identity",
+          "label": "客户身份",
+          "type": "choice-multi",
+          "required": true,
+          "question": "请问您的身份是？主理人（老板）、主播、运营、其他，可多选。",
+          "skippable": false,
+          "askInFull": true,
+          "options": [
+            {
+              "value": "owner",
+              "label": "主理人（老板）"
+            },
+            {
+              "value": "host",
+              "label": "主播"
+            },
+            {
+              "value": "operator",
+              "label": "运营"
+            },
+            {
+              "value": "other",
+              "label": "其他"
+            }
+          ],
+          "helpText": "填写说明：可按实际职责多选，方便我们从对应使用视角整理方案。"
+        },
+        {
           "id": "contact",
           "label": "姓名",
           "type": "text",

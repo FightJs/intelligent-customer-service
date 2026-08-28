@@ -30,7 +30,7 @@ import type {
 import { SECTIONS } from '../../data/sections'
 import MessageBubble from './MessageBubble'
 import QuickChips from './QuickChips'
-import { suggestionOptionUpdate } from './suggestionUpdate'
+import { suggestionOptionsUpdate } from './suggestionUpdate'
 import {
   getConversationSessionId,
   setConversationSessionId,
@@ -453,9 +453,23 @@ export default function ChatPanel({
   const quickOptions = suggestion && suggestionMatchesReply(suggestion, latestReply)
     ? suggestion.options
     : []
+  const suggestionField = suggestion
+    ? SECTIONS
+        .find((section) => section.id === suggestion.section_id)
+        ?.fields.find((field) => field.id === suggestion.field_id)
+    : undefined
+  const quickOptionsAreMulti = suggestionField?.type === 'choice-multi'
   const pickQuickOption = useCallback((option: SuggestionOption) => {
     if (!suggestion) return
-    sendMessage(option.label, [suggestionOptionUpdate(suggestion, option)], undefined)
+    sendMessage(option.label, [suggestionOptionsUpdate(suggestion, [option])], undefined)
+  }, [sendMessage, suggestion])
+  const pickQuickOptions = useCallback((options: SuggestionOption[]) => {
+    if (!suggestion || options.length === 0) return
+    sendMessage(
+      options.map((option) => option.label).join('、'),
+      [suggestionOptionsUpdate(suggestion, options)],
+      undefined,
+    )
   }, [sendMessage, suggestion])
 
   const currentSection = SECTIONS.find((section) => (
@@ -607,8 +621,11 @@ export default function ChatPanel({
         </div>
         <div className="p-3 flex flex-col gap-2">
           <QuickChips
+            key={suggestion ? `${suggestion.section_id}.${suggestion.field_id}` : 'none'}
             options={quickOptions}
             onPick={pickQuickOption}
+            onPickMany={pickQuickOptions}
+            multiple={quickOptionsAreMulti}
             disabled={sending || loading || listening || actionLoading || ended}
           />
 

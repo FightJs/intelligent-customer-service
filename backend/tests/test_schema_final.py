@@ -1,5 +1,10 @@
 """最终确认版调研模板的结构快照。"""
-from survey.schema_def import SECTION_BY_ID, SECTION_ORDER, SECTIONS
+from survey.schema_def import (
+    QUICK_REQUIRED_FIELD_IDS,
+    SECTION_BY_ID,
+    SECTION_ORDER,
+    SECTIONS,
+)
 
 
 def test_final_questionnaire_section_order_and_removed_internal_section():
@@ -16,6 +21,25 @@ def test_final_template_removed_obsolete_fields_and_added_benchmark():
     assert not {'shape', 'wall_color', 'floor', 'power'} & {
         field.id for field in SECTION_BY_ID['venue'].fields
     }
+
+
+def test_customer_identity_is_required_multi_choice_in_both_modes():
+    identity = next(
+        field
+        for field in SECTION_BY_ID['customer'].fields
+        if field.id == 'identity'
+    )
+
+    assert identity.type == 'choice-multi'
+    assert identity.required
+    assert not identity.skippable
+    assert 'customer.identity' in QUICK_REQUIRED_FIELD_IDS
+    assert [(option.value, option.label) for option in identity.options] == [
+        ('owner', '主理人（老板）'),
+        ('host', '主播'),
+        ('operator', '运营'),
+        ('other', '其他'),
+    ]
     assert not {'skin', 'hair', 'photo', 'height'} & {
         field.id for field in SECTION_BY_ID['host'].fields
     }

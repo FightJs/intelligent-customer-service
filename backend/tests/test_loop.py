@@ -67,9 +67,9 @@ def test_custom_multi_answer_is_preserved_and_advances():
 
     assert state.sections['status'].fields['pain_points'].value == ['想要优化']
     assert [(event.kind, event.field_id) for event in events] == [('fill', 'pain_points')]
-CONTACT_COLLECTION_REPLY = (
-    '收到，我理解您的情况。方便留下您的姓名和联系电话吗？\n\n'
-    '填写说明：方便我们后续对接方案细节，确保能第一时间给到您完整的方案内容'
+IDENTITY_COLLECTION_REPLY = (
+    '收到，我理解您的情况。请问您的身份是？主理人（老板）、主播、运营、其他，可多选。\n\n'
+    '填写说明：可按实际职责多选，方便我们从对应使用视角整理方案'
 )
 
 
@@ -267,7 +267,7 @@ def test_run_agent_extraction_pass_recovers_missed_fill(mock_get_client):
     state = create_initial_state()
     result = run_agent(state, '我们品牌叫云裳')
 
-    assert result.reply == CONTACT_COLLECTION_REPLY
+    assert result.reply == IDENTITY_COLLECTION_REPLY
     assert state.sections['customer'].fields['brand'].value == '云裳'
     assert len(result.tool_events) == 1
     assert result.tool_events[0].field_id == 'brand'
@@ -570,7 +570,7 @@ def test_run_agent_fast_path_text_with_fill(mock_get_client):
     state = create_initial_state()
     result = run_agent(state, '品牌叫云裳')
 
-    assert result.reply == CONTACT_COLLECTION_REPLY
+    assert result.reply == IDENTITY_COLLECTION_REPLY
     assert state.sections['customer'].fields['brand'].value == '云裳'
     assert len(result.tool_events) == 1
     assert result.tool_events[0].kind == 'fill'
@@ -615,7 +615,7 @@ def test_run_agent_fill_fields_then_reply(mock_get_client):
 
     state = create_initial_state()
     result = run_agent(state, '品牌叫云裳')
-    assert result.reply == CONTACT_COLLECTION_REPLY
+    assert result.reply == IDENTITY_COLLECTION_REPLY
     assert len(result.tool_events) == 1
     assert result.tool_events[0].kind == 'fill'
     assert result.tool_events[0].field_id == 'brand'

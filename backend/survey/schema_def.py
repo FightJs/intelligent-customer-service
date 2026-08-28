@@ -83,6 +83,7 @@ class SectionDef(BaseModel):
 
 QUICK_REQUIRED_FIELD_IDS = [
     'customer.brand',
+    'customer.identity',
     'industry.category',
     'industry.subcategory',
     'industry.price_band',
@@ -152,6 +153,13 @@ _CUSTOMER_SOURCE = [
     OptionDef(value='douyin', label='抖音直播'),
     OptionDef(value='ads', label='信息流广告'),
     OptionDef(value='referral', label='朋友推荐'),
+    OptionDef(value='other', label='其他'),
+]
+
+_CUSTOMER_IDENTITY = [
+    OptionDef(value='owner', label='主理人（老板）'),
+    OptionDef(value='host', label='主播'),
+    OptionDef(value='operator', label='运营'),
     OptionDef(value='other', label='其他'),
 ]
 
@@ -353,6 +361,12 @@ SECTIONS: list[SectionDef] = [
                 id='brand', label='品牌/公司名称', question='请问您的品牌或公司名称是什么？',
                 type='text', required=True, placeholder='如：云裳',
                 help_text='填写说明：用于方案标题与正式归档，是生成专属方案的核心标识。',
+            ),
+            FieldDef(
+                id='identity', label='客户身份',
+                question='请问您的身份是？主理人（老板）、主播、运营、其他，可多选。',
+                type='choice-multi', required=True, options=_CUSTOMER_IDENTITY,
+                help_text='填写说明：可按实际职责多选，方便我们从对应使用视角整理方案。',
             ),
             FieldDef(
                 id='contact', label='姓名', question='方便留下您的姓名和联系电话吗？',
