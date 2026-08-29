@@ -1,6 +1,6 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
 import { fireEvent, render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CenterCard from '../src/components/CenterCard/CenterCard'
 import { ZStackProvider } from '../src/hooks/useZStack'
 
@@ -70,5 +70,31 @@ describe('CenterCard', () => {
     fireEvent.focus(input)
 
     expect(Number.parseInt(card.style.zIndex, 10)).toBeGreaterThan(initialZ)
+  })
+
+  describe('触屏设备', () => {
+    function mockCoarsePointer() {
+      window.matchMedia = vi.fn((query: string) => ({
+        matches: query === '(pointer: coarse)',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })) as unknown as typeof window.matchMedia
+    }
+
+    afterEach(() => {
+      delete (window as Partial<Window>).matchMedia
+    })
+
+    it('禁用拖拽缩放并铺满容器', () => {
+      mockCoarsePointer()
+
+      const { container } = render(<CenterCard />)
+      const card = container.querySelector('[data-center-card]') as HTMLElement
+
+      expect(container.querySelector('[data-resize-handle]')).toBeNull()
+      expect(card.style.width).toBe('100%')
+      expect(card.style.height).toBe('100%')
+      expect(card.style.transform).toBe('')
+    })
   })
 })

@@ -13,6 +13,7 @@ import {
 import {
   useSpeechRecognition,
 } from '../../hooks/useSpeechRecognition'
+import { useCoarsePointer } from '../../hooks/useCoarsePointer'
 import { useFormState } from '../../state/FormContext'
 import { createSession, getSession, chat, skipCurrentQuestion } from '../../api/client'
 import type { FieldUpdate, SessionMessage, Suggestion, SuggestionOption } from '../../api/client'
@@ -402,23 +403,46 @@ export default function ChatPanel({
     setImages((prev) => prev.filter((_, i) => i !== index))
   }, [])
 
-  const toggleSpeechInput = useCallback(() => {
+  const coarsePointer = useCoarsePointer()
+  const voiceHoldRef = useRef(false)
+
+  const beginSpeechInput = useCallback(() => {
     setSpeechError('')
-
-    if (listening) {
-      stopListening()
-      draftRef.current?.focus()
-      return
-    }
-
     speechBaseRef.current = draft.trimEnd()
     startListening()
-  }, [
-    draft,
-    listening,
-    startListening,
-    stopListening,
-  ])
+  }, [draft, startListening])
+
+  const endSpeechInput = useCallback(() => {
+    stopListening()
+    draftRef.current?.focus()
+  }, [stopListening])
+
+  const toggleSpeechInput = useCallback(() => {
+    if (listening) {
+      endSpeechInput()
+      return
+    }
+    beginSpeechInput()
+  }, [listening, beginSpeechInput, endSpeechInput])
+
+  // 触屏端按住说话：按下开始、松开/取消停止；click 全部忽略，
+  // 避免按住结束后浏览器补发的 click 误触 toggle。
+  const handleVoicePointerDown = useCallback(() => {
+    if (!coarsePointer || listening) return
+    voiceHoldRef.current = true
+    beginSpeechInput()
+  }, [coarsePointer, listening, beginSpeechInput])
+
+  const handleVoicePointerEnd = useCallback(() => {
+    if (!voiceHoldRef.current) return
+    voiceHoldRef.current = false
+    endSpeechInput()
+  }, [endSpeechInput])
+
+  const handleVoiceClick = useCallback(() => {
+    if (coarsePointer) return
+    toggleSpeechInput()
+  }, [coarsePointer, toggleSpeechInput])
 
   useEffect(() => {
     if (!onPetActivityChange) return
@@ -698,7 +722,9 @@ export default function ChatPanel({
                 }}
                 placeholder={
                   listening
-                    ? '正在聆听，请再次点击麦克风结束…'
+                    ? coarsePointer
+                      ? '正在聆听，松开结束…'
+                      : '正在聆听，请再次点击麦克风结束…'
                     : sending
                       ? `${streamStatus ?? '正在处理'}，请稍候…`
                       : '输入您的回答…'
@@ -783,7 +809,10 @@ export default function ChatPanel({
 
             <button
               type="button"
-              onClick={toggleSpeechInput}
+              onClick={handleVoiceClick}
+              onPointerDown={handleVoicePointerDown}
+              onPointerUp={handleVoicePointerEnd}
+              onPointerCancel={handleVoicePointerEnd}
               disabled={
                 loading
                 || sending
@@ -795,17 +824,17 @@ export default function ChatPanel({
                 }`
               }
               aria-label={
-                listening
-                  ? '停止语音输入'
-                  : '开始语音输入'
+                coarsePointer
+                  ? (listening ? '松开停止' : '按住说话')
+                  : (listening ? '停止语音输入' : '开始语音输入')
               }
               aria-pressed={listening}
               title={
                 !speechSupported
                   ? '当前浏览器不支持语音输入'
-                  : listening
-                    ? '停止语音输入'
-                    : '开始语音输入'
+                  : coarsePointer
+                    ? (listening ? '松开停止' : '按住说话')
+                    : (listening ? '停止语音输入' : '开始语音输入')
               }
             >
               {listening ? (
@@ -879,7 +908,7 @@ export default function ChatPanel({
               className="voice-input-status"
               aria-live="polite"
             >
-              正在收音，再次点击结束
+              {coarsePointer ? '正在收音，松开结束' : '正在收音，再次点击结束'}
             </p>
           )}
 

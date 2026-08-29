@@ -38,7 +38,7 @@ export default function TopBar({
 
   return (
     <>
-      <header className="top-bar h-12 flex items-center px-5 gap-3.5 bg-transparent">
+      <header className="top-bar h-11 flex items-center px-3 gap-2 bg-transparent sm:h-12 sm:px-5 sm:gap-3.5">
         <div className="group relative shrink-0">
           <div
             className={`w-9 h-9 rounded-full bg-base p-0.5 cursor-pointer transition ${avatarClass}`}

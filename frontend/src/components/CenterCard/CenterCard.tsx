@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { useCoarsePointer } from '../../hooks/useCoarsePointer'
 import { useDraggable } from '../../hooks/useDraggable'
 import { useResizable } from '../../hooks/useResizable'
 import { useZStack } from '../../hooks/useZStack'
@@ -73,6 +74,7 @@ export default function CenterCard({ resetToken = 0, children }: CenterCardProps
   })
   // 主对话框默认高于左侧进度卡，避免输入区被覆盖后无法点击；其他卡片仍可通过交互置顶。
   const { z, bringToFront } = useZStack({ id: 'center', defaultZ: 40 })
+  const coarsePointer = useCoarsePointer()
 
   const restoreInitialLayout = useCallback(() => {
     resetPosition(initialPosition())
@@ -91,19 +93,21 @@ export default function CenterCard({ resetToken = 0, children }: CenterCardProps
       onMouseDown={bringToFront}
       onFocusCapture={bringToFront}
       className={`center-card flex flex-col overflow-hidden rounded-xl bg-surface/95 backdrop-blur-md shadow-2xl${dragging || resizing ? ' is-interacting' : ''}`}
-      style={{
-        inset: 0,
-        width: size.w,
-        height: size.h,
-        transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`,
-        zIndex: z,
-        opacity: dragging || resizing ? 0.9 : 1,
-      }}
+      style={coarsePointer
+        ? { inset: 0, width: '100%', height: '100%', zIndex: z }
+        : {
+            inset: 0,
+            width: size.w,
+            height: size.h,
+            transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`,
+            zIndex: z,
+            opacity: dragging || resizing ? 0.9 : 1,
+          }}
     >
       <div
         data-card-handle
-        onMouseDown={onDragStart}
-        className="flex cursor-move items-center px-3 py-0 group"
+        onMouseDown={coarsePointer ? undefined : onDragStart}
+        className={`flex ${coarsePointer ? 'cursor-default' : 'cursor-move'} items-center px-3 py-0 group`}
       >
         <div className="flex-1" aria-hidden="true" />
         <button
@@ -125,11 +129,13 @@ export default function CenterCard({ resetToken = 0, children }: CenterCardProps
             内容占位（ChatPanel 将传入）
           </div>
         )}
-        <div
-          data-resize-handle
-          onMouseDown={onResizeStart}
-          className="center-card-resize-handle"
-        />
+        {!coarsePointer && (
+          <div
+            data-resize-handle
+            onMouseDown={onResizeStart}
+            className="center-card-resize-handle"
+          />
+        )}
       </div>
     </div>
   )

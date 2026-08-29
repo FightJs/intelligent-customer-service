@@ -573,6 +573,9 @@ html.theme-transition #root * {
   background: rgb(var(--color-surface));
   color: rgb(var(--color-secondary));
   cursor: pointer;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
   transition:
     color .18s ease,
     border-color .18s ease,
@@ -1015,6 +1018,24 @@ html.theme-transition #root * {
 @media (max-width: 900px) {
   .workbench-stage { grid-template-columns: minmax(240px, .7fr) minmax(0, 1fr); }
   .workbench-slots { display: none; }
+}
+
+@media (max-width: 640px) {
+  .workbench-stage {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  }
+
+  .workbench-pet-zone,
+  .workbench-slots {
+    display: none;
+  }
+
+  /* 防止 iOS 聚焦输入框时自动放大页面 */
+  .chat-input {
+    font-size: 16px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

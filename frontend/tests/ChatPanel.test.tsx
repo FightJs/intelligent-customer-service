@@ -1,6 +1,6 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ChatPanel, {
   suggestionMatchesReply,
   toolEventStatus,
@@ -391,5 +391,99 @@ describe('toolEventStatus', () => {
     expect(toolEventStatus('fill')).toBe('正在更新表单')
     expect(toolEventStatus('skip')).toBe('正在整理需求')
     expect(toolEventStatus('deliverable')).toBe('正在生成交付物')
+  })
+})
+
+describe('ChatPanel 按住说话（触屏）', () => {
+  function mockCoarsePointer() {
+    window.matchMedia = vi.fn((query: string) => ({
+      matches: query === '(pointer: coarse)',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })) as unknown as typeof window.matchMedia
+  }
+
+  afterEach(() => {
+    delete (window as Partial<Window>).matchMedia
+  })
+
+  it('按住开始识别、松开停止，残留 click 不重复触发', async () => {
+    mockCoarsePointer()
+
+    const recognitions: MockSpeechRecognition[] = []
+    class MockSpeechRecognition {
+      lang = ''
+      continuous = false
+      interimResults = false
+      maxAlternatives = 1
+      onresult: ((event: unknown) => void) | null = null
+      onerror: ((event: { error: string }) => void) | null = null
+      onend: (() => void) | null = null
+      onstart: (() => void) | null = null
+      start = vi.fn()
+      stop = vi.fn()
+      abort = vi.fn()
+      constructor() { recognitions.push(this) }
+    }
+    const speechWindow = window as typeof window & {
+      webkitSpeechRecognition?: new () => MockSpeechRecognition
+    }
+    speechWindow.webkitSpeechRecognition = MockSpeechRecognition
+
+    renderPanel()
+    await screen.findByPlaceholderText('输入您的回答…')
+
+    const button = screen.getByRole('button', { name: '按住说话' })
+
+    fireEvent.pointerDown(button)
+    expect(recognitions).toHaveLength(1)
+    expect(recognitions[0].start).toHaveBeenCalledTimes(1)
+
+    act(() => recognitions[0].onstart?.())
+    expect(screen.getByTestId('voice-listening-indicator')).toBeInTheDocument()
+
+    fireEvent.pointerUp(button)
+    expect(recognitions[0].stop).toHaveBeenCalledTimes(1)
+
+    // 触屏按住后浏览器会补发 click，绝不能当成 toggle 重新开始
+    fireEvent.click(button)
+    expect(recognitions).toHaveLength(1)
+
+    delete speechWindow.webkitSpeechRecognition
+  })
+
+  it('pointercancel 同样停止识别', async () => {
+    mockCoarsePointer()
+
+    const recognitions: MockSpeechRecognition[] = []
+    class MockSpeechRecognition {
+      lang = ''
+      continuous = false
+      interimResults = false
+      maxAlternatives = 1
+      onresult: ((event: unknown) => void) | null = null
+      onerror: ((event: { error: string }) => void) | null = null
+      onend: (() => void) | null = null
+      onstart: (() => void) | null = null
+      start = vi.fn()
+      stop = vi.fn()
+      abort = vi.fn()
+      constructor() { recognitions.push(this) }
+    }
+    const speechWindow = window as typeof window & {
+      webkitSpeechRecognition?: new () => MockSpeechRecognition
+    }
+    speechWindow.webkitSpeechRecognition = MockSpeechRecognition
+
+    renderPanel()
+    await screen.findByPlaceholderText('输入您的回答…')
+
+    const button = screen.getByRole('button', { name: '按住说话' })
+    fireEvent.pointerDown(button)
+    act(() => recognitions[0].onstart?.())
+    fireEvent.pointerCancel(button)
+    expect(recognitions[0].stop).toHaveBeenCalledTimes(1)
+
+    delete speechWindow.webkitSpeechRecognition
   })
 })
