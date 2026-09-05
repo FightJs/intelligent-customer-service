@@ -73,7 +73,33 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 LLM_BALANCE_ERROR = 'LLM 服务余额不足，请联系管理员充值后重试。'
+LLM_QUOTA_ERROR = 'LLM 本周使用额度已用完，请等待额度重置或联系管理员升级套餐。'
 LLM_CONNECTION_ERROR = 'LLM 服务暂时无法连接，请检查网络或联系管理员。'
+
+
+def _is_llm_quota_error(exc: APIStatusError) -> bool:
+    """识别 Kimi Coding 当前以 403 返回的周期用量上限。"""
+    if exc.status_code != 403 or not isinstance(exc.body, dict):
+        return False
+
+    error = exc.body.get('error')
+    if not isinstance(error, dict):
+        return False
+
+    message = error.get('message')
+    if not isinstance(message, str):
+        return False
+
+    normalized = message.lower()
+    return 'usage limit' in normalized and 'quota' in normalized
+
+
+def _llm_status_error_detail(exc: APIStatusError) -> str:
+    if exc.status_code == 402:
+        return LLM_BALANCE_ERROR
+    if _is_llm_quota_error(exc):
+        return LLM_QUOTA_ERROR
+    return '顾问暂时无法回复，请稍后重试。'
 
 
 def _get_owned_session(session_id: str, current: dict, action: str) -> dict:
@@ -672,10 +698,9 @@ def chat(
     try:
         result = run_agent(state, req.message, history, saved_images)
     except APIStatusError as exc:
-        if exc.status_code != 402:
-            raise
-        logger.warning('LLM chat unavailable because the account balance is insufficient')
-        raise HTTPException(status_code=503, detail=LLM_BALANCE_ERROR) from exc
+        detail = _llm_status_error_detail(exc)
+        logger.warning('LLM chat unavailable: upstream_status=%s', exc.status_code)
+        raise HTTPException(status_code=503, detail=detail) from exc
     except APIConnectionError as exc:
         logger.warning('LLM chat unavailable because the service cannot be reached')
         raise HTTPException(status_code=503, detail=LLM_CONNECTION_ERROR) from exc
@@ -860,9 +885,9 @@ async def chat_stream(
             db.fail_chat_request(request_id, 'stream_interrupted')
             raise
         except APIStatusError as exc:
-            if exc.status_code == 402:
+            if exc.status_code == 402 or _is_llm_quota_error(exc):
                 code = 'llm_balance_insufficient'
-                message = LLM_BALANCE_ERROR
+                message = _llm_status_error_detail(exc)
                 retryable = False
             else:
                 code = 'llm_unavailable'

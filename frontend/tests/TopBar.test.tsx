@@ -22,22 +22,24 @@ function renderBar(overrides: Partial<React.ComponentProps<typeof TopBar>> = {})
 describe('TopBar', () => {
   it('管理员头像使用中性描边和蓝色盾牌角标', () => {
     const { container } = renderBar({ role: 'admin' })
-    const avatar = container.querySelector('[role="button"][aria-label="管理员"]')
-    expect(avatar?.className).toContain('border-idle')
-    expect(avatar?.className).not.toContain('ring-done')
+    const avatar = screen.getByRole('button', { name: '管理员' })
+    expect(avatar.className).toContain('border-idle')
+    expect(avatar.className).not.toContain('ring-done')
     expect(container.querySelector('[data-admin-shield-badge]')).toBeInTheDocument()
   })
 
   it('头像环色按角色区分：user=accent(蓝)', () => {
-    const { container } = renderBar({ role: 'user' })
-    const avatar = container.querySelector('[role="button"][aria-label="普通用户"]')
-    expect(avatar?.className).toContain('ring-accent')
+    renderBar({ role: 'user' })
+    const avatar = screen.getByRole('button', { name: '普通用户' })
+    expect(avatar.className).toContain('ring-accent')
   })
 
-  it('右键头像弹出二级菜单', () => {
+  it('左键头像弹出二级菜单，右键不触发', () => {
     renderBar()
     const avatar = screen.getByRole('button', { name: '普通用户' })
     fireEvent.contextMenu(avatar)
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    fireEvent.click(avatar)
     expect(screen.getByRole('menu')).toBeInTheDocument()
     expect(screen.getByText('退出登录')).toBeInTheDocument()
     expect(screen.getByText(/切换到/)).toBeInTheDocument()
@@ -47,7 +49,7 @@ describe('TopBar', () => {
   it('菜单项点击触发回调并关闭', () => {
     const onLogout = vi.fn()
     renderBar({ onLogout })
-    fireEvent.contextMenu(screen.getByRole('button', { name: '普通用户' }))
+    fireEvent.click(screen.getByRole('button', { name: '普通用户' }))
     fireEvent.click(screen.getByText('退出登录'))
     expect(onLogout).toHaveBeenCalled()
     // 菜单关闭
@@ -56,8 +58,18 @@ describe('TopBar', () => {
 
   it('ESC 关闭菜单', () => {
     renderBar()
-    fireEvent.contextMenu(screen.getByRole('button', { name: '普通用户' }))
+    fireEvent.click(screen.getByRole('button', { name: '普通用户' }))
     fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('再次点击头像关闭菜单', () => {
+    renderBar()
+    const avatar = screen.getByRole('button', { name: '普通用户' })
+    fireEvent.click(avatar)
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+    fireEvent.pointerDown(avatar)
+    fireEvent.click(avatar)
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 

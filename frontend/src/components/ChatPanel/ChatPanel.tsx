@@ -14,6 +14,7 @@ import {
   useSpeechRecognition,
 } from '../../hooks/useSpeechRecognition'
 import { useCoarsePointer } from '../../hooks/useCoarsePointer'
+import { MOBILE_LAYOUT_QUERY, useMediaQuery } from '../../hooks/useMediaQuery'
 import { useFormState } from '../../state/FormContext'
 import { createSession, getSession, chat, skipCurrentQuestion } from '../../api/client'
 import type { FieldUpdate, SessionMessage, Suggestion, SuggestionOption } from '../../api/client'
@@ -404,45 +405,61 @@ export default function ChatPanel({
   }, [])
 
   const coarsePointer = useCoarsePointer()
-  const voiceHoldRef = useRef(false)
+  const mobileLayout = useMediaQuery(MOBILE_LAYOUT_QUERY)
+  const activeVoicePointerRef = useRef<number | null>(null)
 
-  const beginSpeechInput = useCallback(() => {
+  const beginSpeechInput = useCallback((preflightPermission = true) => {
     setSpeechError('')
     speechBaseRef.current = draft.trimEnd()
-    startListening()
+    startListening({ preflightPermission })
   }, [draft, startListening])
 
-  const endSpeechInput = useCallback(() => {
+  const endSpeechInput = useCallback((restoreDraftFocus: boolean) => {
     stopListening()
-    draftRef.current?.focus()
+    if (restoreDraftFocus) draftRef.current?.focus()
   }, [stopListening])
 
   const toggleSpeechInput = useCallback(() => {
     if (listening) {
-      endSpeechInput()
+      endSpeechInput(true)
       return
     }
     beginSpeechInput()
   }, [listening, beginSpeechInput, endSpeechInput])
 
-  // 触屏端按住说话：按下开始、松开/取消停止；click 全部忽略，
-  // 避免按住结束后浏览器补发的 click 误触 toggle。
-  const handleVoicePointerDown = useCallback(() => {
-    if (!coarsePointer || listening) return
-    voiceHoldRef.current = true
-    beginSpeechInput()
-  }, [coarsePointer, listening, beginSpeechInput])
+  // 触屏端按住说话：按下开始、松开/取消停止；忽略触摸补发的 click，
+  // 但保留键盘和辅助技术生成的无 detail 点击。
+  const handleVoicePointerDown = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!coarsePointer || activeVoicePointerRef.current !== null) return
+    activeVoicePointerRef.current = event.pointerId
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    // 移动浏览器要求语音识别在 pointerdown 的用户手势中同步启动。
+    // getUserMedia 的异步预检会丢失该手势，表现为按住后没有反应。
+    beginSpeechInput(false)
+  }, [coarsePointer, beginSpeechInput])
 
-  const handleVoicePointerEnd = useCallback(() => {
-    if (!voiceHoldRef.current) return
-    voiceHoldRef.current = false
-    endSpeechInput()
+  const handleVoicePointerEnd = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    if (activeVoicePointerRef.current !== event.pointerId) return
+    activeVoicePointerRef.current = null
+    endSpeechInput(false)
   }, [endSpeechInput])
 
-  const handleVoiceClick = useCallback(() => {
-    if (coarsePointer) return
+  const handleVoiceClick = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    if (coarsePointer && event.detail !== 0) return
     toggleSpeechInput()
   }, [coarsePointer, toggleSpeechInput])
+
+  useEffect(() => {
+    function stopWhenHidden() {
+      if (document.visibilityState === 'visible') return
+      if (activeVoicePointerRef.current === null) return
+      activeVoicePointerRef.current = null
+      endSpeechInput(false)
+    }
+
+    document.addEventListener('visibilitychange', stopWhenHidden)
+    return () => document.removeEventListener('visibilitychange', stopWhenHidden)
+  }, [endSpeechInput])
 
   useEffect(() => {
     if (!onPetActivityChange) return
@@ -661,7 +678,7 @@ export default function ChatPanel({
                   <button
                     type="button"
                     onClick={() => removeImage(i)}
-                    className="absolute -top-1.5 -right-1.5 grid h-4 w-4 place-items-center rounded-full bg-active-surface text-secondary opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="chat-image-remove absolute -top-1.5 -right-1.5 grid h-4 w-4 place-items-center rounded-full bg-active-surface text-secondary opacity-0 group-hover:opacity-100 transition-opacity"
                     aria-label="移除图片"
                   >
                     <X size={10} />
@@ -727,11 +744,13 @@ export default function ChatPanel({
                       : '正在聆听，请再次点击麦克风结束…'
                     : sending
                       ? `${streamStatus ?? '正在处理'}，请稍候…`
-                      : '输入您的回答…'
+                      : mobileLayout
+                        ? '输入回答…'
+                        : '输入您的回答…'
                 }
                 disabled={sending || loading || actionLoading || ended}
                 readOnly={listening}
-                className="chat-input block w-full resize-none rounded-bubble py-2.5 pl-3.5 pr-11 text-sm leading-5 text-primary placeholder:text-muted outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
+                className={`chat-input block w-full resize-none rounded-bubble py-2.5 pl-3.5 ${draft && !listening ? 'pr-11' : 'pr-3.5'} text-sm leading-5 text-primary placeholder:text-muted outline-none focus:ring-1 focus:ring-accent disabled:opacity-50`}
               />
 
               {draft && !listening && (
@@ -813,6 +832,10 @@ export default function ChatPanel({
               onPointerDown={handleVoicePointerDown}
               onPointerUp={handleVoicePointerEnd}
               onPointerCancel={handleVoicePointerEnd}
+              onLostPointerCapture={handleVoicePointerEnd}
+              onContextMenu={(event) => {
+                if (coarsePointer) event.preventDefault()
+              }}
               disabled={
                 loading
                 || sending

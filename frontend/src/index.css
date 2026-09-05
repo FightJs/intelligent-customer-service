@@ -74,6 +74,10 @@ body {
   flex-shrink: 0;
 }
 
+.mobile-workbench-actions {
+  display: none;
+}
+
 .top-bar-icon-button svg {
   transition: transform .18s cubic-bezier(.22, 1, .36, 1), filter .18s ease-out;
 }
@@ -440,10 +444,14 @@ html.theme-transition #root * {
 .word-preview-status { display: flex; height: 100%; align-items: center; justify-content: center; gap: 9px; color: rgb(var(--color-secondary)); font-size: 13px; }
 .word-preview-error { width: min(480px, calc(100% - 40px)); margin: 48px auto; color: rgb(var(--color-danger)); font-size: 13px; line-height: 1.6; text-align: center; }
 
-@media (max-width: 640px) {
+@media (max-width: 640px), (max-width: 900px) and (max-height: 500px) {
   .word-preview-backdrop { padding: 0; }
   .word-preview-modal { width: 100%; height: 100dvh; border: 0; border-radius: 0; }
-  .word-preview-header { padding-right: 10px; padding-left: 12px; }
+  .word-preview-header {
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-right: max(10px, env(safe-area-inset-right));
+    padding-left: max(12px, env(safe-area-inset-left));
+  }
   .word-preview-document .docx-wrapper { padding: 0; }
 }
 
@@ -1018,13 +1026,65 @@ html.theme-transition #root * {
 @media (max-width: 900px) {
   .workbench-stage { grid-template-columns: minmax(240px, .7fr) minmax(0, 1fr); }
   .workbench-slots { display: none; }
+
+  .admin-entry-button { display: none; }
+
+  .mobile-workbench-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 6px;
+    padding: 4px max(8px, env(safe-area-inset-right)) 6px max(8px, env(safe-area-inset-left));
+  }
+
+  .mobile-workbench-actions > button,
+  .mobile-workbench-actions > a {
+    display: inline-flex;
+    min-width: 0;
+    min-height: 38px;
+    flex: 1 1 0;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border: 1px solid rgb(var(--color-outline));
+    border-radius: 10px;
+    color: rgb(var(--color-secondary));
+    background: rgb(var(--color-surface));
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .mobile-workbench-actions > button.is-active,
+  .mobile-workbench-actions > button:focus-visible,
+  .mobile-workbench-actions > a:focus-visible {
+    border-color: rgb(var(--color-accent));
+    color: rgb(var(--color-accent));
+  }
+
+  .mobile-workbench-actions > button:disabled {
+    cursor: not-allowed;
+    opacity: .48;
+  }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 640px), (max-width: 900px) and (max-height: 500px) {
+  .top-bar {
+    height: calc(44px + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-left: max(12px, env(safe-area-inset-left));
+  }
+
+  .top-bar-title,
+  .top-bar-restore-button {
+    display: none;
+  }
+
   .workbench-stage {
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
-    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+    padding: 0 max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
   }
 
   .workbench-pet-zone,
@@ -1035,6 +1095,65 @@ html.theme-transition #root * {
   /* 防止 iOS 聚焦输入框时自动放大页面 */
   .chat-input {
     font-size: 16px;
+  }
+
+  .chat-scrollbar {
+    padding: 10px;
+  }
+
+  .message-bubble-wrap {
+    max-width: min(84%, calc(100% - 54px));
+  }
+
+  .message-copy {
+    width: 32px;
+    height: 32px;
+    opacity: .72;
+    pointer-events: auto;
+    transform: none;
+  }
+
+  .message-bubble-wrap.is-ai .message-copy { right: -32px; }
+  .message-bubble-wrap.is-user .message-copy { left: -32px; }
+
+  .chat-image-remove {
+    width: 32px;
+    height: 32px;
+    opacity: 1;
+  }
+
+  .order-modal-backdrop {
+    padding: 0;
+  }
+
+  .order-modal {
+    width: 100%;
+    max-height: 100dvh;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .order-modal-header {
+    padding: 16px;
+  }
+
+  .order-modal-body {
+    padding: 16px;
+  }
+
+  .order-modal-steps {
+    justify-content: space-between;
+    gap: 4px;
+    font-size: 10px;
+  }
+
+  .order-modal-step-group {
+    gap: 4px;
+  }
+
+  .order-modal-step-line {
+    width: 10px;
   }
 }
 

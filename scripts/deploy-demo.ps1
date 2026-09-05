@@ -1,6 +1,6 @@
 ﻿# 一键演示部署：本地后端 + cloudflared 快速隧道 + Workers 静态站点
 # 用法：powershell -File scripts/deploy-demo.ps1
-# 前提：wrangler 已登录（npx wrangler login）；cloudflared 已安装；本机代理 TUN 模式关闭
+# 前提：wrangler 已登录（npx wrangler login）；cloudflared 已安装；隧道固定使用 HTTP/2
 $ErrorActionPreference = 'Stop'
 
 $root       = Split-Path $PSScriptRoot -Parent
@@ -32,23 +32,27 @@ $stamp = Get-Date -Format yyyyMMddHHmmss
 $outLog = Join-Path $env:TEMP "cloudflared-$stamp.out.log"
 $errLog = Join-Path $env:TEMP "cloudflared-$stamp.err.log"
 $tunnelProc = Start-Process -FilePath 'cloudflared' `
-    -ArgumentList 'tunnel','--url','http://localhost:8000' `
+    -ArgumentList 'tunnel','--protocol','http2','--url','http://localhost:8000' `
     -RedirectStandardOutput $outLog -RedirectStandardError $errLog `
     -WindowStyle Hidden -PassThru
 
 $tunnelUrl = $null
+$tunnelRegistered = $false
 foreach ($i in 1..60) {
     Start-Sleep -Seconds 1
     $hit = Select-String -Path $outLog,$errLog `
         -Pattern 'https://[a-z0-9-]+\.trycloudflare\.com' -List -ErrorAction SilentlyContinue
-    if ($hit) { $tunnelUrl = $hit.Matches[0].Value; break }
+    if ($hit) { $tunnelUrl = $hit.Matches[0].Value }
+    $tunnelRegistered = [bool](Select-String -Path $outLog,$errLog `
+        -Pattern 'Registered tunnel connection' -Quiet -ErrorAction SilentlyContinue)
+    if ($tunnelUrl -and $tunnelRegistered) { break }
     if ($tunnelProc.HasExited) { break }
 }
-if (-not $tunnelUrl) {
+if (-not $tunnelUrl -or -not $tunnelRegistered) {
     $tail = (Get-Content $errLog -Tail 5 -ErrorAction SilentlyContinue) -join "`n"
-    throw "隧道 URL 获取失败。cloudflared 错误日志末尾：`n$tail`n（检查代理 TUN 是否关闭）"
+    throw "HTTP/2 隧道建立失败。cloudflared 错误日志末尾：`n$tail"
 }
-Write-Host "[2/4] 隧道已建立：$tunnelUrl"
+Write-Host "[2/4] HTTP/2 隧道已建立：$tunnelUrl"
 
 # ── 3. 构建前端（API 用相对路径 /api，与隧道同域）────────────
 $env:VITE_API_BASE = '/api'

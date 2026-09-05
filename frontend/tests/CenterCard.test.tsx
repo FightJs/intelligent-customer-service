@@ -73,9 +73,9 @@ describe('CenterCard', () => {
   })
 
   describe('触屏设备', () => {
-    function mockCoarsePointer() {
+    function mockMobileViewport() {
       window.matchMedia = vi.fn((query: string) => ({
-        matches: query === '(pointer: coarse)',
+        matches: query.includes('max-width: 640px'),
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
       })) as unknown as typeof window.matchMedia
@@ -86,7 +86,7 @@ describe('CenterCard', () => {
     })
 
     it('禁用拖拽缩放并铺满容器', () => {
-      mockCoarsePointer()
+      mockMobileViewport()
 
       const { container } = render(<CenterCard />)
       const card = container.querySelector('[data-center-card]') as HTMLElement
@@ -95,6 +95,20 @@ describe('CenterCard', () => {
       expect(card.style.width).toBe('100%')
       expect(card.style.height).toBe('100%')
       expect(card.style.transform).toBe('')
+    })
+
+    it('宽屏触屏仍保留桌面卡片布局', () => {
+      window.matchMedia = vi.fn((query: string) => ({
+        matches: query === '(pointer: coarse)',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })) as unknown as typeof window.matchMedia
+
+      const { container } = render(<CenterCard />)
+      const card = container.querySelector('[data-center-card]') as HTMLElement
+
+      expect(container.querySelector('[data-resize-handle]')).toBeInTheDocument()
+      expect(card.style.width).not.toBe('100%')
     })
   })
 })

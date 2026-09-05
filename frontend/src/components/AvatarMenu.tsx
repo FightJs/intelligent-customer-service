@@ -1,20 +1,21 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import { Sun, Moon, RotateCcw, LogOut } from 'lucide-react'
 import type { Theme } from '../state/theme'
 
 interface AvatarMenuProps {
-  /** 菜单左上角坐标（视窗坐标，来自 contextmenu 事件） */
+  /** 菜单左上角坐标（视窗坐标，来自头像按钮） */
   pos: { x: number; y: number }
   theme: Theme
   onToggleTheme: () => void
   onReset: () => void
   onLogout: () => void
   onClose: () => void
+  anchorRef: RefObject<HTMLElement | null>
 }
 
 /**
- * 头像右键二级菜单：切换主题 / 重新开始 / 退出登录。
- * fixed 定位在鼠标位置，点击外部或 ESC 关闭。
+ * 头像点击菜单：切换主题 / 重新开始 / 退出登录。
+ * fixed 定位在头像下方，点击外部或 ESC 关闭。
  */
 export default function AvatarMenu({
   pos,
@@ -23,29 +24,46 @@ export default function AvatarMenu({
   onReset,
   onLogout,
   onClose,
+  anchorRef,
 }: AvatarMenuProps) {
   const ref = useRef<HTMLDivElement>(null)
 
   // 点击菜单外关闭；ESC 关闭
   useEffect(() => {
-    function onDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    function onDown(e: PointerEvent) {
+      const target = e.target as Node
+      if (
+        ref.current
+        && !ref.current.contains(target)
+        && !anchorRef.current?.contains(target)
+      ) onClose()
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
     }
-    document.addEventListener('mousedown', onDown)
+    document.addEventListener('pointerdown', onDown)
     document.addEventListener('keydown', onKey)
     return () => {
-      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('pointerdown', onDown)
       document.removeEventListener('keydown', onKey)
     }
-  }, [onClose])
+  }, [anchorRef, onClose])
 
   const isDark = theme === 'dark'
 
-  // 防止菜单贴边溢出：粗略右移限制
-  const style = { left: pos.x, top: pos.y }
+  const menuWidth = 176
+  const menuHeight = 132
+  const viewportPadding = 8
+  const style = {
+    left: Math.min(
+      Math.max(viewportPadding, pos.x),
+      Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding),
+    ),
+    top: Math.min(
+      Math.max(viewportPadding, pos.y),
+      Math.max(viewportPadding, window.innerHeight - menuHeight - viewportPadding),
+    ),
+  }
 
   const items = [
     {
@@ -60,6 +78,7 @@ export default function AvatarMenu({
   return (
     <div
       ref={ref}
+      id="avatar-menu"
       style={style}
       className="fixed z-50 min-w-[160px] rounded-card border border-idle/50 bg-surface/95 py-1 shadow-2xl backdrop-blur-md"
       role="menu"

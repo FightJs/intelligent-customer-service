@@ -5,7 +5,9 @@ import re
 from unittest.mock import patch
 from uuid import uuid4
 
+import httpx
 import pytest
+from anthropic import APIStatusError
 from fastapi.testclient import TestClient
 
 from agent.loop import AgentStreamDelta, AgentStreamResult, AgentStreamStatus
@@ -130,3 +132,46 @@ def test_stream_rejects_invalid_updates_before_agent_run(client, auth_headers):
     assert 'invalid_updates' in response.text
     assert 'event: tool_event' not in response.text
     stream.assert_not_called()
+
+
+def test_stream_reports_weekly_llm_quota_without_retry(client, auth_headers):
+    session_id = _session_id(client, auth_headers)
+    response = httpx.Response(
+        403,
+        request=httpx.Request('POST', 'https://llm.example.test/v1/messages'),
+    )
+    quota_error = APIStatusError(
+        'Weekly usage limit reached',
+        response=response,
+        body={
+            'error': {
+                'type': 'permission_error',
+                'message': (
+                    "You've reached your weekly (7-day) usage limit. "
+                    'Your quota will reset when the current 7-day window ends.'
+                ),
+            },
+        },
+    )
+
+    async def failed_stream(*_args, **_kwargs):
+        if False:
+            yield None
+        raise quota_error
+
+    with patch('api.app.run_agent_stream', failed_stream):
+        result = client.post(
+            '/api/chat/stream',
+            json={
+                'request_id': str(uuid4()),
+                'session_id': session_id,
+                'message': '你好',
+            },
+            headers=auth_headers,
+        )
+
+    assert result.status_code == 200
+    assert 'event: error' in result.text
+    assert 'llm_balance_insufficient' in result.text
+    assert 'LLM 本周使用额度已用完' in result.text
+    assert '"retryable":false' in result.text

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { useCoarsePointer } from '../../hooks/useCoarsePointer'
+import { MOBILE_LAYOUT_QUERY, useMediaQuery } from '../../hooks/useMediaQuery'
 import { useDraggable } from '../../hooks/useDraggable'
 import { useResizable } from '../../hooks/useResizable'
 import { useZStack } from '../../hooks/useZStack'
@@ -74,7 +74,7 @@ export default function CenterCard({ resetToken = 0, children }: CenterCardProps
   })
   // 主对话框默认高于左侧进度卡，避免输入区被覆盖后无法点击；其他卡片仍可通过交互置顶。
   const { z, bringToFront } = useZStack({ id: 'center', defaultZ: 40 })
-  const coarsePointer = useCoarsePointer()
+  const mobileViewport = useMediaQuery(MOBILE_LAYOUT_QUERY)
 
   const restoreInitialLayout = useCallback(() => {
     resetPosition(initialPosition())
@@ -93,7 +93,7 @@ export default function CenterCard({ resetToken = 0, children }: CenterCardProps
       onMouseDown={bringToFront}
       onFocusCapture={bringToFront}
       className={`center-card flex flex-col overflow-hidden rounded-xl bg-surface/95 backdrop-blur-md shadow-2xl${dragging || resizing ? ' is-interacting' : ''}`}
-      style={coarsePointer
+      style={mobileViewport
         ? { inset: 0, width: '100%', height: '100%', zIndex: z }
         : {
             inset: 0,
@@ -104,32 +104,34 @@ export default function CenterCard({ resetToken = 0, children }: CenterCardProps
             opacity: dragging || resizing ? 0.9 : 1,
           }}
     >
-      <div
-        data-card-handle
-        onMouseDown={coarsePointer ? undefined : onDragStart}
-        className={`flex ${coarsePointer ? 'cursor-default' : 'cursor-move'} items-center px-3 py-0 group`}
-      >
-        <div className="flex-1" aria-hidden="true" />
-        <button
-          type="button"
-          onClick={restoreInitialLayout}
-          onMouseDown={(e) => e.stopPropagation()}
-          className="center-card-expand-button"
-          aria-label="恢复问答窗口初始位置"
-          title="恢复初始大小和位置"
+      {!mobileViewport && (
+        <div
+          data-card-handle
+          onMouseDown={onDragStart}
+          className="group flex cursor-move items-center px-3 py-0"
         >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-          </svg>
-        </button>
-      </div>
+          <div className="flex-1" aria-hidden="true" />
+          <button
+            type="button"
+            onClick={restoreInitialLayout}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="center-card-expand-button"
+            aria-label="恢复问答窗口初始位置"
+            title="恢复初始大小和位置"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+            </svg>
+          </button>
+        </div>
+      )}
       <div className="flex-1 overflow-hidden relative">
         {children ?? (
           <div className="h-full flex items-center justify-center text-muted text-sm">
             内容占位（ChatPanel 将传入）
           </div>
         )}
-        {!coarsePointer && (
+        {!mobileViewport && (
           <div
             data-resize-handle
             onMouseDown={onResizeStart}

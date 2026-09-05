@@ -47,6 +47,28 @@ describe('useSpeechRecognition', () => {
     ).webkitSpeechRecognition
     MockSpeechRecognition.instances = []
     vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('移动端可跳过异步权限预检并在用户手势内立即启动', () => {
+    const getUserMedia = vi.fn(() => new Promise<MediaStream>(() => undefined))
+    vi.stubGlobal('navigator', {
+      mediaDevices: { getUserMedia },
+    })
+    ;(window as SpeechTestWindow).webkitSpeechRecognition = MockSpeechRecognition
+
+    const { result } = renderHook(() => useSpeechRecognition({
+      onTranscript: vi.fn(),
+      onError: vi.fn(),
+    }))
+
+    act(() => {
+      result.current.startListening({ preflightPermission: false })
+    })
+
+    expect(getUserMedia).not.toHaveBeenCalled()
+    expect(MockSpeechRecognition.instances).toHaveLength(1)
+    expect(MockSpeechRecognition.instances[0].start).toHaveBeenCalledTimes(1)
   })
 
   it('网络错误时自动重试一次，持续失败后停止', () => {

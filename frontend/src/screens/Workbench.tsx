@@ -10,6 +10,7 @@ import WordPreviewModal from '../components/DeliveryPanel/WordPreviewModal'
 import DeliverableSlot from '../components/DeliveryPanel/DeliverableSlot'
 import OrderConfirmationModal from '../components/DeliveryPanel/OrderConfirmationModal'
 import GridBackground from '../components/GridBackground'
+import MobileWorkbenchActions from '../components/MobileWorkbenchActions'
 import { ZStackProvider } from '../hooks/useZStack'
 import { FormProvider } from '../state/FormContext'
 import { useTheme } from '../state/theme'
@@ -62,6 +63,17 @@ export default function Workbench() {
           {user?.role === 'admin' && (
             <AdminEntryButton />
           )}
+
+          <MobileWorkbenchActions
+            role={user?.role}
+            previewOpen={formPreviewOpen}
+            orderSent={orderSent}
+            onPreview={() => setFormPreviewOpen(true)}
+            onSendOrder={() => {
+              setEarlySubmit(false)
+              setOrderModalOpen(true)
+            }}
+          />
 
           <main
             className="workbench-stage"

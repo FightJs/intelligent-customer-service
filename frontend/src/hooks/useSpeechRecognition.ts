@@ -61,6 +61,10 @@ interface UseSpeechRecognitionOptions {
   onError: (message: string) => void
 }
 
+interface StartListeningOptions {
+  preflightPermission?: boolean
+}
+
 function getSpeechRecognitionConstructor():
   | SpeechRecognitionConstructor
   | null {
@@ -196,7 +200,9 @@ export function useSpeechRecognition({
     setListening(false)
   }, [])
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback(({
+    preflightPermission = true,
+  }: StartListeningOptions = {}) => {
     const Recognition =
       getSpeechRecognitionConstructor()
 
@@ -401,6 +407,11 @@ export function useSpeechRecognition({
           '语音识别启动失败，请稍后重试或继续键盘输入',
         )
       }
+    }
+
+    if (!preflightPermission) {
+      startRecognition()
+      return
     }
 
     const mediaDevices = (

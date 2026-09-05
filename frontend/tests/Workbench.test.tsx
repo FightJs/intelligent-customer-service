@@ -27,7 +27,10 @@ vi.mock('../src/hooks/useZStack', () => ({
   ZStackProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useZStack: () => ({ z: 10, bringToFront: vi.fn(), isTopmost: true }),
 }))
-vi.mock('../src/state/FormContext', () => ({ FormProvider: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
+vi.mock('../src/state/FormContext', () => ({
+  FormProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useFormState: () => ({ state: { currentFieldId: 'brand', completed: false } }),
+}))
 vi.mock('../src/state/theme', () => ({ useTheme: () => ({ theme: 'dark', toggleTheme: vi.fn() }) }))
 vi.mock('../src/state/AuthContext', () => ({
   useAuth: () => ({ user: { role: authState.role }, logout: vi.fn() }),

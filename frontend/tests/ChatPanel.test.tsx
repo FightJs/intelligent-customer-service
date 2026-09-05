@@ -44,6 +44,13 @@ function renderPanel(props: React.ComponentProps<typeof ChatPanel> = {}) {
   )
 }
 
+async function waitForReadyInput() {
+  const input = screen.getByPlaceholderText('输入您的回答…')
+  // 输入框在会话加载期间就已存在；可编辑才代表异步初始化完成。
+  await waitFor(() => expect(input).toBeEnabled())
+  return input
+}
+
 beforeEach(() => {
   sessionStorage.clear()
   vi.clearAllMocks()
@@ -76,7 +83,7 @@ describe('ChatPanel 输入与流式回复', () => {
     sessionStorage.setItem('ics_session_id:42', 'user-session')
 
     renderPanel({ userId: 42 })
-    await screen.findByPlaceholderText('输入您的回答…')
+    await waitForReadyInput()
 
     expect(getSession).toHaveBeenCalledWith('user-session')
     expect(getSession).not.toHaveBeenCalledWith('guest-session')
@@ -84,7 +91,7 @@ describe('ChatPanel 输入与流式回复', () => {
 
   it('使用多行输入框并允许清空草稿', async () => {
     renderPanel()
-    const input = await screen.findByPlaceholderText('输入您的回答…')
+    const input = await waitForReadyInput()
     expect(input.tagName).toBe('TEXTAREA')
     fireEvent.change(input, { target: { value: '第一行\n第二行' } })
     fireEvent.keyDown(input, { key: 'Enter', shiftKey: true })
@@ -105,7 +112,7 @@ describe('ChatPanel 输入与流式回复', () => {
     })
 
     renderPanel()
-    const input = await screen.findByPlaceholderText('输入您的回答…')
+    const input = await waitForReadyInput()
     fireEvent.change(input, { target: { value: '品牌名是云裳' } })
     fireEvent.click(screen.getByRole('button', { name: '发送' }))
     await screen.findByText('最终回复')
@@ -124,7 +131,7 @@ describe('ChatPanel 输入与流式回复', () => {
     })
 
     renderPanel({ userRole: 'guest' })
-    const input = await screen.findByPlaceholderText('输入您的回答…')
+    const input = await waitForReadyInput()
     fireEvent.change(input, { target: { value: '最后一项' } })
     fireEvent.click(screen.getByRole('button', { name: '发送' }))
 
@@ -152,7 +159,7 @@ describe('ChatPanel 输入与流式回复', () => {
     })
 
     renderPanel()
-    const input = await screen.findByPlaceholderText('输入您的回答…')
+    const input = await waitForReadyInput()
     fireEvent.change(input, { target: { value: '第一条消息' } })
     fireEvent.click(screen.getByRole('button', { name: '发送' }))
     const waitingInput = await screen.findByPlaceholderText('正在生成回复，请稍候…')
@@ -163,9 +170,33 @@ describe('ChatPanel 输入与流式回复', () => {
     expect(waitingInput).toBeEnabled()
   })
 
+  it('会话请求未完成时禁用图片入口，完成后才能打开菜单', async () => {
+    let resolveSession!: (data: ReturnType<typeof sessionData>) => void
+    const pendingSession = new Promise<ReturnType<typeof sessionData>>((resolve) => {
+      resolveSession = resolve
+    })
+    vi.mocked(createSession).mockReturnValueOnce(pendingSession)
+
+    renderPanel()
+    const addImage = screen.getByRole('button', { name: '添加图片' })
+    expect(screen.getByPlaceholderText('输入您的回答…')).toBeDisabled()
+    expect(addImage).toBeDisabled()
+    fireEvent.click(addImage)
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+
+    await act(async () => {
+      resolveSession(sessionData())
+      await pendingSession
+    })
+    await waitForReadyInput()
+    expect(addImage).toBeEnabled()
+    fireEvent.click(addImage)
+    expect(screen.getByRole('menuitem', { name: '拍照' })).toBeInTheDocument()
+  })
+
   it('用单一图片入口选择相册或拍照，多图只追加一次', async () => {
     const { container } = renderPanel()
-    await screen.findByPlaceholderText('输入您的回答…')
+    await waitForReadyInput()
     const addImage = screen.getByRole('button', { name: '添加图片' })
     expect(addImage).toBeEnabled()
     expect(screen.queryByRole('menuitem', { name: '拍照' })).not.toBeInTheDocument()
@@ -219,7 +250,7 @@ describe('ChatPanel 跳过与提前结束', () => {
   it('核心题不显示跳过按钮，但正式用户可提前结束', async () => {
     const onFinishEarly = vi.fn()
     renderPanel({ canFinishEarly: true, onFinishEarly })
-    await screen.findByPlaceholderText('输入您的回答…')
+    await waitForReadyInput()
     expect(screen.queryByRole('button', { name: /跳过/ })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '提前结束并提交' }))
     expect(onFinishEarly).toHaveBeenCalledTimes(1)
@@ -259,7 +290,7 @@ describe('ChatPanel 跳过与提前结束', () => {
     const onFinishEarly = vi.fn()
 
     renderPanel({ canFinishEarly: true, onFinishEarly })
-    fireEvent.change(await screen.findByPlaceholderText('输入您的回答…'), {
+    fireEvent.change(await waitForReadyInput(), {
       target: { value: '还没发送的回答' },
     })
     fireEvent.click(screen.getByRole('button', { name: '跳过此题' }))
@@ -304,7 +335,7 @@ describe('ChatPanel 语音输入', () => {
     speechWindow.webkitSpeechRecognition = MockSpeechRecognition
 
     renderPanel()
-    const input = await screen.findByPlaceholderText('输入您的回答…')
+    const input = await waitForReadyInput()
     fireEvent.click(screen.getByRole('button', { name: '开始语音输入' }))
     const recognition = recognitions[0]
     expect(recognition.start).toHaveBeenCalledTimes(1)
@@ -431,7 +462,7 @@ describe('ChatPanel 按住说话（触屏）', () => {
     speechWindow.webkitSpeechRecognition = MockSpeechRecognition
 
     renderPanel()
-    await screen.findByPlaceholderText('输入您的回答…')
+    await waitForReadyInput()
 
     const button = screen.getByRole('button', { name: '按住说话' })
 
@@ -446,7 +477,7 @@ describe('ChatPanel 按住说话（触屏）', () => {
     expect(recognitions[0].stop).toHaveBeenCalledTimes(1)
 
     // 触屏按住后浏览器会补发 click，绝不能当成 toggle 重新开始
-    fireEvent.click(button)
+    fireEvent.click(button, { detail: 1 })
     expect(recognitions).toHaveLength(1)
 
     delete speechWindow.webkitSpeechRecognition
@@ -476,12 +507,53 @@ describe('ChatPanel 按住说话（触屏）', () => {
     speechWindow.webkitSpeechRecognition = MockSpeechRecognition
 
     renderPanel()
-    await screen.findByPlaceholderText('输入您的回答…')
+    await waitForReadyInput()
 
     const button = screen.getByRole('button', { name: '按住说话' })
     fireEvent.pointerDown(button)
     act(() => recognitions[0].onstart?.())
     fireEvent.pointerCancel(button)
+    expect(recognitions[0].stop).toHaveBeenCalledTimes(1)
+
+    delete speechWindow.webkitSpeechRecognition
+  })
+
+  it('只响应发起按住的手指，并在丢失捕获时停止', async () => {
+    mockCoarsePointer()
+
+    const recognitions: MockSpeechRecognition[] = []
+    class MockSpeechRecognition {
+      lang = ''
+      continuous = false
+      interimResults = false
+      maxAlternatives = 1
+      onresult: ((event: unknown) => void) | null = null
+      onerror: ((event: { error: string }) => void) | null = null
+      onend: (() => void) | null = null
+      onstart: (() => void) | null = null
+      start = vi.fn()
+      stop = vi.fn()
+      abort = vi.fn()
+      constructor() { recognitions.push(this) }
+    }
+    const speechWindow = window as typeof window & {
+      webkitSpeechRecognition?: new () => MockSpeechRecognition
+    }
+    speechWindow.webkitSpeechRecognition = MockSpeechRecognition
+
+    renderPanel()
+    await waitForReadyInput()
+    const button = screen.getByRole('button', { name: '按住说话' })
+
+    fireEvent.pointerDown(button, { pointerId: 1 })
+    fireEvent.pointerDown(button, { pointerId: 2 })
+    expect(recognitions).toHaveLength(1)
+
+    act(() => recognitions[0].onstart?.())
+    fireEvent.pointerUp(button, { pointerId: 2 })
+    expect(recognitions[0].stop).not.toHaveBeenCalled()
+
+    fireEvent.lostPointerCapture(button, { pointerId: 1 })
     expect(recognitions[0].stop).toHaveBeenCalledTimes(1)
 
     delete speechWindow.webkitSpeechRecognition

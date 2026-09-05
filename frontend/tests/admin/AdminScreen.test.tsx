@@ -160,7 +160,7 @@ describe('AdminScreen', () => {
       owner_username: 'admin',
       markdown: '# 方案\n这是交付物正文',
     })
-    renderAdmin()
+    const { unmount } = renderAdmin()
     await waitFor(() => expect(screen.getByText('客户甲')).toBeInTheDocument())
     fireEvent.click(screen.getByText('客户甲'))
     await waitFor(() => expect(screen.getByText('这是交付物正文')).toBeInTheDocument())
@@ -169,7 +169,8 @@ describe('AdminScreen', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: documentLabel })).toHaveAttribute('aria-pressed', 'true')
     })
-    vi.useFakeTimers()
+    // 只控制提示消失的定时器，不替换 React 调度器依赖的时钟。
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     try {
       fireEvent.click(screen.getByRole('button', { name: downloadLabel }))
       expect(screen.getByRole('alert')).toHaveTextContent('暂不支持该类文档')
@@ -188,6 +189,8 @@ describe('AdminScreen', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(screen.getByRole('alert')).toBeInTheDocument()
     } finally {
+      // 组件仍持有提示定时器，先卸载清理，再恢复真实计时器。
+      unmount()
       vi.useRealTimers()
     }
   })

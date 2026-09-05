@@ -28,6 +28,26 @@ def _insufficient_balance_error() -> APIStatusError:
     )
 
 
+def _weekly_quota_error() -> APIStatusError:
+    response = httpx.Response(
+        403,
+        request=httpx.Request('POST', 'https://llm.example.test/v1/messages'),
+    )
+    return APIStatusError(
+        'Weekly usage limit reached',
+        response=response,
+        body={
+            'error': {
+                'type': 'permission_error',
+                'message': (
+                    "You've reached your weekly (7-day) usage limit. "
+                    'Your quota will reset when the current 7-day window ends.'
+                ),
+            },
+        },
+    )
+
+
 def _llm_connection_error() -> APIConnectionError:
     return APIConnectionError(
         request=httpx.Request('POST', 'https://llm.example.test/v1/messages'),
@@ -388,6 +408,20 @@ def test_chat_returns_clear_503_when_llm_balance_is_insufficient(client, auth_he
 
     assert r.status_code == 503
     assert r.json()['detail'] == 'LLM 服务余额不足，请联系管理员充值后重试。'
+
+
+def test_chat_returns_clear_503_when_weekly_llm_quota_is_exhausted(client, auth_headers):
+    sid = client.post('/api/session', headers=auth_headers).json()['session_id']
+    with patch('api.app.run_agent', side_effect=_weekly_quota_error()):
+        with TestClient(app, raise_server_exceptions=False) as degraded_client:
+            r = degraded_client.post(
+                '/api/chat',
+                json={'session_id': sid, 'message': '你好'},
+                headers=auth_headers,
+            )
+
+    assert r.status_code == 503
+    assert r.json()['detail'] == 'LLM 本周使用额度已用完，请等待额度重置或联系管理员升级套餐。'
 
 
 def test_chat_returns_clear_503_when_llm_cannot_connect(client, auth_headers):
