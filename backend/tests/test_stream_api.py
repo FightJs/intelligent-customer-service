@@ -45,7 +45,8 @@ def test_stream_emits_ordered_events_persists_and_replays(client, auth_headers):
     session_id = _session_id(client, auth_headers)
     request_id = str(uuid4())
 
-    async def fake_stream(state, message, history, images=None):
+    async def fake_stream(state, message, history, images=None, trace_id=None):
+        assert trace_id == request_id
         yield AgentStreamStatus(phase='generating', message='正在生成回复')
         yield AgentStreamDelta('好的，')
         yield AgentStreamDelta('已记录。')
@@ -132,6 +133,31 @@ def test_stream_rejects_invalid_updates_before_agent_run(client, auth_headers):
     assert 'invalid_updates' in response.text
     assert 'event: tool_event' not in response.text
     stream.assert_not_called()
+
+
+def test_stream_valid_updates_bypass_llm_and_advance_question(client, auth_headers):
+    session_id = _session_id(client, auth_headers)
+    payload = {
+        'request_id': str(uuid4()),
+        'session_id': session_id,
+        'message': '云裳',
+        'updates': [{
+            'section_id': 'customer',
+            'field_id': 'brand',
+            'value': '云裳',
+        }],
+    }
+
+    with patch('api.app.run_agent_stream') as stream:
+        response = client.post('/api/chat/stream', json=payload, headers=auth_headers)
+
+    assert response.status_code == 200
+    assert 'event: delta' in response.text
+    assert 'event: done' in response.text
+    assert '身份' in response.text
+    stream.assert_not_called()
+    messages = db.get_messages(session_id)
+    assert len(messages) == 2
 
 
 def test_stream_reports_weekly_llm_quota_without_retry(client, auth_headers):

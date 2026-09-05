@@ -120,6 +120,43 @@ describe('ChatPanel 输入与流式回复', () => {
     expect(screen.getAllByText('最终回复')).toHaveLength(1)
   })
 
+  it('在同一动画帧批量合并多个流式 delta', async () => {
+    const frameCallbacks: FrameRequestCallback[] = []
+    const requestFrame = vi.spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((callback) => {
+        frameCallbacks.push(callback)
+        return frameCallbacks.length
+      })
+    const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+    let finishStream!: () => void
+    const pending = new Promise<void>((resolve) => { finishStream = resolve })
+    vi.mocked(streamChat).mockImplementation(async (_request, handlers) => {
+      handlers.onStart({ request_id: 'batched-delta', status: 'started' })
+      handlers.onDelta({ text: '第一段' })
+      handlers.onDelta({ text: '第二段' })
+      await pending
+      handlers.onDone({
+        request_id: 'batched-delta', reply: '第一段第二段', tool_events: [],
+        form_state: createInitialState(), form_complete: false,
+        suggestions: [], assistant_message_id: 1,
+      })
+    })
+
+    renderPanel()
+    const input = await waitForReadyInput()
+    fireEvent.change(input, { target: { value: '测试流式合帧' } })
+    fireEvent.click(screen.getByRole('button', { name: '发送' }))
+    await waitFor(() => expect(requestFrame).toHaveBeenCalledTimes(1))
+    expect(screen.queryByText('第一段第二段')).not.toBeInTheDocument()
+
+    await act(async () => { frameCallbacks[0](0) })
+    expect(screen.getByText('第一段第二段')).toBeInTheDocument()
+
+    await act(async () => { finishStream(); await pending })
+    requestFrame.mockRestore()
+    cancelFrame.mockRestore()
+  })
+
   it('简约版完成后引导查看右上角需求表和登录正式账号', async () => {
     vi.mocked(streamChat).mockImplementation(async (_request, handlers) => {
       handlers.onStart({ request_id: 'quick-done', status: 'started' })

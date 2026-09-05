@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import logging
 import os
 from functools import lru_cache
 
@@ -17,6 +18,9 @@ LLM_API_KEY = os.getenv('LLM_API_KEY', '')
 LLM_BASE_URL = os.getenv('LLM_BASE_URL', '')
 LLM_MODEL = os.getenv('LLM_MODEL', '')
 LLM_TEMPERATURE = 0.3
+
+logger = logging.getLogger(__name__)
+_async_client: AsyncAnthropic | None = None
 
 
 def _validate_config() -> None:
@@ -50,8 +54,8 @@ def get_client() -> Anthropic:
     )
 
 
-def get_async_client() -> AsyncAnthropic:
-    """创建单次流式请求使用的异步 Anthropic 兼容 client。"""
+def _create_async_client() -> AsyncAnthropic:
+    """创建异步 Anthropic 兼容 client。"""
     _validate_config()
     http_client = httpx.AsyncClient(
         trust_env=False,
@@ -62,3 +66,32 @@ def get_async_client() -> AsyncAnthropic:
         base_url=LLM_BASE_URL,
         http_client=http_client,
     )
+
+
+def get_async_client() -> AsyncAnthropic:
+    """获取应用生命周期内共享的异步 client，复用 HTTP 连接池。"""
+    global _async_client
+    if _async_client is None:
+        _async_client = _create_async_client()
+    return _async_client
+
+
+async def close_clients() -> None:
+    """应用退出时释放已创建的同步与异步 LLM 连接。"""
+    global _async_client
+
+    async_client = _async_client
+    _async_client = None
+    if async_client is not None:
+        try:
+            await async_client.close()
+        except Exception:
+            logger.warning('failed to close async LLM client', exc_info=True)
+
+    if get_client.cache_info().currsize:
+        sync_client = get_client()
+        get_client.cache_clear()
+        try:
+            sync_client.close()
+        except Exception:
+            logger.warning('failed to close sync LLM client', exc_info=True)

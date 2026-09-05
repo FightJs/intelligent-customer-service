@@ -1,4 +1,5 @@
 """Agent loop 测试（mock anthropic 响应）。"""
+from copy import deepcopy
 from unittest.mock import AsyncMock, patch, MagicMock
 from survey.state import create_initial_state
 from survey.models import TextValue
@@ -14,12 +15,16 @@ from agent.loop import (
     _apply_deterministic_current_answer,
     _skip_unknown_equipment_inventory,
     _build_system_prompt,
+    _compact_history,
     _correct_premature_completion,
     _enforce_collector_reply,
+    _prepare_recent_history,
     _price_band_from_text,
+    result_after_authoritative_updates,
     run_agent,
     run_agent_stream,
 )
+from agent.tools import apply_updates
 
 BRAND_COLLECTION_REPLY = (
     '收到，我理解您的情况。请问您的品牌或公司名称是什么？\n\n'
@@ -681,6 +686,94 @@ def test_run_agent_strips_leading_assistant_history(mock_get_client):
     call_args = mock_client.messages.create.call_args
     sent_messages = call_args.kwargs['messages']
     assert sent_messages[0]['role'] == 'user', '第一条必须是 user role'
+
+
+def test_history_removes_display_help_and_unreferenced_image_bytes():
+    history = [
+        {
+            'role': 'user',
+            'content': [
+                {'type': 'text', 'text': '这是现场照片'},
+                {
+                    'type': 'image',
+                    'source': {
+                        'type': 'base64',
+                        'media_type': 'image/png',
+                        'data': 'large-image-base64',
+                    },
+                },
+            ],
+            'tool_events': [{'kind': 'fill'}],
+        },
+        {
+            'role': 'assistant',
+            'content': '请问预算是多少？\n填写说明：用于方案规划',
+        },
+    ]
+    original = deepcopy(history)
+
+    prepared = _prepare_recent_history(history, '预算是五万元')
+
+    assert history == original
+    assert 'large-image-base64' not in str(prepared)
+    assert '历史消息包含图片' in str(prepared)
+    assert '用于方案规划' not in str(prepared)
+    assert 'tool_events' not in str(prepared)
+
+
+def test_history_preserves_latest_image_only_when_user_refers_to_it():
+    history = [
+        {
+            'role': 'user',
+            'content': [
+                {'type': 'text', 'text': '刚上传的直播间'},
+                {
+                    'type': 'image',
+                    'source': {
+                        'type': 'base64',
+                        'media_type': 'image/png',
+                        'data': 'latest-image-base64',
+                    },
+                },
+            ],
+        },
+        {'role': 'assistant', 'content': '已经看到了。'},
+    ]
+
+    prepared = _prepare_recent_history(history, '这张图片里的灯光怎么样？')
+
+    assert isinstance(prepared[0]['content'], list)
+    assert prepared[0]['content'][1]['source']['data'] == 'latest-image-base64'
+
+
+def test_compact_history_never_contains_image_bytes():
+    summary = _compact_history([{
+        'role': 'user',
+        'content': [
+            {'type': 'text', 'text': '旧现场图'},
+            {'type': 'image', 'source': {'data': 'old-image-base64'}},
+        ],
+    }])
+
+    assert '旧现场图' in summary
+    assert '历史消息包含图片' in summary
+    assert 'old-image-base64' not in summary
+
+
+def test_authoritative_update_result_asks_next_question_without_llm():
+    state = create_initial_state()
+    _, failures = apply_updates(state, [{
+        'section_id': 'customer',
+        'field_id': 'brand',
+        'value': '云裳',
+    }])
+    assert failures == []
+
+    result = result_after_authoritative_updates(state)
+
+    assert '身份' in result.reply
+    assert result.tool_events == []
+    assert result.suggestions[0]['field_id'] == 'identity'
 
 
 @patch('agent.loop.get_client')

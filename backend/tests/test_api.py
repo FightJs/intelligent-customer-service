@@ -385,6 +385,31 @@ def test_chat_rejects_invalid_direct_updates_without_fake_fill_event(client, aut
     run_agent_mock.assert_not_called()
 
 
+def test_chat_valid_updates_bypass_llm_in_non_streaming_demo(client, auth_headers):
+    sid = client.post('/api/session', headers=auth_headers).json()['session_id']
+
+    with patch('api.app.run_agent') as run_agent_mock:
+        response = client.post(
+            '/api/chat',
+            json={
+                'session_id': sid,
+                'message': '云裳',
+                'updates': [{
+                    'section_id': 'customer',
+                    'field_id': 'brand',
+                    'value': '云裳',
+                }],
+            },
+            headers=auth_headers,
+        )
+
+    assert response.status_code == 200
+    assert '身份' in response.json()['reply']
+    assert response.json()['tool_events'][0]['field_id'] == 'brand'
+    run_agent_mock.assert_not_called()
+    assert len(db.get_messages(sid)) == 2
+
+
 def test_chat_validates_update_shape_before_endpoint_logic(client, auth_headers):
     sid = client.post('/api/session', headers=auth_headers).json()['session_id']
     response = client.post(

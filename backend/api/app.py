@@ -22,6 +22,7 @@ import sqlite3
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
+from time import perf_counter
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
@@ -56,9 +57,11 @@ from agent.loop import (
     AgentStreamResult,
     AgentStreamStatus,
     AgentStreamToolEvent,
+    result_after_authoritative_updates,
     run_agent,
     run_agent_stream,
 )
+from agent.llm import close_clients
 from agent.tools import apply_updates, ToolEvent
 from delivery.markdown import generate_markdown
 from delivery.excel import generate_excel
@@ -134,7 +137,10 @@ def _seed_admin() -> None:
 async def lifespan(app: FastAPI):
     db.init_db()
     _seed_admin()
-    yield
+    try:
+        yield
+    finally:
+        await close_clients()
 
 
 app = FastAPI(title='ICS Backend', version='0.3.0', lifespan=lifespan)
@@ -695,8 +701,14 @@ def chat(
     # 前端 history 仅作为空会话 fallback，DB 是权威源。
     history = db.get_messages(req.session_id, limit=50) or req.history
 
+    started_at = perf_counter()
+    fast_path = bool(req.updates and not saved_images)
     try:
-        result = run_agent(state, req.message, history, saved_images)
+        result = (
+            result_after_authoritative_updates(state)
+            if fast_path
+            else run_agent(state, req.message, history, saved_images)
+        )
     except APIStatusError as exc:
         detail = _llm_status_error_detail(exc)
         logger.warning('LLM chat unavailable: upstream_status=%s', exc.status_code)
@@ -713,6 +725,14 @@ def chat(
     db.save_session(req.session_id, to_dict(result.state))
     db.add_message(req.session_id, 'user', user_content)
     db.add_message(req.session_id, 'assistant', result.reply, events_dict)
+
+    logger.info(
+        'chat_timing total_ms=%.1f fast_path=%s history_messages=%d images=%d',
+        (perf_counter() - started_at) * 1000,
+        fast_path,
+        len(history or []),
+        len(saved_images or []),
+    )
 
     return ChatResponse(
         reply=result.reply,
@@ -832,23 +852,44 @@ async def chat_stream(
             yield event('tool_event', asdict(update_event))
         history = db.get_messages(req.session_id, limit=50) or req.history
         phase = 'generating'
+        started_at = perf_counter()
+        fast_path = bool(req.updates and not saved_images)
         try:
             result: AgentStreamResult | None = None
-            async for item in run_agent_stream(state, req.message, history, saved_images):
-                if item is None:
-                    yield ': heartbeat\n\n'
-                elif isinstance(item, AgentStreamDelta):
-                    yield event('delta', {'text': item.text})
-                elif isinstance(item, AgentStreamStatus):
-                    phase = item.phase
-                    yield event('status', {
-                        'phase': item.phase,
-                        'message': item.message,
-                    })
-                elif isinstance(item, AgentStreamToolEvent):
-                    yield event('tool_event', asdict(item.event))
-                elif isinstance(item, AgentStreamResult):
-                    result = item
+            if fast_path:
+                fast_result = result_after_authoritative_updates(
+                    state,
+                )
+                yield event('delta', {'text': fast_result.reply})
+                result = AgentStreamResult(
+                    reply=fast_result.reply,
+                    tool_events=fast_result.tool_events,
+                    state=fast_result.state,
+                    form_complete=fast_result.form_complete,
+                    suggestions=fast_result.suggestions,
+                )
+            else:
+                async for item in run_agent_stream(
+                    state,
+                    req.message,
+                    history,
+                    saved_images,
+                    trace_id=request_id,
+                ):
+                    if item is None:
+                        yield ': heartbeat\n\n'
+                    elif isinstance(item, AgentStreamDelta):
+                        yield event('delta', {'text': item.text})
+                    elif isinstance(item, AgentStreamStatus):
+                        phase = item.phase
+                        yield event('status', {
+                            'phase': item.phase,
+                            'message': item.message,
+                        })
+                    elif isinstance(item, AgentStreamToolEvent):
+                        yield event('tool_event', asdict(item.event))
+                    elif isinstance(item, AgentStreamResult):
+                        result = item
 
             if result is None:
                 raise RuntimeError('agent stream ended without result')
@@ -881,6 +922,15 @@ async def chat_stream(
                 **done_payload,
                 'assistant_message_id': assistant_message_id,
             })
+            logger.info(
+                'chat_stream_timing request_id=%s total_ms=%.1f fast_path=%s '
+                'history_messages=%d images=%d',
+                request_id,
+                (perf_counter() - started_at) * 1000,
+                fast_path,
+                len(history or []),
+                len(saved_images or []),
+            )
         except asyncio.CancelledError:
             db.fail_chat_request(request_id, 'stream_interrupted')
             raise

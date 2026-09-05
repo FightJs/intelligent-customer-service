@@ -33,6 +33,12 @@ def normalize_help_format(text: str) -> str:
     return _DISPLAY_HELP_LINE_RE.sub(replace_line, text)
 
 
+def strip_help_lines(text: str) -> str:
+    """移除仅供界面展示的填写帮助，不改动其他对话内容。"""
+    cleaned = _MODEL_HELP_LINE_RE.sub('', text)
+    return re.sub(r'\n{3,}', '\n\n', cleaned).strip()
+
+
 def _canonical_help_lines(field: FieldDef, *, skippable: bool) -> list[str]:
     """把 schema 文案规整为最多一条说明和一条示例。"""
     instruction_parts: list[str] = []
@@ -87,8 +93,7 @@ def ensure_current_question_help(
     if field.question not in reply:
         return reply
 
-    cleaned = _MODEL_HELP_LINE_RE.sub('', reply)
-    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned).strip()
+    cleaned = strip_help_lines(reply)
     help_lines = _canonical_help_lines(
         field,
         skippable=field.skippable if skippable is None else skippable,

@@ -154,6 +154,7 @@ export default function ChatPanel({
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const sendingRef = useRef(false)
   const controllerRef = useRef<AbortController | null>(null)
+  const streamCleanupRef = useRef<(() => void) | null>(null)
   const retryRef = useRef<{ request: ChatStreamRequest; messageId: string } | null>(null)
   const speechBaseRef = useRef('')
 
@@ -206,6 +207,13 @@ export default function ChatPanel({
     return () => { cancelled = true }
   }, [dispatch, userId])
 
+  useEffect(() => () => {
+    streamCleanupRef.current?.()
+    streamCleanupRef.current = null
+    controllerRef.current?.abort()
+    controllerRef.current = null
+  }, [])
+
   useEffect(() => {
     const el = scrollRef.current
     if (!el || el.scrollHeight - el.scrollTop - el.clientHeight > 96) return
@@ -237,6 +245,46 @@ export default function ChatPanel({
     controllerRef.current = controller
     let messageId = options.messageId
     let terminal = false
+    let disposed = false
+    let pendingDelta = ''
+    let deltaFrame: number | null = null
+
+    const cancelDeltaFrame = () => {
+      if (deltaFrame === null) return
+      window.cancelAnimationFrame(deltaFrame)
+      deltaFrame = null
+    }
+
+    const flushPartialDelta = () => {
+      cancelDeltaFrame()
+      if (disposed) {
+        pendingDelta = ''
+        return
+      }
+      if (!messageId || !pendingDelta) return
+      const text = pendingDelta
+      pendingDelta = ''
+      setMessages((prev) => prev.map((message) => message.id === messageId
+        ? { ...message, text: message.text + text }
+        : message))
+    }
+
+    const queueDelta = (text: string) => {
+      if (disposed || !messageId || !text) return
+      pendingDelta += text
+      if (deltaFrame !== null) return
+      deltaFrame = window.requestAnimationFrame(() => {
+        deltaFrame = null
+        flushPartialDelta()
+      })
+    }
+
+    const disposeDelta = () => {
+      disposed = true
+      cancelDeltaFrame()
+      pendingDelta = ''
+    }
+    streamCleanupRef.current = disposeDelta
 
     const applyDone = (result: {
       reply: string
@@ -244,7 +292,10 @@ export default function ChatPanel({
       suggestions: Suggestion[]
       form_complete: boolean
     }) => {
+      cancelDeltaFrame()
+      pendingDelta = ''
       terminal = true
+      if (disposed) return
       const id = messageId ?? newId()
       messageId = id
       setMessages((prev) => {
@@ -267,23 +318,25 @@ export default function ChatPanel({
 
       await streamChat(request, {
         onStart: () => {
+          if (disposed) return
           const id = messageId ?? newId()
           messageId = id
           setMessages((prev) => prev.some((message) => message.id === id)
             ? prev.map((message) => message.id === id ? { ...message, text: '', partial: true, interrupted: false } : message)
             : [...prev, { id, role: 'ai', text: '', partial: true }])
         },
-        onDelta: ({ text }) => {
-          if (!messageId) return
-          setMessages((prev) => prev.map((message) => message.id === messageId
-            ? { ...message, text: message.text + text, partial: true }
-            : message))
+        onDelta: ({ text }) => queueDelta(text),
+        onStatus: ({ message }) => {
+          if (!disposed) setStreamStatus(message)
         },
-        onStatus: ({ message }) => setStreamStatus(message),
-        onToolEvent: ({ kind }) => setStreamStatus(toolEventStatus(kind)),
+        onToolEvent: ({ kind }) => {
+          if (!disposed) setStreamStatus(toolEventStatus(kind))
+        },
         onDone: applyDone,
         onError: (error) => {
+          flushPartialDelta()
           terminal = true
+          if (disposed) return
           setStreamStatus(null)
           setStreamError(error)
           if (messageId) {
@@ -295,7 +348,7 @@ export default function ChatPanel({
         },
       }, controller.signal)
     } catch (error) {
-      if (controller.signal.aborted) return
+      if (controller.signal.aborted || disposed) return
       let requestError = error
       if (error instanceof ChatStreamHttpError && (error.status === 404 || error.status === 405)) {
         try {
@@ -314,6 +367,7 @@ export default function ChatPanel({
         phase: 'transport',
       }
       terminal = true
+      flushPartialDelta()
       setStreamStatus(null)
       setStreamError(streamFailure)
       if (messageId) {
@@ -323,10 +377,14 @@ export default function ChatPanel({
         retryRef.current = { request, messageId }
       }
     } finally {
+      if (!terminal) flushPartialDelta()
       if (controllerRef.current === controller) controllerRef.current = null
-      sendingRef.current = false
-      setSending(false)
-      if (!terminal) setStreamStatus(null)
+      if (streamCleanupRef.current === disposeDelta) streamCleanupRef.current = null
+      if (!disposed) {
+        sendingRef.current = false
+        setSending(false)
+        if (!terminal) setStreamStatus(null)
+      }
     }
   }, [dispatch])
 

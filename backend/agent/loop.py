@@ -12,6 +12,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
+from time import perf_counter
 from typing import AsyncIterator, Literal
 
 from anthropic import Anthropic, AsyncAnthropic
@@ -23,7 +24,7 @@ from agent.llm import (
 )
 from agent.tools import TOOL_DEFS, execute_tool, ToolEvent
 from agent import flow
-from agent.question_copy import ensure_current_question_help
+from agent.question_copy import ensure_current_question_help, strip_help_lines
 from store.uploads import SavedImage
 from survey.models import StudioFormState
 from survey.schema_def import (
@@ -37,6 +38,12 @@ from survey.schema_def import (
 MAX_ITERATIONS = 5
 RECENT_MESSAGE_LIMIT = 12
 HISTORY_CONTEXT_CHAR_LIMIT = 1600
+HISTORICAL_IMAGE_MARKER = '[历史消息包含图片，图片字段以当前表单状态为准]'
+
+_HISTORICAL_IMAGE_REFERENCE_RE = re.compile(
+    r'(?:这|那|上|前|刚才|之前).{0,5}(?:张|个)?(?:图|图片|照片|截图)'
+    r'|(?:图|图片|照片|截图).{0,5}(?:里|中|上|刚才|之前)'
+)
 
 CAPTURE_CONFIRMATION_WORDS = (
     '记下',
@@ -326,18 +333,87 @@ def _skip_unknown_equipment_inventory(
     )]
 
 
-def _extract_text(content: str | list[dict]) -> str:
-    """从 content（字符串或数组）中提取纯文本。图片用 [图片] 占位。"""
+def _history_content_for_model(
+    role: str,
+    content: str | list[dict],
+    *,
+    preserve_images: bool = False,
+) -> str | list[dict]:
+    """清理历史展示文案和旧图，只把明确被追问的最近图片继续发给模型。"""
     if isinstance(content, str):
-        return content
-    parts = []
-    for block in content:
-        if isinstance(block, dict):
+        text = content
+        has_image = False
+    else:
+        text_parts: list[str] = []
+        has_image = False
+        for block in content:
+            if not isinstance(block, dict):
+                continue
             if block.get('type') == 'text':
-                parts.append(block.get('text', ''))
+                text_parts.append(str(block.get('text', '')))
             elif block.get('type') == 'image':
-                parts.append('[图片]')
-    return ''.join(parts)
+                has_image = True
+        text = ''.join(text_parts)
+
+    if role == 'assistant':
+        text = strip_help_lines(text)
+
+    if preserve_images and isinstance(content, list):
+        blocks: list[dict] = []
+        if text:
+            blocks.append({'type': 'text', 'text': text})
+        blocks.extend(
+            {
+                'type': 'image',
+                'source': dict(block.get('source') or {}),
+            }
+            for block in content
+            if isinstance(block, dict) and block.get('type') == 'image'
+        )
+        return blocks
+
+    if has_image:
+        text = f'{text.rstrip()}\n{HISTORICAL_IMAGE_MARKER}'.strip()
+    return text
+
+
+def _prepare_recent_history(
+    history: list[dict],
+    user_message: str,
+) -> list[dict]:
+    """过滤数据库元数据，并按当前语义决定是否携带上一轮图片。"""
+    latest_image_index = next(
+        (
+            index
+            for index in range(len(history) - 1, -1, -1)
+            if history[index].get('role') == 'user'
+            and isinstance(history[index].get('content'), list)
+            and any(
+                isinstance(block, dict) and block.get('type') == 'image'
+                for block in history[index]['content']
+            )
+        ),
+        None,
+    )
+    preserve_image_index = (
+        latest_image_index
+        if _HISTORICAL_IMAGE_REFERENCE_RE.search(user_message)
+        else None
+    )
+
+    prepared: list[dict] = []
+    for index, message in enumerate(history):
+        role = message.get('role')
+        if role not in {'user', 'assistant'}:
+            continue
+        content = _history_content_for_model(
+            role,
+            message.get('content') or '',
+            preserve_images=(index == preserve_image_index),
+        )
+        if content:
+            prepared.append({'role': role, 'content': content})
+    return prepared
 
 
 def _build_user_content(message: str, images: list[SavedImage] | None) -> str | list[dict]:
@@ -674,13 +750,15 @@ async def _run_extraction_pass_async(
     messages: list[dict],
     reply: str,
     history_summary: str,
-) -> list[ToolEvent]:
-    """_run_extraction_pass 的异步版（流式路径用），返回产生的事件。"""
+) -> tuple[list[ToolEvent], int]:
+    """_run_extraction_pass 的异步版，返回产生的事件和上游调用次数。"""
     events: list[ToolEvent] = []
     expects_update = _reply_claims_capture(reply)
+    call_count = 0
 
     for attempt in range(2):
         try:
+            call_count += 1
             resp = await client.messages.create(
                 model=LLM_MODEL,
                 max_tokens=500,
@@ -706,7 +784,7 @@ async def _run_extraction_pass_async(
                 'extraction pass failed',
                 exc_info=True,
             )
-            return events
+            return events, call_count
 
         attempt_events: list[ToolEvent] = []
         all_ok = True
@@ -731,9 +809,9 @@ async def _run_extraction_pass_async(
             attempt_events
             or not expects_update
         ):
-            return events
+            return events, call_count
 
-    return events
+    return events, call_count
 
 
 def _compact_history(history: list[dict]) -> str:
@@ -744,14 +822,15 @@ def _compact_history(history: list[dict]) -> str:
     history_lines: list[str] = []
 
     for message in history:
+        role = message.get('role', '')
         content = message.get('content')
-        text = _extract_text(content) if content else ''
-        if not text or text == '[图片]':
+        text = _history_content_for_model(role, content) if content else ''
+        if not isinstance(text, str) or not text:
             continue
 
         speaker = (
             '客户'
-            if message.get('role') == 'user'
+            if role == 'user'
             else '客服'
         )
 
@@ -1194,6 +1273,52 @@ def _apply_image_invitation(
     return reply
 
 
+def _finalize_reply(
+    state: StudioFormState,
+    user_message: str,
+    reply: str,
+    events: list[ToolEvent],
+) -> str:
+    """统一收敛回复，保证流式、非流式和快捷选项使用相同业务规则。"""
+    _apply_deterministic_price_range(state, user_message)
+    _apply_deterministic_reference_link(state, user_message)
+    flow.recompute_section_status(state)
+    flow.sync_current_question(state)
+    finalized = _correct_premature_completion(state, reply)
+    finalized = _enforce_collector_reply(state, finalized)
+    current = flow.next_question_field(state)
+    if current is not None:
+        section_id, current_field = current
+        finalized = ensure_current_question_help(
+            current_field,
+            finalized,
+            skippable=(
+                current_field.skippable
+                or SECTION_BY_ID[section_id].skippable
+            ),
+        )
+    return _apply_image_invitation(
+        state,
+        user_message,
+        finalized,
+        events,
+    )
+
+
+def result_after_authoritative_updates(
+    state: StudioFormState,
+) -> AgentResult:
+    """快捷选项已由后端写入时，直接生成下一题，避免无意义的 LLM 往返。"""
+    reply = _finalize_reply(state, '', '', [])
+    return AgentResult(
+        reply=reply,
+        tool_events=[],
+        state=state,
+        form_complete=flow.form_complete(state),
+        suggestions=_build_suggestions(state, reply),
+    )
+
+
 def run_agent(
     state: StudioFormState,
     user_message: str,
@@ -1224,7 +1349,7 @@ def run_agent(
 
     # Anthropic API 要求第一条消息必须是 user。
     messages: list[dict] = []
-    trimmed = list(recent_history)
+    trimmed = _prepare_recent_history(recent_history, user_message)
 
     while (
         trimmed
@@ -1328,26 +1453,7 @@ def run_agent(
             client, state, messages, reply, history_summary, events,
         )
 
-    # 确定性价格规则拥有最终优先级，避免模型把边界区间误写回错误档位。
-    _apply_deterministic_price_range(state, user_message)
-    _apply_deterministic_reference_link(state, user_message)
-    # 完成与否只信任真实 form_state，不信任模型的口头判断。
-    flow.recompute_section_status(state)
-    flow.sync_current_question(state)
-    reply = _correct_premature_completion(
-        state,
-        reply,
-    )
-    reply = _enforce_collector_reply(state, reply)
-    current = flow.next_question_field(state)
-    if current is not None:
-        section_id, field = current
-        reply = ensure_current_question_help(
-            field,
-            reply,
-            skippable=(field.skippable or SECTION_BY_ID[section_id].skippable),
-        )
-    reply = _apply_image_invitation(
+    reply = _finalize_reply(
         state,
         user_message,
         reply,
@@ -1430,10 +1536,15 @@ async def run_agent_stream(
     user_message: str,
     history: list[dict] | None = None,
     images: list[SavedImage] | None = None,
+    trace_id: str | None = None,
 ) -> AsyncIterator[
     AgentStreamDelta | AgentStreamStatus | AgentStreamToolEvent | AgentStreamResult | None
 ]:
     """运行真实 SDK stream，并产出安全的内部流式事件。images 为已落盘的 SavedImage 列表。"""
+    started_at = perf_counter()
+    first_delta_at: float | None = None
+    main_llm_calls = 0
+    extraction_llm_calls = 0
     client = get_async_client()
     events: list[ToolEvent] = []
     flow.sync_current_question(state)
@@ -1448,7 +1559,7 @@ async def run_agent_stream(
         recent_history = full_history[-RECENT_MESSAGE_LIMIT:]
         history_summary = _compact_history(older_history)
 
-        messages = list(recent_history)
+        messages = _prepare_recent_history(recent_history, user_message)
         while messages and messages[0].get('role') != 'user':
             messages.pop(0)
         messages.append({'role': 'user', 'content': _build_user_content(user_message, images)})
@@ -1456,6 +1567,7 @@ async def run_agent_stream(
         reply = ''
         filled = False  # 本轮是否调过 fill_fields（updates=[] 也算）
         for _ in range(MAX_ITERATIONS):
+            main_llm_calls += 1
             yield AgentStreamStatus(phase='generating', message='正在生成回复')
             response = None
             async for item in _stream_response(
@@ -1472,6 +1584,8 @@ async def run_agent_stream(
                 if item is None:
                     yield None
                 elif isinstance(item, AgentStreamDelta):
+                    if first_delta_at is None:
+                        first_delta_at = perf_counter()
                     yield item
                 else:
                     response = item
@@ -1541,7 +1655,7 @@ async def run_agent_stream(
                 phase='tool_call',
                 message='正在整理已采集信息',
             )
-            extract_events = await _run_extraction_pass_async(
+            extract_events, extraction_llm_calls = await _run_extraction_pass_async(
                 client, state, messages, reply, history_summary,
             )
             if extract_events:
@@ -1549,26 +1663,7 @@ async def run_agent_stream(
                 for event in extract_events:
                     yield AgentStreamToolEvent(event)
 
-        # 确定性价格规则拥有最终优先级，避免模型把边界区间误写回错误档位。
-        _apply_deterministic_price_range(state, user_message)
-        _apply_deterministic_reference_link(state, user_message)
-        # 完成与否只信任真实 form_state，不信任模型的口头判断。
-        flow.recompute_section_status(state)
-        flow.sync_current_question(state)
-        reply = _correct_premature_completion(
-            state,
-            reply,
-        )
-        reply = _enforce_collector_reply(state, reply)
-        current = flow.next_question_field(state)
-        if current is not None:
-            section_id, field = current
-            reply = ensure_current_question_help(
-                field,
-                reply,
-                skippable=(field.skippable or SECTION_BY_ID[section_id].skippable),
-            )
-        reply = _apply_image_invitation(
+        reply = _finalize_reply(
             state,
             user_message,
             reply,
@@ -1582,4 +1677,20 @@ async def run_agent_stream(
             suggestions=_build_suggestions(state, reply),
         )
     finally:
-        await client.close()
+        total_ms = (perf_counter() - started_at) * 1000
+        ttft_ms = (
+            (first_delta_at - started_at) * 1000
+            if first_delta_at is not None
+            else None
+        )
+        logger.info(
+            'agent_stream_timing trace_id=%s total_ms=%.1f ttft_ms=%s '
+            'main_llm_calls=%d extraction_llm_calls=%d history_messages=%d images=%d',
+            trace_id or 'none',
+            total_ms,
+            f'{ttft_ms:.1f}' if ttft_ms is not None else 'none',
+            main_llm_calls,
+            extraction_llm_calls,
+            len(history or []),
+            len(images or []),
+        )
