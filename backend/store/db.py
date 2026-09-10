@@ -106,6 +106,34 @@ def init_db() -> None:
             CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_usage_request
                 ON chat_usage(request_key)
                 WHERE request_key IS NOT NULL;
+
+            CREATE TABLE IF NOT EXISTS skill_runs (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                pipeline_run_id  TEXT NOT NULL,
+                skill            TEXT NOT NULL,
+                status           TEXT NOT NULL,
+                attempt          INTEGER DEFAULT 1,
+                input_json       TEXT,
+                output_json      TEXT,
+                cost_cny         REAL DEFAULT 0,
+                started_at       TEXT,
+                finished_at      TEXT,
+                error            TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_skill_runs_pipeline
+                ON skill_runs(pipeline_run_id, skill);
+
+            CREATE TABLE IF NOT EXISTS artifacts (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                pipeline_run_id  TEXT NOT NULL,
+                kind             TEXT NOT NULL,
+                path             TEXT NOT NULL,
+                sha256           TEXT,
+                meta_json        TEXT,
+                created_at       TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_artifacts_pipeline_kind
+                ON artifacts(pipeline_run_id, kind);
         ''')
 
         # sessions 表：检测老结构（无 user_id），DROP 重建
@@ -146,6 +174,70 @@ def init_db() -> None:
         conn.execute('''
             CREATE INDEX IF NOT EXISTS idx_sessions_user_updated
             ON sessions(user_id, updated_at)
+        ''')
+
+        # 智能交付管线（F1–F5）
+        conn.executescript('''
+            CREATE TABLE IF NOT EXISTS pipeline_runs (
+                id             TEXT PRIMARY KEY,
+                session_id     TEXT NOT NULL,
+                delivery_id    INTEGER,
+                user_id        INTEGER NOT NULL,
+                status         TEXT NOT NULL,
+                current_skill  TEXT,
+                created_at     TEXT NOT NULL,
+                updated_at     TEXT NOT NULL,
+                error          TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_pipeline_runs_session
+                ON pipeline_runs(session_id);
+            CREATE INDEX IF NOT EXISTS idx_pipeline_runs_user
+                ON pipeline_runs(user_id, created_at);
+
+            CREATE TABLE IF NOT EXISTS skill_runs (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                pipeline_run_id  TEXT NOT NULL,
+                skill            TEXT NOT NULL,
+                status           TEXT NOT NULL,
+                attempt          INTEGER DEFAULT 1,
+                input_json       TEXT,
+                output_json      TEXT,
+                cost_cny         REAL DEFAULT 0,
+                started_at       TEXT,
+                finished_at      TEXT,
+                error            TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_skill_runs_pipeline
+                ON skill_runs(pipeline_run_id, skill);
+
+            CREATE TABLE IF NOT EXISTS artifacts (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                pipeline_run_id  TEXT NOT NULL,
+                kind             TEXT NOT NULL,
+                path             TEXT NOT NULL,
+                sha256           TEXT,
+                meta_json        TEXT,
+                created_at       TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_artifacts_pipeline_kind
+                ON artifacts(pipeline_run_id, kind);
+
+            CREATE TABLE IF NOT EXISTS knowledge_docs (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename     TEXT NOT NULL,
+                category     TEXT NOT NULL,
+                status       TEXT NOT NULL,
+                chunks       INTEGER NOT NULL DEFAULT 0,
+                path         TEXT,
+                industry     TEXT,
+                scene        TEXT,
+                source       TEXT,
+                note         TEXT,
+                created_at   TEXT NOT NULL,
+                updated_at   TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_knowledge_docs_status
+                ON knowledge_docs(status, updated_at);
         ''')
 
 
@@ -1084,3 +1176,218 @@ def delete_delivery(delivery_id: int) -> bool:
         )
 
     return cursor.rowcount > 0
+
+
+# ── Knowledge docs（F1 运营侧文档状态） ─────────────────────
+
+def create_knowledge_doc(
+    *,
+    filename: str,
+    category: str,
+    status: str = 'pending',
+    path: str | None = None,
+    industry: str | None = None,
+    scene: str | None = None,
+    note: str | None = None,
+) -> int:
+    now = _now()
+    with _connect() as conn:
+        cursor = conn.execute(
+            '''
+            INSERT INTO knowledge_docs
+                (filename, category, status, chunks, path, industry, scene, note, created_at, updated_at)
+            VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
+            ''',
+            (filename, category, status, path, industry, scene, note, now, now),
+        )
+    return int(cursor.lastrowid)
+
+
+def update_knowledge_doc(doc_id: int, **fields: Any) -> bool:
+    allowed = {'status', 'chunks', 'path', 'note', 'source', 'industry', 'scene'}
+    safe = {k: v for k, v in fields.items() if k in allowed}
+    if not safe:
+        return False
+    safe['updated_at'] = _now()
+    assignments = ', '.join(f'{k} = ?' for k in safe)
+    with _connect() as conn:
+        cursor = conn.execute(
+            f'UPDATE knowledge_docs SET {assignments} WHERE id = ?',
+            (*safe.values(), doc_id),
+        )
+    return cursor.rowcount > 0
+
+
+def get_knowledge_doc(doc_id: int) -> dict[str, Any] | None:
+    with _connect() as conn:
+        row = conn.execute(
+            'SELECT * FROM knowledge_docs WHERE id = ?', (doc_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def list_knowledge_docs(
+    *,
+    status: str | None = None,
+    category: str | None = None,
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    if status:
+        clauses.append('status = ?')
+        params.append(status)
+    if category:
+        clauses.append('category = ?')
+        params.append(category)
+    where = f'WHERE {" AND ".join(clauses)}' if clauses else ''
+    with _connect() as conn:
+        rows = conn.execute(
+            f'''
+            SELECT * FROM knowledge_docs
+            {where}
+            ORDER BY updated_at DESC
+            LIMIT ?
+            ''',
+            (*params, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+# ── Pipeline skill_runs / artifacts ─────────────────────────
+
+def start_skill_run(
+    *,
+    pipeline_run_id: str,
+    skill: str,
+    input_json: dict[str, Any] | None = None,
+) -> int:
+    """开始一次 skill 运行，返回 run id。"""
+    now = _now()
+    with _connect() as conn:
+        cursor = conn.execute(
+            '''
+            INSERT INTO skill_runs (
+                pipeline_run_id, skill, status, attempt,
+                input_json, started_at
+            ) VALUES (?, ?, 'running', 1, ?, ?)
+            ''',
+            (
+                pipeline_run_id,
+                skill,
+                json.dumps(input_json, ensure_ascii=False) if input_json else None,
+                now,
+            ),
+        )
+        return int(cursor.lastrowid)
+
+
+def finish_skill_run_latest(
+    *,
+    pipeline_run_id: str,
+    skill: str,
+    status: str,
+    output_json: dict[str, Any] | None = None,
+    cost_cny: float = 0.0,
+    error: str | None = None,
+) -> None:
+    """结束该 pipeline+skill 最近一条 running 记录。"""
+    now = _now()
+    with _connect() as conn:
+        row = conn.execute(
+            '''
+            SELECT id FROM skill_runs
+            WHERE pipeline_run_id = ? AND skill = ? AND status = 'running'
+            ORDER BY id DESC LIMIT 1
+            ''',
+            (pipeline_run_id, skill),
+        ).fetchone()
+        if row is None:
+            conn.execute(
+                '''
+                INSERT INTO skill_runs (
+                    pipeline_run_id, skill, status, output_json,
+                    cost_cny, started_at, finished_at, error
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (
+                    pipeline_run_id,
+                    skill,
+                    status,
+                    json.dumps(output_json, ensure_ascii=False) if output_json else None,
+                    cost_cny,
+                    now,
+                    now,
+                    error,
+                ),
+            )
+            return
+        conn.execute(
+            '''
+            UPDATE skill_runs
+            SET status = ?, output_json = ?, cost_cny = ?,
+                finished_at = ?, error = ?
+            WHERE id = ?
+            ''',
+            (
+                status,
+                json.dumps(output_json, ensure_ascii=False) if output_json else None,
+                cost_cny,
+                now,
+                error,
+                row['id'],
+            ),
+        )
+
+
+def list_skill_runs(pipeline_run_id: str) -> list[dict[str, Any]]:
+    with _connect() as conn:
+        rows = conn.execute(
+            '''
+            SELECT * FROM skill_runs
+            WHERE pipeline_run_id = ?
+            ORDER BY id ASC
+            ''',
+            (pipeline_run_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def upsert_artifact(
+    *,
+    pipeline_run_id: str,
+    kind: str,
+    path: str,
+    sha256: str | None = None,
+    meta: dict[str, Any] | None = None,
+) -> None:
+    now = _now()
+    with _connect() as conn:
+        conn.execute(
+            '''
+            INSERT INTO artifacts (
+                pipeline_run_id, kind, path, sha256, meta_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ''',
+            (
+                pipeline_run_id,
+                kind,
+                path,
+                sha256,
+                json.dumps(meta, ensure_ascii=False) if meta else None,
+                now,
+            ),
+        )
+
+
+def list_artifacts(pipeline_run_id: str) -> list[dict[str, Any]]:
+    with _connect() as conn:
+        rows = conn.execute(
+            '''
+            SELECT * FROM artifacts
+            WHERE pipeline_run_id = ?
+            ORDER BY id ASC
+            ''',
+            (pipeline_run_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]

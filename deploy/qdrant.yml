@@ -1,0 +1,21 @@
+# Qdrant 单容器（替代原 Milvus Standalone + MinIO + etcd 三容器）
+# 用法：docker compose -f deploy/qdrant.yml up -d
+# 客户端：QDRANT_URI=http://localhost:6333
+#
+# 本地嵌入式（无 Docker）：
+#   QDRANT_URI=./data/qdrant
+
+services:
+  qdrant:
+    container_name: qdrant
+    image: qdrant/qdrant:v1.13.2
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ${DOCKER_VOLUME_ROOT:-.}/volumes/qdrant:/qdrant/storage
+    restart: unless-stopped
+
+networks:
+  default:
+    name: qdrant

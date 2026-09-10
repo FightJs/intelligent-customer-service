@@ -25,11 +25,30 @@ uv run pytest
 | 目录 | 职责 |
 |---|---|
 | `agent/` | LLM 调用（Anthropic 兼容端点）、tool-use 循环、表单状态机 |
-| `api/` | FastAPI 路由（`app.py`：session / chat / generate） |
+| `api/` | FastAPI 路由（`app.py`：session / chat / generate / admin） |
 | `survey/` | 表单 schema 单一真相源 + codegen（生成前端 `schema.json`） |
 | `store/` | SQLite 持久化（`db.py`：sessions / messages，无 ORM） |
 | `delivery/` | 交付物生成（markdown / excel / word） |
+| `knowledge/` | F1 向量知识库（Qdrant hybrid 检索 / ingest / mapping） |
 | `tests/` | pytest（`conftest.py` 自动 init_db，API 测试 mock LLM） |
+
+## 知识库（F1）
+
+```bash
+# 本地无 Docker：内存库 + mock embedding
+export QDRANT_URI=memory:// EMBEDDING_PROVIDER=mock RERANK_PROVIDER=identity
+uv run python scripts/seed_knowledge.py
+
+# 本地嵌入式（持久化，零 Docker）
+export QDRANT_URI=./data/qdrant EMBEDDING_PROVIDER=dashscope DASHSCOPE_API_KEY=...
+uv run --extra qdrant python scripts/seed_knowledge.py
+
+# 服务端（单容器）
+docker compose -f ../deploy/qdrant.yml up -d
+export QDRANT_URI=http://localhost:6333 EMBEDDING_PROVIDER=dashscope DASHSCOPE_API_KEY=...
+uv run --extra qdrant python scripts/seed_knowledge.py
+uv run --extra qdrant python scripts/ingest_knowledge.py path/to/docs.json
+```
 
 ## 改了表单 schema 后
 

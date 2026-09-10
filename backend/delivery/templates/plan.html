@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ title }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm 16mm;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "PingFang SC", "Hiragino Sans GB", "Source Han Sans SC",
+        "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+      color: #1f1f1f;
+      font-size: 11.5pt;
+      line-height: 1.55;
+      margin: 0;
+    }
+    h1, h2, h3 { font-weight: 600; margin: 0 0 8px; }
+    h1 { font-size: 22pt; }
+    h2 {
+      font-size: 14pt;
+      margin-top: 18px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #d9d2c5;
+    }
+    .cover {
+      min-height: 220mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      text-align: center;
+      page-break-after: always;
+    }
+    .cover .brand { font-size: 28pt; margin-bottom: 12px; }
+    .cover .subtitle { font-size: 14pt; color: #555; margin-bottom: 28px; }
+    .cover .meta { color: #777; font-size: 10.5pt; line-height: 1.8; }
+    .banner {
+      background: #fff7e6;
+      border: 1px solid #f0d59a;
+      color: #8a6100;
+      padding: 8px 10px;
+      margin-bottom: 12px;
+      border-radius: 4px;
+    }
+    .summary-box {
+      background: #f7f4ef;
+      border-left: 3px solid #b08d57;
+      padding: 10px 12px;
+      margin: 8px 0 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 12px;
+      font-size: 10.5pt;
+    }
+    th, td {
+      border: 1px solid #d9d2c5;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #f3efe7; font-weight: 600; }
+    ul, ol { margin: 6px 0 10px 18px; padding: 0; }
+    li { margin-bottom: 4px; }
+    .muted { color: #777; }
+    .tag {
+      display: inline-block;
+      background: #f0ebe3;
+      border-radius: 3px;
+      padding: 1px 6px;
+      margin-right: 4px;
+      font-size: 9.5pt;
+    }
+    .risk-list li { color: #7a4b00; }
+    .footer-note {
+      margin-top: 24px;
+      font-size: 9pt;
+      color: #999;
+    }
+    .kv { width: 100%; }
+    .kv td:first-child { width: 28%; color: #555; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div class="brand">{{ brand or '直播间搭建方案' }}</div>
+    <div class="subtitle">智能交付 · 方案文档</div>
+    <div class="meta">
+      <div>行业：{{ industry_label }}{% if subcategory %}｜{{ subcategory }}{% endif %}</div>
+      <div>面积档：{{ area_band or room_size }}｜总预算：{{ budget_total or '未填写' }}</div>
+      <div>生成日期：{{ generated_date }}</div>
+      <div>版本：v1</div>
+    </div>
+  </section>
+
+  {% if incomplete %}
+  <div class="banner">信息不完整：部分核心需求未填写，方案细节可能需要复核。</div>
+  {% endif %}
+  {% if knowledge_degraded %}
+  <div class="banner">未接入知识库：本方案基于通用模板生成，设备型号与价格区间仅供方向参考。</div>
+  {% endif %}
+
+  <h2>一、需求摘要</h2>
+  <table class="kv">
+    <tr><td>品牌</td><td>{{ brand or '未填写' }}</td></tr>
+    <tr><td>行业/品类</td><td>{{ industry_label }}{% if subcategory %}｜{{ subcategory }}{% endif %}</td></tr>
+    <tr><td>价格带 / 定位</td><td>{{ price_band or '—' }} / {{ positioning or '—' }}</td></tr>
+    <tr><td>直播类型</td><td>{{ live_type or '—' }}</td></tr>
+    <tr><td>面积 / 尺寸档</td><td>{{ area_band or '—' }}（{{ room_size }}）</td></tr>
+    <tr><td>预算</td><td>总 {{ budget_total or '—' }}｜设备 {{ budget_equip or '—' }}｜装修 {{ budget_decor or '—' }}</td></tr>
+    <tr><td>核心目标</td><td>{{ goal_core or '—' }}{% if goal_focus %}｜关注：{{ goal_focus|join('、') }}{% endif %}</td></tr>
+    <tr><td>主营商品</td><td>{{ product_main or '—' }}{% if product_keywords %}｜风格：{{ product_keywords|join('、') }}{% endif %}</td></tr>
+    <tr><td>主播</td><td>{{ host_count or '—' }}｜{{ host_movement or '—' }}</td></tr>
+    <tr><td>窗户 / 装修</td><td>{{ window or '—' }}{% if window_pos %}（{{ window_pos }}）{% endif %} / {{ renovation or '—' }}</td></tr>
+    {% if existing_equipment %}
+    <tr>
+      <td>已有设备</td>
+      <td>
+        {% for item in existing_equipment %}
+          {{ item.type or '设备' }}{% if item.model %}（{{ item.model }}）{% endif %}{% if item.qty %} ×{{ item.qty }}{% endif %}{% if not loop.last %}；{% endif %}
+        {% endfor %}
+      </td>
+    </tr>
+    {% endif %}
+  </table>
+
+  <div class="summary-box">{{ summary }}</div>
+
+  <h2>二、空间与布局</h2>
+  <ul>
+    {% for zone in layout.zones %}
+    <li><strong>{{ zone.name }}</strong>：{{ zone.notes }}</li>
+    {% endfor %}
+  </ul>
+  <table>
+    <tr><th>布光</th><td>{{ layout.lighting_plan }}</td></tr>
+    <tr><th>机位</th><td>{{ layout.camera_plan }}</td></tr>
+    <tr><th>背景</th><td>{{ layout.background_plan }}</td></tr>
+  </table>
+
+  <h2>三、设备清单</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>类别</th><th>名称/型号</th><th>品牌</th><th>数量</th><th>理由</th><th>状态</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in equipment_list %}
+      <tr>
+        <td>{{ item.category }}</td>
+        <td>{{ item.name }}{% if item.model %}<br/><span class="muted">{{ item.model }}</span>{% endif %}</td>
+        <td>{{ item.brand or '—' }}</td>
+        <td>{{ item.qty }}</td>
+        <td>{{ item.reason }}</td>
+        <td>
+          {% if item.already_owned %}<span class="tag">已有</span>{% endif %}
+          {% if item.is_custom %}<span class="tag">定制</span>{% endif %}
+          {% if item.knowledge_id %}<span class="tag">#{{ item.knowledge_id }}</span>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">暂无设备清单</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>四、三档套餐</h2>
+  <table>
+    <thead>
+      <tr><th>档位</th><th>金额区间</th><th>包含内容</th></tr>
+    </thead>
+    <tbody>
+      {% for tier in package_tiers %}
+      <tr>
+        <td>{{ tier.tier }}</td>
+        <td>{{ tier.total_range }}</td>
+        <td>
+          {% if tier.items %}
+            {% for item in tier.items %}
+              {{ item.name }} ×{{ item.qty }}{% if not loop.last %}；{% endif %}
+            {% endfor %}
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="muted">暂无套餐</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>五、搭建步骤</h2>
+  <ol>
+    {% for step in setup_steps %}
+    <li>{{ step }}</li>
+    {% endfor %}
+  </ol>
+
+  <h2>六、风险与提示</h2>
+  {% if risks %}
+  <ul class="risk-list">
+    {% for risk in risks %}
+    <li>{{ risk }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">暂无额外风险提示。</p>
+  {% endif %}
+
+  <h2>七、场景卡（供预览图使用）</h2>
+  <table class="kv">
+    <tr><td>风格关键词</td><td>{% for k in scene_card.style_keywords %}<span class="tag">{{ k }}</span>{% endfor %}</td></tr>
+    <tr><td>色板</td><td>{{ scene_card.color_palette|join(' / ') }}</td></tr>
+    <tr><td>色温</td><td>{{ scene_card.color_temp }}</td></tr>
+    <tr><td>家具</td><td>{{ scene_card.furniture|join('、') }}</td></tr>
+    <tr><td>灯具</td><td>{{ scene_card.lighting_fixtures|join('、') }}</td></tr>
+    <tr><td>机位</td><td>{{ scene_card.camera_angles|join(' / ') }}</td></tr>
+    <tr><td>禁止元素</td><td>{{ scene_card.forbidden|join('、') }}</td></tr>
+  </table>
+
+  {% if knowledge_refs %}
+  <h2>附录：知识引用</h2>
+  <ul>
+    {% for ref in knowledge_refs %}
+    <li>{{ ref.collection }} #{{ ref.id }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <p class="footer-note">本方案由智能客服系统自动生成。价格为区间参考，非成交报价；设备型号以最终核对为准。</p>
+</body>
+</html>

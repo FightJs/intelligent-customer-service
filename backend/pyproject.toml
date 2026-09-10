@@ -23,6 +23,11 @@ dependencies = [
     "bcrypt>=4.0,<5.0",  # passlib 1.7 与 bcrypt 5 不兼容，约束到 4.x
     "python-jose[cryptography]>=3.3",
     "python-dotenv>=1.0",  # 之前是传递依赖，显式声明
+    # F1 知识库
+    "pypdf>=5.0",          # PDF 切块入库
+    "python-multipart>=0.0.9",  # Admin 上传
+    # F2 方案 PDF（WeasyPrint 需系统 pango/cairo；失败自动降级 Word）
+    "weasyprint>=62",
 ]
 
 [project.optional-dependencies]
@@ -30,6 +35,11 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
 ]
+qdrant = [
+    "qdrant-client>=1.12",
+]
+# 本地 BGE 向量/rerank 需自行安装：pip install sentence-transformers
+# （体积大，默认不进 lock；CI 单测使用 mock provider）
 
 # 不打包（无 [build-system]），用 `pip install -r` + PYTHONPATH 方式开发。
 # 运行：cd backend && uvicorn api.app:app --reload
