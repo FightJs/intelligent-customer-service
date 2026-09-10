@@ -6,6 +6,13 @@ import Workbench from './screens/Workbench'
 import AdminScreen from './screens/AdminScreen'
 import BreathingScreen from './components/BreathingScreen'
 import MarketingScreen from './screens/MarketingScreen'
+import WorkbenchPreview from './screens/WorkbenchPreview'
+import { useTheme } from './state/theme'
+
+function ThemeRoot({ children }: { children: React.ReactNode }) {
+  useTheme()
+  return <>{children}</>
+}
 
 /** 受保护路由：未登录跳 /login，loading 时显示占位 */
 function Protected({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
@@ -47,7 +54,8 @@ function BreathingRoute() {
 
 export default function App() {
   return (
-    <Routes>
+    <ThemeRoot>
+      <Routes>
       <Route path="/welcome" element={<BreathingRoute />} />
       <Route
         path="/"
@@ -66,6 +74,7 @@ export default function App() {
           </Protected>
         }
       />
+      <Route path="/workbench-preview" element={<WorkbenchPreview />} />
       <Route
         path="/admin"
         element={
@@ -75,6 +84,7 @@ export default function App() {
         }
       />
       <Route path="*" element={<Navigate to="/welcome" replace />} />
-    </Routes>
+      </Routes>
+    </ThemeRoot>
   )
 }

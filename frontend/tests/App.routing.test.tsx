@@ -99,6 +99,14 @@ describe('App 路由同步', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/')
   })
 
+  it('未登录可直接访问工作台风格预览页', () => {
+    authState.user = null
+    renderAt('/workbench-preview')
+
+    expect(screen.getByRole('main', { name: '直播设备租赁工作台预览' })).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('/workbench-preview')
+  })
+
   it('旧 breathing 路径重定向到登录页', () => {
     authState.user = null
     renderAt('/breathing')
