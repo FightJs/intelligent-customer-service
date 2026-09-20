@@ -17,7 +17,7 @@ COLLECTIONS: tuple[CollectionName, ...] = (
 )
 
 INDUSTRIES = frozenset(
-    {'women', 'men', 'beauty', 'food', 'jewelry', 'home', 'digital', 'baby', 'all', 'other'}
+    {'women', 'men', 'shoes', 'beauty', 'food', 'jewelry', 'home', 'digital', 'baby', 'all', 'other'}
 )
 ROOM_SIZES = frozenset({'small', 'medium', 'large', 'xlarge'})
 BUDGET_LEVELS = frozenset({'low', 'mid', 'high', 'ultra'})

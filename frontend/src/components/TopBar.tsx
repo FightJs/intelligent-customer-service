@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
-import { ShieldCheck } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Clapperboard, ShieldCheck } from 'lucide-react'
 import type { Theme } from '../state/theme'
 import AvatarMenu from './AvatarMenu'
 
@@ -90,6 +91,15 @@ export default function TopBar({
           <span className="top-bar-title text-secondary text-[16px] leading-6 font-medium pointer-events-none">Livestream Studio Setup Assistant</span>
         </div>
         <div className="flex-1 flex items-center justify-end gap-3.5">
+          <Link
+            to="/plans"
+            className="top-bar-icon-button top-bar-plans-button inline-flex h-8 items-center gap-1.5 rounded-card px-2.5 text-xs text-secondary hover:bg-active-surface hover:text-primary"
+            title="我的方案"
+            aria-label="我的方案"
+          >
+            <Clapperboard size={15} aria-hidden="true" />
+            <span className="hidden sm:inline">我的方案</span>
+          </Link>
           <button
             type="button"
             onClick={onRestoreCenterCard}

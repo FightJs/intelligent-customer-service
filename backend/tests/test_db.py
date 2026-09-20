@@ -97,6 +97,56 @@ def test_session_user_binding(tmp_path, monkeypatch):
     assert rec['form_state'] == {'currentSectionId': 'customer'}
 
 
+def test_get_latest_session_with_content_skips_empty(tmp_path, monkeypatch):
+    """跳过空壳会话，返回最近有填写内容的会话。"""
+    monkeypatch.setattr(db, 'DB_PATH', tmp_path / 'test.db')
+    db.init_db()
+
+    uid = db.create_user('dave', 'hashed_pw', role='user')
+    empty = db.create_session(uid, {'sections': {}})
+    filled = db.create_session(
+        uid,
+        {
+            'sections': {
+                'customer': {
+                    'fields': {
+                        'brand': {'type': 'text', 'value': '云裳'},
+                    }
+                }
+            }
+        },
+    )
+    # 再开一个更晚的空会话，不应覆盖 filled
+    db.create_session(uid, {'sections': {}})
+
+    latest = db.get_latest_session_with_content(uid)
+    assert latest is not None
+    assert latest['session_id'] == filled
+    assert latest['session_id'] != empty
+
+
+def test_get_latest_session_with_content_uses_messages(tmp_path, monkeypatch):
+    """仅有消息、表单仍空时也算有内容。"""
+    monkeypatch.setattr(db, 'DB_PATH', tmp_path / 'test.db')
+    db.init_db()
+
+    uid = db.create_user('erin', 'hashed_pw', role='user')
+    sid = db.create_session(uid, {'sections': {}})
+    db.add_message(sid, 'user', '女装')
+
+    latest = db.get_latest_session_with_content(uid)
+    assert latest is not None
+    assert latest['session_id'] == sid
+
+
+def test_get_latest_session_with_content_none(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, 'DB_PATH', tmp_path / 'test.db')
+    db.init_db()
+    uid = db.create_user('frank', 'hashed_pw', role='user')
+    db.create_session(uid, {'sections': {}})
+    assert db.get_latest_session_with_content(uid) is None
+
+
 def test_list_users_search_sort_pagination(tmp_path, monkeypatch):
     """list_users 支持搜索/排序/分页，返回 {items, total, page, size}。"""
     monkeypatch.setattr(db, 'DB_PATH', tmp_path / 'test.db')

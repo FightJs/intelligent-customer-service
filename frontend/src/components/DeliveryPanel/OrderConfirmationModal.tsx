@@ -5,7 +5,7 @@ import {
   Loader2,
   X,
 } from 'lucide-react'
-import { sendOrder } from '../../api/client'
+import { sendOrder, startPipeline } from '../../api/client'
 import { useFormState } from '../../state/FormContext'
 import { SECTIONS } from '../../data/sections'
 import {
@@ -97,6 +97,13 @@ export default function OrderConfirmationModal({
 
     try {
       const result = await sendOrder(sessionId, allowIncomplete)
+
+      // 订单成功后启动智能交付管线（失败不阻断订单结果）
+      try {
+        await startPipeline(sessionId, allowIncomplete)
+      } catch {
+        // 可在「我的方案」页手动再点生成
+      }
 
       setSuccessMessage(result.message)
       setSent(true)

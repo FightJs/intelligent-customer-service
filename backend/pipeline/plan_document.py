@@ -147,6 +147,18 @@ async def _compose(
             for owned_type, owned_model in owned_keys:
                 if name == owned_type or model == owned_model:
                     item.already_owned = True
+                    item.must_buy = False
+
+    if not draft.must_buy_list:
+        draft.must_buy_list = [
+            f'{item.brand} {item.model}'.strip() or item.name
+            for item in draft.equipment_list
+            if item.must_buy and not item.already_owned
+        ]
+    if not draft.rental_channels:
+        from pipeline.templates_plan import _RENTAL_CHANNELS
+
+        draft.rental_channels = list(_RENTAL_CHANNELS)
     return draft
 
 

@@ -13,7 +13,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from media.dashscope_video import DashScopeVideoClient, VideoClient, VideoClientError
+from media.dashscope_video import VideoClient, VideoClientError
 from pipeline import store
 from pipeline.models import PreviewVideoInput, PreviewVideoOutput, SceneCard
 
@@ -65,29 +65,46 @@ def estimate_cost(duration_sec: int, resolution: str, tier: str | None = None) -
     return round(base * (duration_sec / 5.0), 2)
 
 
+CAMERA_MOVES = {
+    'front': '镜头从主播正机位缓慢向右横移并轻度环绕，逐步露出左侧灯位与背景层次',
+    'left': '镜头从左侧机位缓慢向前推进并轻度环绕，展示主灯、柔光箱与背景层次',
+    'rear': '镜头从后侧机位缓慢向纵深推进，展示空间动线、理线与房间尺度',
+}
+
+
 def build_motion_prompt(
     scene_card: SceneCard,
     *,
     duration_sec: int,
     resolution: str,
+    source_angle: str = 'front',
 ) -> str:
-    """按 Spec §5 组装 motion prompt；禁止品牌 logo / 屏幕文字。"""
-    style = ', '.join(k for k in scene_card.style_keywords if k) or 'modern'
+    """以首帧为锚组装 i2v motion prompt；注入完整 scene_card，禁止品牌 logo / 屏幕文字。"""
+    style = ', '.join(k for k in scene_card.style_keywords if k) or '现代专业'
+    palette = ', '.join(c for c in scene_card.color_palette if c) or '暖中性'
+    furniture = ', '.join(f for f in scene_card.furniture if f) or '直播家具'
+    fixtures = ', '.join(f for f in scene_card.lighting_fixtures if f) or '柔光箱'
+    product = scene_card.product_category or '通用商品'
+    camera = CAMERA_MOVES.get(source_angle, CAMERA_MOVES['front'])
+
     parts = [
-        'slow cinematic orbit around a professional livestream studio interior,',
-        'same room as the still image, soft key lighting,',
-        f'{style} aesthetic,',
-        'smooth camera movement, no people close-up, no text, no watermark,',
-        f'duration {duration_sec}s, {resolution}',
+        '以给定首帧图为唯一起点，严格保持画面中的房间结构、家具布置、灯具位置与色彩不变。',
+        f'{camera}。',
+        (
+            f'专业直播间室内，{style}风格，色调 {palette}，'
+            f'可见 {furniture} 与 {fixtures}。'
+        ),
+        (
+            f'色温 {scene_card.color_temp}，商品品类 {product}，'
+            f'{scene_card.room_size_band} 房间尺度。'
+        ),
+        '灯光稳定无闪烁，画面干净专业，无人物特写，无文字，无水印，无 logo。',
     ]
-    if scene_card.color_temp:
-        parts.append(f'color temperature {scene_card.color_temp}')
-    if scene_card.product_category:
-        parts.append(f'product category {scene_card.product_category}')
     for item in scene_card.forbidden:
         cleaned = str(item).strip()
         if cleaned:
-            parts.append(f'no {cleaned}')
+            parts.append(f'不要出现{cleaned}。')
+    parts.append(f'镜头运动平滑电影感，时长约 {duration_sec} 秒，画质 {resolution}。')
     return ' '.join(parts)
 
 
@@ -308,10 +325,12 @@ async def run_preview_video(
 
     scene_card, scene_warnings = load_scene_card(inp.plan_json_path)
     warnings.extend(scene_warnings)
+    source_angle = str(source.get('angle') or inp.source_angle or 'front')
     prompt = build_motion_prompt(
         scene_card,
         duration_sec=inp.duration_sec,
         resolution=inp.resolution,
+        source_angle=source_angle,
     )
 
     out_dir = video_dir(inp.pipeline_run_id, root)
@@ -321,7 +340,9 @@ async def run_preview_video(
 
     owns_client = client is None
     if client is None:
-        client = DashScopeVideoClient()
+        from media.factory import get_video_client
+
+        client = get_video_client()
     budget = timeout_sec if timeout_sec is not None else float(os.getenv('VIDEO_TIMEOUT_SEC', '300'))
 
     models_to_try = [primary_model(), fallback_model()]

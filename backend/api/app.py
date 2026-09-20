@@ -11,6 +11,9 @@
 - GET    /api/admin/users       用户列表（admin only）
 - GET    /api/admin/deliverables 交付物列表+筛选（admin only）
 - GET    /api/admin/deliverables/{id} 交付物详情含 markdown（admin only）
+- GET    /api/admin/knowledge/docs  知识库文档列表（admin only）
+- POST   /api/admin/knowledge/upload 知识 PDF 上传入库（admin only）
+- POST   /api/admin/knowledge/docs/{id}/retry 失败重试（admin only）
 """
 from __future__ import annotations
 
@@ -28,9 +31,18 @@ from uuid import UUID, uuid4
 
 from dotenv import load_dotenv
 from anthropic import APIConnectionError, APIStatusError
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel, field_validator, model_validator
@@ -567,6 +579,38 @@ def create_session(current: dict = Depends(get_current_user)) -> SessionResponse
         session_id=session_id,
         form_state=to_dict(state),
         greeting=greeting,
+    )
+
+
+@app.get('/api/session/latest', response_model=SessionResponse)
+def get_latest_session(current: dict = Depends(get_current_user)) -> SessionResponse:
+    """取回当前用户最近一次有内容的调研会话（sessionStorage 丢失时用于恢复）。"""
+    rec = db.get_latest_session_with_content(current['id'])
+    if rec is None:
+        raise HTTPException(status_code=404, detail='暂无已采集的调研会话')
+    session_id = rec['session_id']
+    state = from_dict(rec['form_state'], session_id=session_id)
+    sync_current_question(state)
+    normalized_state = to_dict(state)
+    if normalized_state != rec['form_state']:
+        db.save_session(session_id, normalized_state)
+    messages = [
+        SessionMessage(
+            role=m['role'],
+            content=(
+                normalize_help_format(m['content'])
+                if m['role'] == 'assistant' and isinstance(m['content'], str)
+                else m['content']
+            ),
+        )
+        for m in db.get_messages(session_id)
+    ]
+    return SessionResponse(
+        session_id=session_id,
+        form_state=normalized_state,
+        greeting=initial_greeting(state) if not messages else '',
+        messages=messages,
+        form_complete=form_complete(state),
     )
 
 
@@ -1479,6 +1523,386 @@ def admin_delete_delivery(
         )
 
     return Response(status_code=204)
+
+
+# ── Admin 知识库（F1：上传 PDF → 向量化）────────────────────
+
+_KB_CATEGORY_TO_FRONTEND = {
+    'equipment_specs': 'equipment',
+    'setup_schemes': 'scheme',
+    'vertical_knowledge': 'vertical',
+}
+
+
+@app.get('/api/admin/knowledge/docs')
+def admin_list_knowledge_docs(
+    status: str | None = None,
+    category: str | None = None,
+    admin: dict = Depends(get_admin_user),
+):
+    from knowledge import service as knowledge_service
+
+    rows = knowledge_service.list_docs(status=status, category=category)
+    return {
+        'items': [
+            {
+                'id': f"kb_{r['id']}",
+                'filename': r['filename'],
+                'category': r['category'],
+                'status': r['status'],
+                'chunks': r['chunks'],
+                'updatedAt': r['updated_at'],
+                'note': r.get('note') or '',
+                'source': r.get('source'),
+                'industry': r.get('industry'),
+                'scene': r.get('scene'),
+            }
+            for r in rows
+        ]
+    }
+
+
+@app.post('/api/admin/knowledge/upload')
+async def admin_upload_knowledge_pdf(
+    background: BackgroundTasks,
+    file: UploadFile = File(...),
+    category: str = Form('vertical'),
+    industry: str = Form('all'),
+    scene: str = Form(''),
+    admin: dict = Depends(get_admin_user),
+):
+    from knowledge import service as knowledge_service
+
+    if category not in knowledge_service.CATEGORY_TO_COLLECTION:
+        raise HTTPException(status_code=400, detail=f'invalid category: {category}')
+    filename = file.filename or 'upload.pdf'
+    content = await file.read()
+    try:
+        path = knowledge_service.save_knowledge_pdf(filename, content)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    rec = knowledge_service.create_pending_doc(
+        filename=filename,
+        category=category,  # type: ignore[arg-type]
+        path=str(path),
+        industry=industry or 'all',
+        scene=scene,
+    )
+
+    def _run() -> None:
+        try:
+            knowledge_service.run_pdf_ingest(rec['id'])
+        except Exception:
+            logger.exception('background knowledge ingest failed doc_id=%s', rec['id'])
+
+    # 设备/方案需结构化 JSON；PDF 仅垂类知识自动入库
+    if category == 'vertical':
+        background.add_task(_run)
+        note = '已加入向量化队列'
+    else:
+        db.update_knowledge_doc(
+            rec['id'],
+            status='pending',
+            note='设备/方案请用 JSON 脚本导入；PDF 仅支持垂类知识',
+        )
+        note = '已保存，等待 JSON 结构化导入'
+
+    return {
+        'id': f"kb_{rec['id']}",
+        'filename': filename,
+        'category': category,
+        'status': db.get_knowledge_doc(rec['id'])['status'],
+        'chunks': 0,
+        'note': note,
+    }
+
+
+@app.post('/api/admin/knowledge/docs/{doc_id}/retry')
+def admin_retry_knowledge_doc(
+    doc_id: int,
+    admin: dict = Depends(get_admin_user),
+):
+    from knowledge import service as knowledge_service
+
+    try:
+        rec = knowledge_service.retry_doc(doc_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)[:300]) from exc
+    return {
+        'id': f"kb_{rec['id']}",
+        'status': rec['status'],
+        'chunks': rec['chunks'],
+        'note': rec.get('note') or '',
+    }
+
+
+# ── 智能交付管线 ─────────────────────────────────────────────
+
+
+class PipelineStartRequest(BaseModel):
+    session_id: str
+    allow_incomplete: bool = False
+
+
+class PipelineRetryRequest(BaseModel):
+    skill: str
+
+
+def _owned_pipeline_run(pipeline_run_id: str, current: dict) -> dict:
+    run = db.get_pipeline_run(pipeline_run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail='管线任务不存在')
+    if current['role'] != 'admin' and run['user_id'] != current['id']:
+        raise HTTPException(status_code=403, detail='无权访问该管线任务')
+    return run
+
+
+@app.post('/api/pipeline')
+async def start_pipeline(
+    req: PipelineStartRequest,
+    background_tasks: BackgroundTasks,
+    current: dict = Depends(get_current_user),
+):
+    """启动 F2–F5 交付管线。Guest 禁止。"""
+    if current['role'] == 'guest':
+        raise HTTPException(status_code=403, detail='快速体验模式不支持生成方案')
+
+    rec = _get_owned_session(req.session_id, current, '生成方案')
+    form_state = rec.get('form_state') or {}
+    if req.allow_incomplete and isinstance(form_state, dict):
+        form_state = {**form_state, '_allow_incomplete': True}
+
+    if db.count_active_pipeline_runs(current['id']) >= 1:
+        raise HTTPException(status_code=409, detail='已有进行中的方案生成，请等待完成后再试')
+
+    delivery = db.get_delivery_by_session(req.session_id)
+    run_id = db.create_pipeline_run(
+        session_id=req.session_id,
+        user_id=current['id'],
+        delivery_id=delivery['id'] if delivery else None,
+        status='pending',
+    )
+
+    from pipeline.orchestrator import run_pipeline
+
+    async def _bg():
+        try:
+            await run_pipeline(run_id, form_state=form_state)
+        except Exception:
+            logger.exception('pipeline background failed: %s', run_id)
+
+    background_tasks.add_task(_bg)
+
+    return {
+        'id': run_id,
+        'status': 'pending',
+        'session_id': req.session_id,
+        'message': '管线已启动',
+    }
+
+
+@app.get('/api/pipeline')
+def list_pipelines(
+    current: dict = Depends(get_current_user),
+    limit: int = 50,
+):
+    from pipeline.orchestrator import build_pipeline_detail
+
+    user_id = None if current['role'] == 'admin' else current['id']
+    runs = db.list_pipeline_runs(user_id=user_id, limit=min(limit, 100))
+    items = []
+    for run in runs:
+        detail = build_pipeline_detail(run['id'])
+        if detail:
+            items.append(
+                {
+                    'id': detail['id'],
+                    'title': detail['title'],
+                    'industry': detail['industry'],
+                    'roomSize': detail['roomSize'],
+                    'status': detail['status'],
+                    'updatedAt': detail.get('updated_at') or detail.get('created_at'),
+                    'session_id': detail.get('session_id'),
+                }
+            )
+    return {'items': items}
+
+
+@app.get('/api/pipeline/{pipeline_run_id}')
+def get_pipeline(
+    pipeline_run_id: str,
+    current: dict = Depends(get_current_user),
+):
+    from pipeline.orchestrator import build_pipeline_detail
+
+    _owned_pipeline_run(pipeline_run_id, current)
+    detail = build_pipeline_detail(pipeline_run_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail='管线任务不存在')
+    return detail
+
+
+@app.post('/api/pipeline/{pipeline_run_id}/retry')
+async def retry_pipeline(
+    pipeline_run_id: str,
+    req: PipelineRetryRequest,
+    background_tasks: BackgroundTasks,
+    current: dict = Depends(get_current_user),
+):
+    run = _owned_pipeline_run(pipeline_run_id, current)
+    if current['role'] == 'guest':
+        raise HTTPException(status_code=403, detail='快速体验模式不支持重试')
+    if run['status'] == 'running':
+        raise HTTPException(status_code=409, detail='管线运行中，不能重试')
+
+    from pipeline.orchestrator import SKILL_ORDER, retry_pipeline_skill
+
+    skill = req.skill
+    # 允许前端传 UI 短名
+    ui_to_skill = {
+        'plan': 'plan_document',
+        'images': 'preview_images',
+        'video': 'preview_video',
+        'package': 'final_package',
+    }
+    skill = ui_to_skill.get(skill, skill)
+    if skill not in SKILL_ORDER:
+        raise HTTPException(status_code=400, detail=f'未知 skill: {req.skill}')
+
+    status_map = db.latest_skill_status_map(pipeline_run_id)
+    if status_map.get(skill) not in {'failed', 'partial', None, 'pending'}:
+        raise HTTPException(status_code=409, detail=f'{skill} 未处于可重试状态')
+
+    form_state = None
+    session = db.get_session(run['session_id'])
+    if session:
+        form_state = session.get('form_state') or {}
+
+    async def _bg():
+        try:
+            await retry_pipeline_skill(pipeline_run_id, skill, form_state=form_state)
+        except Exception:
+            logger.exception('pipeline retry background failed: %s', pipeline_run_id)
+
+    background_tasks.add_task(_bg)
+    return {
+        'id': pipeline_run_id,
+        'skill': skill,
+        'status': 'running',
+        'message': f'已从 {skill} 重试',
+    }
+
+
+@app.post('/api/pipeline/{pipeline_run_id}/cancel')
+def cancel_pipeline(
+    pipeline_run_id: str,
+    current: dict = Depends(get_current_user),
+):
+    run = _owned_pipeline_run(pipeline_run_id, current)
+    if current['role'] == 'guest':
+        raise HTTPException(status_code=403, detail='快速体验模式不支持取消')
+    if run['status'] not in {'pending', 'running'}:
+        raise HTTPException(status_code=409, detail=f'当前状态 {run["status"]} 不可取消')
+    db.update_pipeline_run(pipeline_run_id, status='cancelled', error='用户取消')
+    return {'id': pipeline_run_id, 'status': 'cancelled'}
+
+
+@app.get('/api/pipeline/{pipeline_run_id}/package')
+def download_pipeline_package(
+    pipeline_run_id: str,
+    current: dict = Depends(get_current_user),
+):
+    run = _owned_pipeline_run(pipeline_run_id, current)
+    from pipeline.orchestrator import build_pipeline_detail
+
+    detail = build_pipeline_detail(pipeline_run_id)
+    if not detail or detail.get('raw_status') not in {'ready', 'ready_with_warnings'}:
+        raise HTTPException(status_code=409, detail='交付包尚未就绪')
+
+    from pipeline.final_package import package_dir_for
+
+    package_dir = package_dir_for(pipeline_run_id)
+    zip_path = package_dir.parent / f'{package_dir.name}.zip'
+    if not zip_path.is_file():
+        # 尝试从 skill_runs 最近输出恢复路径
+        runs = db.list_skill_runs(pipeline_run_id)
+        for s in reversed(runs):
+            if s['skill'] == 'final_package' and s.get('output_json'):
+                import json
+
+                try:
+                    out = json.loads(s['output_json'])
+                except json.JSONDecodeError:
+                    continue
+                candidate = out.get('zip_path')
+                if candidate and Path(candidate).is_file():
+                    zip_path = Path(candidate)
+                    break
+        else:
+            raise HTTPException(status_code=404, detail='交付包文件不存在')
+
+    return FileResponse(
+        path=str(zip_path),
+        media_type='application/zip',
+        filename=f'{pipeline_run_id}.zip',
+    )
+
+
+@app.get('/api/pipeline/{pipeline_run_id}/artifacts/{kind}')
+def download_pipeline_artifact(
+    pipeline_run_id: str,
+    kind: str,
+    current: dict = Depends(get_current_user),
+):
+    _owned_pipeline_run(pipeline_run_id, current)
+
+    # 禁止路径穿越：kind 仅允许字母数字下划线
+    if not kind.replace('_', '').isalnum():
+        raise HTTPException(status_code=400, detail='非法 artifact 类型')
+
+    artifacts = db.list_artifacts(pipeline_run_id)
+    target = None
+    for art in reversed(artifacts):
+        if art.get('kind') == kind:
+            target = art
+            break
+    if target is None:
+        raise HTTPException(status_code=404, detail=f'artifact 不存在: {kind}')
+
+    path = Path(target['path']).resolve()
+    # 路径规范化：必须在 ARTIFACT_ROOT 内
+    from pipeline.artifacts import get_artifact_root
+
+    root = get_artifact_root().resolve()
+    try:
+        path.relative_to(root)
+    except ValueError:
+        raise HTTPException(status_code=403, detail='非法 artifact 路径') from None
+
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail='artifact 文件不存在')
+
+    media_type = 'application/octet-stream'
+    suffix = path.suffix.lower()
+    if suffix == '.png':
+        media_type = 'image/png'
+    elif suffix == '.jpg' or suffix == '.jpeg':
+        media_type = 'image/jpeg'
+    elif suffix == '.mp4':
+        media_type = 'video/mp4'
+    elif suffix == '.pdf':
+        media_type = 'application/pdf'
+    elif suffix == '.json':
+        media_type = 'application/json'
+    elif suffix == '.zip':
+        media_type = 'application/zip'
+
+    return FileResponse(path=str(path), media_type=media_type, filename=path.name)
 
 
 # ── 前端静态托管（SPA）────────────────────────────────────────

@@ -104,6 +104,7 @@ _YES_NO = [OptionDef(value='yes', label='是'), OptionDef(value='no', label='否
 _INDUSTRY_CATEGORIES = [
     OptionDef(value='women', label='女装'),
     OptionDef(value='men', label='男装'),
+    OptionDef(value='shoes', label='鞋靴'),
     OptionDef(value='beauty', label='美妆'),
     OptionDef(value='food', label='食品'),
     OptionDef(value='jewelry', label='珠宝'),
@@ -359,7 +360,7 @@ SECTIONS: list[SectionDef] = [
         fields=[
             FieldDef(
                 id='brand', label='品牌/公司名称', question='请问您的品牌或公司名称是什么？',
-                type='text', required=True, placeholder='如：云裳',
+                type='text', required=True, placeholder='如：跃步',
                 help_text='填写说明：用于方案标题与正式归档，是生成专属方案的核心标识。',
             ),
             FieldDef(
@@ -410,8 +411,8 @@ SECTIONS: list[SectionDef] = [
             FieldDef(
                 id='subcategory', label='细分品类', question='更具体的细分品类是什么？',
                 type='text', skippable=True,
-                placeholder='例：高端香云纱女装、黄金珠宝、进口零食',
-                help_text='填写示例：高端香云纱女装、黄金珠宝、进口零食，越具体，生成的方案越精准。',
+                placeholder='例：国产实战篮球鞋、高端香云纱女装、黄金珠宝、进口零食',
+                help_text='填写示例：国产实战篮球鞋、高端香云纱女装、黄金珠宝、进口零食，越具体，生成的方案越精准。',
             ),
             FieldDef(
                 id='price_band', label='商品价格带', question='您的商品价格带大致是多少？',
@@ -582,8 +583,8 @@ SECTIONS: list[SectionDef] = [
         fields=[
             FieldDef(
                 id='main', label='主营商品类型', question='直播间的主营商品类型是什么？',
-                type='text', required=True, placeholder='例：连衣裙、口红、翡翠手镯',
-                help_text='填写示例：连衣裙、口红、翡翠手镯，越具体越好。',
+                type='text', required=True, placeholder='例：实战篮球鞋、口红、翡翠手镯',
+                help_text='填写示例：实战篮球鞋、口红、翡翠手镯，越具体越好。',
             ),
             FieldDef(
                 id='size_cat', label='商品尺寸', question='您的商品尺寸属于哪一类？',

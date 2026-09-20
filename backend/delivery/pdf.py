@@ -69,6 +69,10 @@ def render_plan_html(
         package_tiers=plan.get('package_tiers') or [],
         setup_steps=plan.get('setup_steps') or [],
         risks=plan.get('risks') or [],
+        layout_scale=(plan.get('meta') or {}).get('layout_scale') or '',
+        must_buy_list=plan.get('must_buy_list') or [],
+        rental_channels=plan.get('rental_channels') or [],
+        vertical_notes=plan.get('vertical_notes') or [],
         scene_card={
             'style_keywords': scene_card.get('style_keywords') or [],
             'color_palette': scene_card.get('color_palette') or [],

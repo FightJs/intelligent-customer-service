@@ -117,6 +117,10 @@ class EquipmentItem(BaseModel):
     reason: str = ''
     is_custom: bool = False
     already_owned: bool = False
+    must_buy: bool = False
+    specs: dict[str, Any] = Field(default_factory=dict)
+    purchase_price: str = ''
+    rent_monthly: str = ''
 
 
 class PackageItem(BaseModel):
@@ -124,6 +128,8 @@ class PackageItem(BaseModel):
 
     name: str
     qty: int = 1
+    model: str = ''
+    brand: str = ''
 
 
 class PackageTier(BaseModel):
@@ -132,6 +138,20 @@ class PackageTier(BaseModel):
     tier: str
     total_range: str
     items: list[PackageItem] = Field(default_factory=list)
+    mode: Literal['rent', 'buy', 'mixed'] = 'mixed'
+    monthly_rent_range: str = ''
+    suitable: str = ''
+
+
+class RentalChannel(BaseModel):
+    """设备租赁/采购渠道（平台级，不编造具体小店名）。"""
+
+    model_config = ConfigDict(extra='forbid')
+
+    name: str
+    kind: Literal['platform', 'local', 'brand', 'ecom'] = 'platform'
+    note: str = ''
+    categories: list[str] = Field(default_factory=list)
 
 
 class SceneCard(BaseModel):
@@ -163,6 +183,9 @@ class PlanDraft(BaseModel):
     setup_steps: list[str] = Field(default_factory=list)
     risks: list[str] = Field(default_factory=list)
     scene_card: SceneCard = Field(default_factory=SceneCard)
+    rental_channels: list[RentalChannel] = Field(default_factory=list)
+    vertical_notes: list[str] = Field(default_factory=list)
+    must_buy_list: list[str] = Field(default_factory=list)
 
 
 class PlanDocumentOutput(BaseModel):
@@ -181,7 +204,7 @@ class PlanDocumentOutput(BaseModel):
     reused: bool = False
 
 
-LLMJsonFn = Callable[[str, str], Awaitable[dict[str, Any]]]
+LLMJsonFn = Callable[[str, str], Awaitable[Any]]
 
 
 # ──────────────────────────────────────────────────────────────
@@ -196,6 +219,7 @@ class PreviewImagesInput(BaseModel):
     plan_json_path: str
     image_count: int = 3
     quality: Literal['draft', 'standard', 'high'] = 'standard'
+    allow_partial: bool = True
     force: bool = False
 
 

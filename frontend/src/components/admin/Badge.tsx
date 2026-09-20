@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react'
 
-type Variant = 'accent' | 'secondary' | 'done' | 'muted'
+type Variant = 'accent' | 'secondary' | 'done' | 'muted' | 'warning' | 'danger'
 
 const VARIANT_CLASS: Record<Variant, string> = {
   accent: 'bg-accent/15 text-accent',
   secondary: 'bg-active-surface text-secondary',
   done: 'bg-done/15 text-done',
   muted: 'bg-idle/20 text-muted',
+  warning: 'bg-warning/15 text-warning',
+  danger: 'bg-danger/10 text-danger',
 }
 
 interface BadgeProps {

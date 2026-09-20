@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>镜头小摄 · 动作预览</title>
+<style>
+  :root {
+    --base: #f2f8f6;
+    --surface: #ffffff;
+    --active: #ecf4f1;
+    --primary: #193b35;
+    --secondary: #47635c;
+    --muted: #5f766f;
+    --outline: #dde9e4;
+    --accent: #006a60;
+    --accent-strong: #00584f;
+    --done: #1f7a5a;
+    --warning: #996000;
+    --amber: #d9ad62;
+    --brand-soft: #ddf4ed;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    min-height: 100vh;
+    background: var(--base);
+    color: var(--primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    padding: 40px 32px 64px;
+  }
+  header { max-width: 1120px; margin: 0 auto 32px; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+  .eyebrow { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .18em; margin-bottom: 10px; }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+  header p { margin-top: 10px; color: var(--secondary); font-size: 14px; line-height: 1.7; max-width: 680px; }
+  .back-link {
+    flex: none; color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 700;
+    background: var(--surface); border: 1px solid var(--outline); border-radius: 999px; padding: 9px 14px;
+  }
+  .back-link:hover { border-color: var(--accent); background: var(--brand-soft); }
+  .grid { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  .card { background: var(--surface); border: 1px solid var(--outline); border-radius: 16px; overflow: hidden; }
+  .stage {
+    height: 260px; display: grid; place-items: center; border-bottom: 1px solid var(--outline);
+    background: radial-gradient(circle at 50% 62%, rgb(0 106 96 / .07), transparent 62%), var(--active);
+  }
+  .info { padding: 17px 20px 20px; display: grid; gap: 9px; }
+  .badge { justify-self: start; color: var(--accent); background: var(--brand-soft); border-radius: 999px; padding: 3px 9px; font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+  .title-row { display: flex; align-items: baseline; gap: 10px; }
+  .title { font-size: 17px; font-weight: 700; }
+  .subtitle { color: var(--muted); font-size: 12px; }
+  .desc { color: var(--secondary); font-size: 13px; line-height: 1.65; }
+  .timing { color: var(--muted); font-size: 12px; line-height: 1.7; }
+  .timing b { color: var(--secondary); font-weight: 600; }
+
+  .pet-svg { overflow: visible; }
+  .pet-svg * { transform-box: fill-box; transform-origin: center; }
+  .mover { transform-origin: 50% 78%; }
+  .body-nod { transform-origin: 50% 72%; }
+  .lens { transform-origin: center; }
+  .arm-left { transform-origin: 72% 18%; }
+  .arm-right { transform-origin: 28% 18%; }
+  .leg { transform-origin: 50% 0%; }
+  .eyes { transform-origin: center; }
+  .record-light { transform-origin: center; }
+  .output-lines { opacity: 0; }
+  .output-line { transform-origin: left center; }
+  .wink-eye, .playful-mouth { opacity: 0; fill: none; stroke: #193b35; stroke-width: 3.5; stroke-linecap: round; }
+  .photo-flash { fill: #fff; opacity: 0; pointer-events: none; }
+  .sparkle { fill: #d9ad62; opacity: 0; pointer-events: none; }
+
+  @keyframes blink { 0%, 91%, 100% { transform: scaleY(1); } 94% { transform: scaleY(.14); } }
+  @keyframes idleBody { 0%,100% { transform: rotate(-1.2deg) translateY(0); } 50% { transform: rotate(1.2deg) translateY(-4px); } }
+  @keyframes idleLens { 0%,100% { transform: translate(0,0); } 25% { transform: translate(3px,-2px); } 50% { transform: translate(0,2px); } 75% { transform: translate(-3px,-1px); } }
+  @keyframes recordPulse { 0%,100% { opacity: .52; transform: scale(.9); } 50% { opacity: 1; transform: scale(1.12); } }
+  @keyframes clickPress { 0%,100% { transform: translateY(0) scale(1); } 32% { transform: translateY(7px) scale(.96,.9); } 52% { transform: translateY(-2px) scale(1.02); } }
+  @keyframes clickTap { 0%,100% { transform: rotate(0); } 28% { transform: rotate(-24deg) translateY(5px); } 50% { transform: rotate(5deg); } }
+  @keyframes clickLight { 0%,100% { opacity: .55; transform: scale(.9); } 30% { opacity: 1; transform: scale(1.45); } 48% { opacity: .75; transform: scale(1); } }
+  @keyframes lensLeadUp { 0%,14%,100% { transform: translateY(0); } 30%,58% { transform: translateY(-10px); } }
+  @keyframes lensLeadDown { 0%,14%,100% { transform: translateY(0); } 30%,58% { transform: translateY(10px); } }
+  @keyframes lensLeadLeft { 0%,14%,100% { transform: translateX(0); } 30%,58% { transform: translateX(-11px); } }
+  @keyframes lensLeadRight { 0%,14%,100% { transform: translateX(0); } 30%,58% { transform: translateX(11px); } }
+  @keyframes nodAfter { 0%,24%,100% { transform: rotate(0); } 43% { transform: rotate(4deg); } 66% { transform: rotate(-2deg); } }
+  @keyframes nodAfterReverse { 0%,24%,100% { transform: rotate(0); } 43% { transform: rotate(-4deg); } 66% { transform: rotate(2deg); } }
+  @keyframes moveUp { 0%,100% { transform: translateY(0); } 34%,62% { transform: translateY(-20px); } }
+  @keyframes moveDown { 0%,100% { transform: translateY(0); } 34%,62% { transform: translateY(20px); } }
+  @keyframes moveLeft { 0%,100% { transform: translateX(0); } 34%,62% { transform: translateX(-22px); } }
+  @keyframes moveRight { 0%,100% { transform: translateX(0); } 34%,62% { transform: translateX(22px); } }
+  @keyframes armSwingA { 0%,100% { transform: rotate(2deg) translateY(0); } 50% { transform: rotate(-7deg) translateY(2px); } }
+  @keyframes armSwingB { 0%,100% { transform: rotate(-2deg) translateY(1px); } 50% { transform: rotate(7deg) translateY(-1px); } }
+  @keyframes photoFlash { 0% { opacity: 0; transform: scale(.48); } 18% { opacity: .9; transform: scale(.78); } 34% { opacity: .32; transform: scale(1.1); } 52%,100% { opacity: 0; transform: scale(1.32); } }
+  @keyframes sparklePop { 0%,100% { opacity: 0; transform: scale(.45) rotate(0deg); } 24% { opacity: 1; transform: scale(1.08) rotate(10deg); } 52% { opacity: .75; transform: scale(.9) rotate(-8deg); } 76% { opacity: 0; transform: scale(.55) rotate(0deg); } }
+  @keyframes legStepA { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-6px) rotate(-8deg); } }
+  @keyframes legStepB { 0%,100% { transform: translateY(-6px) rotate(8deg); } 50% { transform: translateY(0) rotate(0); } }
+  @keyframes outputNod { 0%,100% { transform: rotate(0); } 28% { transform: rotate(2.5deg); } 48% { transform: rotate(-1.5deg); } }
+  @keyframes outputLight { 0%,100% { fill: var(--done); opacity: .65; transform: scale(.95); } 50% { fill: var(--done); opacity: 1; transform: scale(1.16); } }
+  @keyframes lineIn { 0%,18% { opacity: 0; transform: scaleX(.2); } 42%,82% { opacity: 1; transform: scaleX(1); } 100% { opacity: 0; transform: scaleX(1); } }
+  @keyframes thinkLens { 0%,100% { transform: translate(0,0) rotate(0); } 32% { transform: translate(-6px,-8px) rotate(-7deg); } 66% { transform: translate(6px,-6px) rotate(6deg); } }
+  @keyframes thinkBody { 0%,100% { transform: rotate(0); } 35% { transform: rotate(-2.5deg); } 68% { transform: rotate(2deg); } }
+  @keyframes waitBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+  @keyframes waveArm { 0%,100% { transform: rotate(0); } 28% { transform: rotate(-28deg); } 52% { transform: rotate(10deg); } 72% { transform: rotate(-18deg); } }
+  @keyframes waveBody { 0%,100% { transform: rotate(0); } 35% { transform: rotate(-2.5deg); } 70% { transform: rotate(2deg); } }
+
+  .action-idle .body-nod { animation: idleBody 3.8s ease-in-out infinite; }
+  .action-idle .lens { animation: idleLens 4.8s ease-in-out infinite; }
+  .action-idle .record-light { animation: recordPulse 3.2s ease-in-out infinite; }
+  .pet-svg .eyes { animation: blink 4.8s ease-in-out infinite; }
+
+  .action-click .body-nod { animation: clickPress .9s ease-in-out; }
+  .action-click .arm-left { animation: clickTap .9s ease-in-out; }
+  .action-click .record-light { animation: clickLight .9s ease-in-out; }
+  .action-click .eye-left { opacity: 0; }
+  .action-click .wink-eye, .action-click .playful-mouth { opacity: 1; }
+  .action-click .mouth-default { opacity: 0; }
+  .action-click .photo-flash { animation: photoFlash .9s ease-out; }
+  .action-click .sparkle-1 { animation: sparklePop .9s ease-out; }
+  .action-click .sparkle-2 { animation: sparklePop .9s ease-out .08s; }
+  .action-click .sparkle-3 { animation: sparklePop .9s ease-out .14s; }
+
+  .action-move-up .mover { animation: moveUp 2.4s cubic-bezier(.45,0,.2,1) infinite; }
+  .action-move-up .lens { animation: lensLeadUp 2.4s ease-in-out infinite; }
+  .action-move-up .body-nod { animation: nodAfter 2.4s ease-in-out infinite; }
+  .action-move-down .mover { animation: moveDown 2.4s cubic-bezier(.45,0,.2,1) infinite; }
+  .action-move-down .lens { animation: lensLeadDown 2.4s ease-in-out infinite; }
+  .action-move-down .body-nod { animation: nodAfterReverse 2.4s ease-in-out infinite; }
+  .action-move-left .mover { animation: moveLeft 2.4s cubic-bezier(.45,0,.2,1) infinite; }
+  .action-move-left .lens { animation: lensLeadLeft 2.4s ease-in-out infinite; }
+  .action-move-left .body-nod { animation: nodAfterReverse 2.4s ease-in-out infinite; }
+  .action-move-right .mover { animation: moveRight 2.4s cubic-bezier(.45,0,.2,1) infinite; }
+  .action-move-right .lens { animation: lensLeadRight 2.4s ease-in-out infinite; }
+  .action-move-right .body-nod { animation: nodAfter 2.4s ease-in-out infinite; }
+  .action-move-up .leg-left, .action-move-down .leg-left, .action-move-left .leg-left, .action-move-right .leg-left, .action-waiting .leg-left { animation: legStepA 1.2s ease-in-out infinite; }
+  .action-move-up .leg-right, .action-move-down .leg-right, .action-move-left .leg-right, .action-move-right .leg-right, .action-waiting .leg-right { animation: legStepB 1.2s ease-in-out infinite; }
+
+  .action-move-up .arm-left, .action-move-down .arm-left, .action-move-left .arm-left, .action-move-right .arm-left { animation: armSwingA .6s ease-in-out infinite; }
+  .action-move-up .arm-right, .action-move-down .arm-right, .action-move-left .arm-right, .action-move-right .arm-right { animation: armSwingB .6s ease-in-out infinite; }
+
+  .action-output .face { opacity: 0; }
+  .action-output .output-lines { opacity: 1; }
+  .action-output .line-1 { animation: lineIn 2.4s ease-in-out infinite; }
+  .action-output .line-2 { animation: lineIn 2.4s ease-in-out .24s infinite; }
+  .action-output .line-3 { animation: lineIn 2.4s ease-in-out .48s infinite; }
+  .action-output .body-nod { animation: outputNod 2.4s ease-in-out infinite; }
+  .action-output .record-light { animation: outputLight 1.5s ease-in-out infinite; }
+
+  .action-think .lens { animation: thinkLens 3.4s ease-in-out infinite; }
+  .action-think .body-nod { animation: thinkBody 3.4s ease-in-out infinite; }
+  .action-think .record-light { animation: recordPulse 1.3s ease-in-out infinite; }
+
+  .action-waiting .mover { animation: waitBob 1.7s ease-in-out infinite; }
+  .action-waiting .record-light { animation: recordPulse 1.05s ease-in-out infinite; }
+
+  .action-wave .arm-right { animation: waveArm 2.1s ease-in-out infinite; }
+  .action-wave .body-nod { animation: waveBody 2.1s ease-in-out infinite; }
+  .action-wave .lens { animation: lensLeadRight 2.1s ease-in-out infinite; }
+
+  footer { max-width: 1120px; margin: 34px auto 0; padding-top: 18px; border-top: 1px solid var(--outline); color: var(--muted); font-size: 12px; line-height: 1.8; }
+  @media (max-width: 960px) { header { display: block; } .back-link { display: inline-block; margin-top: 18px; } .grid { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { .pet-svg * { animation: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <p class="eyebrow">CAMERA PET ACTIONS</p>
+    <h1>镜头小摄 · 动作预览</h1>
+    <p>基于已选定的方案一，预览待机、点击、四向移动、输出、思考、等待和挥手动作。方向动作统一采用「镜头先转向目标 → 机身随后点头 → 短腿交替移动」的节奏。</p>
+  </div>
+  <a class="back-link" href="/pet-preview.html">返回方案对比</a>
+</header>
+
+<main id="action-grid" class="grid" aria-label="镜头小摄动作预览"></main>
+
+<template id="pet-template">
+  <svg class="pet-svg" width="220" height="220" viewBox="0 0 240 240" role="img" aria-label="镜头小摄">
+    <defs>
+      <linearGradient class="camera-gradient" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#3d9b88"/>
+        <stop offset="1" stop-color="#1f7a5a"/>
+      </linearGradient>
+    </defs>
+    <g class="mover">
+      <g class="legs">
+        <path class="leg leg-left" d="M86 170 L80 201" stroke="#00584f" stroke-width="7" stroke-linecap="round" fill="none"/>
+        <path class="leg leg-right" d="M132 170 L137 201" stroke="#00584f" stroke-width="7" stroke-linecap="round" fill="none"/>
+        <path d="M73 201 H89 M129 201 H145" stroke="#193b35" stroke-width="6" stroke-linecap="round"/>
+      </g>
+      <g class="body-nod">
+        <path d="M88 91 V70 Q88 58 100 58 H132 Q144 58 144 70 V91" fill="none" stroke="#00584f" stroke-width="8" stroke-linecap="round"/>
+        <path class="arm arm-left" d="M58 129 Q39 139 43 160" stroke="#00584f" stroke-width="8" stroke-linecap="round" fill="none"/>
+        <path class="arm arm-right" d="M190 147 Q207 154 202 172" stroke="#00584f" stroke-width="8" stroke-linecap="round" fill="none"/>
+        <rect class="gradient-fill" x="56" y="88" width="122" height="82" rx="22" stroke="#00584f" stroke-width="4"/>
+        <rect x="75" y="106" width="58" height="43" rx="13" fill="#f2f8f6" opacity=".96"/>
+        <g class="face">
+          <g class="eyes">
+            <circle class="eye-left" cx="94" cy="123" r="5.5" fill="#193b35"/>
+            <circle class="eye-right" cx="116" cy="123" r="5.5" fill="#193b35"/>
+            <path class="wink-eye" d="M88 123 Q94 118 100 123"/>
+          </g>
+          <path class="mouth-default" d="M96 137 Q105 143 114 137" stroke="#193b35" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+          <path class="playful-mouth" d="M94 136 Q105 148 116 136"/>
+        </g>
+        <g class="output-lines">
+          <rect class="output-line line-1" x="83" y="114" width="42" height="5" rx="2.5" fill="#006a60"/>
+          <rect class="output-line line-2" x="83" y="126" width="34" height="5" rx="2.5" fill="#1f7a5a"/>
+          <rect class="output-line line-3" x="83" y="138" width="45" height="5" rx="2.5" fill="#00584f"/>
+        </g>
+        <g class="lens">
+          <circle cx="169" cy="129" r="36" fill="#00584f"/>
+          <circle cx="169" cy="129" r="27" fill="#a9dcd0"/>
+          <circle cx="169" cy="129" r="18" fill="#006a60"/>
+          <circle cx="163" cy="121" r="6" fill="#f2f8f6" opacity=".9"/>
+        </g>
+        <circle class="photo-flash" cx="169" cy="129" r="43"/>
+        <g aria-hidden="true">
+          <path class="sparkle sparkle-1" d="M205 76 L208 84 L216 87 L208 90 L205 98 L202 90 L194 87 L202 84 Z"/>
+          <path class="sparkle sparkle-2" d="M212 151 L214.5 157 L221 159.5 L214.5 162 L212 168 L209.5 162 L203 159.5 L209.5 157 Z"/>
+          <path class="sparkle sparkle-3" d="M141 67 L143 72 L148 74 L143 76 L141 81 L139 76 L134 74 L139 72 Z"/>
+        </g>
+        <circle class="record-light" cx="148" cy="83" r="6" fill="#d9ad62" stroke="#996000" stroke-width="2"/>
+      </g>
+    </g>
+  </svg>
+</template>
+
+<footer>
+  当前页面是动作语言预览，不是最终图集。正式孵化时会保持同一身份和动作机制，再按桌宠标准生成 9 组基础动作与 16 个注视方向；预览中的屏幕内容行用于表达“输出内容”状态。
+</footer>
+
+<script>
+const actions = [
+  { id: 'idle', badge: '01 · 待机', title: '待机', subtitle: 'Idle', desc: '机身轻微呼吸，镜头缓慢扫视，录制灯低强度呼吸。', timing: '节奏：3.8s 循环；动作幅度小，适合长时间停留在桌面。' },
+  { id: 'click', badge: '02 · 点击', title: '点击回应', subtitle: 'Click', desc: '左侧臂向下点击，左眼调皮闭上，镜头闪光，周围星光短促闪烁。', timing: '节奏：0.9s；先眨眼和动手臂，再触发镜头闪光，星光错落出现。' },
+  { id: 'move-up', badge: '03 · 上移', title: '向上移动', subtitle: 'Move Up', desc: '镜头先向上看，机身随后点头，两只短腿向上小步移动。', timing: '节奏：2.4s；镜头 0%-30%，机身 24%-66%，腿部持续交替。' },
+  { id: 'move-down', badge: '04 · 下移', title: '向下移动', subtitle: 'Move Down', desc: '镜头先向下探，机身跟随下沉，腿部保持交替步态。', timing: '节奏：2.4s；镜头先行，机身随后反向点头。' },
+  { id: 'move-left', badge: '05 · 左移', title: '向左移动', subtitle: 'Move Left', desc: '镜头先转向左侧，机身轻微侧倾，短腿跟上完成位移。', timing: '节奏：2.4s；水平位移约 22px，避免大幅跳出工作区。' },
+  { id: 'move-right', badge: '06 · 右移', title: '向右移动', subtitle: 'Move Right', desc: '镜头先转向右侧，机身随后点头，短腿交替向右移动。', timing: '节奏：2.4s；与左移镜像，但保留机身轻微前倾。' },
+  { id: 'output', badge: '07 · 输出', title: '输出内容', subtitle: 'Output', desc: '屏幕面板切换为内容行，录制灯转为完成绿并有节奏地确认。', timing: '节奏：2.4s；三条内容行依次出现，表达正在生成结果。' },
+  { id: 'think', badge: '08 · 思考', title: '思考', subtitle: 'Thinking', desc: '镜头缓慢抬起并左右偏转，机身跟随思考，琥珀灯持续呼吸。', timing: '节奏：3.4s；比待机更慢，表示正在组织答案。' },
+  { id: 'waiting', badge: '09 · 等待/进行中', title: '等待或进行中', subtitle: 'Waiting / Running', desc: '录制灯加快呼吸，短腿原地踏步，表示等待用户或任务进行中。', timing: '节奏：1.05s 灯光呼吸；1.7s 机身浮动。' },
+  { id: 'wave', badge: '10 · 挥手', title: '挥手', subtitle: 'Wave', desc: '右侧臂完成挥手，镜头跟随手的方向，机身轻微侧倾。', timing: '节奏：2.1s；挥手由侧臂完成，不增加额外道具。' }
+];
+
+const grid = document.getElementById('action-grid');
+const template = document.getElementById('pet-template');
+
+actions.forEach(function(action) {
+  const card = document.createElement('section');
+  card.className = 'card';
+
+  const stage = document.createElement('div');
+  stage.className = 'stage';
+  const fragment = template.content.cloneNode(true);
+  const svg = fragment.querySelector('svg');
+  const gradient = fragment.querySelector('.camera-gradient');
+  const gradientId = 'cameraActionGrad-' + action.id;
+  gradient.id = gradientId;
+  fragment.querySelectorAll('.gradient-fill').forEach(function(node) {
+    node.setAttribute('fill', 'url(#' + gradientId + ')');
+  });
+  svg.classList.add('action-' + action.id);
+  stage.appendChild(fragment);
+
+  const info = document.createElement('div');
+  info.className = 'info';
+  const badge = document.createElement('span');
+  badge.className = 'badge';
+  badge.textContent = action.badge;
+  const titleRow = document.createElement('div');
+  titleRow.className = 'title-row';
+  const title = document.createElement('span');
+  title.className = 'title';
+  title.textContent = action.title;
+  const subtitle = document.createElement('span');
+  subtitle.className = 'subtitle';
+  subtitle.textContent = action.subtitle;
+  titleRow.appendChild(title);
+  titleRow.appendChild(subtitle);
+  const desc = document.createElement('p');
+  desc.className = 'desc';
+  desc.textContent = action.desc;
+  const timing = document.createElement('p');
+  timing.className = 'timing';
+  const timingLabel = document.createElement('b');
+  timingLabel.textContent = action.timing.split('；')[0] + '；';
+  timing.appendChild(timingLabel);
+  timing.appendChild(document.createTextNode(action.timing.split('；').slice(1).join('；')));
+
+  info.appendChild(badge);
+  info.appendChild(titleRow);
+  info.appendChild(desc);
+  info.appendChild(timing);
+  card.appendChild(stage);
+  card.appendChild(info);
+  grid.appendChild(card);
+});
+</script>
+</body>
+</html>

@@ -279,6 +279,45 @@ def save_session(session_id: str, form_state: dict[str, Any]) -> None:
         )
 
 
+def _form_has_content(form_state: dict[str, Any]) -> bool:
+    sections = form_state.get('sections') or {}
+    for section in sections.values():
+        for field in (section.get('fields') or {}).values():
+            if not isinstance(field, dict):
+                continue
+            value = field.get('value')
+            if isinstance(value, str) and value.strip():
+                return True
+            if isinstance(value, (list, dict)) and value:
+                return True
+    return bool(form_state.get('completed'))
+
+
+def get_latest_session_with_content(user_id: int) -> dict[str, Any] | None:
+    """取该用户最近有内容的会话（有消息或表单有填写）。空壳会话跳过。"""
+    with _connect() as conn:
+        rows = conn.execute(
+            '''
+            SELECT s.session_id, s.form_state, s.updated_at,
+                   (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.session_id) AS msg_count
+            FROM sessions s
+            WHERE s.user_id = ?
+            ORDER BY s.updated_at DESC
+            LIMIT 30
+            ''',
+            (user_id,),
+        ).fetchall()
+    for row in rows:
+        form_state = json.loads(row['form_state'])
+        if row['msg_count'] > 0 or _form_has_content(form_state):
+            return {
+                'session_id': row['session_id'],
+                'form_state': form_state,
+                'updated_at': row['updated_at'],
+            }
+    return None
+
+
 # ── Messages ─────────────────────────────────────────────────
 
 def add_message(
@@ -1252,6 +1291,132 @@ def list_knowledge_docs(
             (*params, limit),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ── Pipeline runs ─────────────────────────────────────────────
+
+PIPELINE_SKILLS = ('plan_document', 'preview_images', 'preview_video', 'final_package')
+PIPELINE_ACTIVE_STATUSES = ('pending', 'running')
+PIPELINE_TERMINAL_STATUSES = ('ready', 'ready_with_warnings', 'failed', 'cancelled')
+
+
+def create_pipeline_run(
+    *,
+    session_id: str,
+    user_id: int,
+    delivery_id: int | None = None,
+    status: str = 'pending',
+) -> str:
+    """创建 pipeline_run，返回 run id。"""
+    run_id = f'pr_{uuid.uuid4().hex[:16]}'
+    now = _now()
+    with _connect() as conn:
+        conn.execute(
+            '''
+            INSERT INTO pipeline_runs
+                (id, session_id, delivery_id, user_id, status, current_skill, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''',
+            (run_id, session_id, delivery_id, user_id, status, PIPELINE_SKILLS[0], now, now),
+        )
+    return run_id
+
+
+def get_pipeline_run(pipeline_run_id: str) -> dict[str, Any] | None:
+    with _connect() as conn:
+        row = conn.execute(
+            'SELECT * FROM pipeline_runs WHERE id = ?',
+            (pipeline_run_id,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def update_pipeline_run(
+    pipeline_run_id: str,
+    *,
+    status: str | None = None,
+    current_skill: str | None = None,
+    error: str | None = None,
+    delivery_id: int | None = None,
+) -> None:
+    fields: list[str] = ['updated_at = ?']
+    values: list[Any] = [_now()]
+    if status is not None:
+        fields.append('status = ?')
+        values.append(status)
+    if current_skill is not None:
+        fields.append('current_skill = ?')
+        values.append(current_skill)
+    if error is not None:
+        fields.append('error = ?')
+        values.append(error)
+    if delivery_id is not None:
+        fields.append('delivery_id = ?')
+        values.append(delivery_id)
+    values.append(pipeline_run_id)
+    with _connect() as conn:
+        conn.execute(
+            f'UPDATE pipeline_runs SET {", ".join(fields)} WHERE id = ?',
+            values,
+        )
+
+
+def list_pipeline_runs(
+    *,
+    user_id: int | None = None,
+    session_id: str | None = None,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    clauses: list[str] = []
+    values: list[Any] = []
+    if user_id is not None:
+        clauses.append('user_id = ?')
+        values.append(user_id)
+    if session_id is not None:
+        clauses.append('session_id = ?')
+        values.append(session_id)
+    where = f'WHERE {" AND ".join(clauses)}' if clauses else ''
+    values.append(limit)
+    with _connect() as conn:
+        rows = conn.execute(
+            f'''
+            SELECT * FROM pipeline_runs
+            {where}
+            ORDER BY created_at DESC
+            LIMIT ?
+            ''',
+            values,
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def count_active_pipeline_runs(user_id: int) -> int:
+    with _connect() as conn:
+        row = conn.execute(
+            f'''
+            SELECT COUNT(*) AS n FROM pipeline_runs
+            WHERE user_id = ? AND status IN ({','.join('?' * len(PIPELINE_ACTIVE_STATUSES))})
+            ''',
+            (user_id, *PIPELINE_ACTIVE_STATUSES),
+        ).fetchone()
+    return int(row['n']) if row else 0
+
+
+def latest_skill_status_map(pipeline_run_id: str) -> dict[str, str]:
+    """每个 skill 最近一次 run 的 status。"""
+    with _connect() as conn:
+        rows = conn.execute(
+            '''
+            SELECT skill, status FROM skill_runs sr
+            WHERE pipeline_run_id = ?
+              AND id = (
+                SELECT MAX(id) FROM skill_runs
+                WHERE pipeline_run_id = sr.pipeline_run_id AND skill = sr.skill
+              )
+            ''',
+            (pipeline_run_id,),
+        ).fetchall()
+    return {row['skill']: row['status'] for row in rows}
 
 
 # ── Pipeline skill_runs / artifacts ─────────────────────────

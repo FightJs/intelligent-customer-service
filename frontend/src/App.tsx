@@ -4,6 +4,7 @@ import { useAuth } from './state/AuthContext'
 import AuthScreen from './screens/AuthScreen'
 import Workbench from './screens/Workbench'
 import AdminScreen from './screens/AdminScreen'
+import PlansScreen from './screens/PlansScreen'
 import BreathingScreen from './components/BreathingScreen'
 import MarketingScreen from './screens/MarketingScreen'
 import WorkbenchPreview from './screens/WorkbenchPreview'
@@ -75,6 +76,14 @@ export default function App() {
         }
       />
       <Route path="/workbench-preview" element={<WorkbenchPreview />} />
+      <Route
+        path="/plans"
+        element={
+          <Protected>
+            <PlansScreen />
+          </Protected>
+        }
+      />
       <Route
         path="/admin"
         element={

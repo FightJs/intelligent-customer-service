@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>智能交付页面 · 设计原型</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="top-bar">
+      <div class="avatar" aria-hidden="true">用</div>
+      <div class="top-bar__brand">
+        <div class="top-bar__logo" aria-hidden="true">播</div>
+        <span>Livestream Studio Setup Assistant</span>
+      </div>
+      <nav class="top-bar__nav" aria-label="页面切换">
+        <button type="button" class="top-nav-btn" data-route="workbench" aria-current="false">工作台</button>
+        <button type="button" class="top-nav-btn" data-route="plans" aria-current="page">我的方案</button>
+        <button type="button" class="top-nav-btn" data-route="admin" aria-current="false">后台管理</button>
+      </nav>
+    </header>
+
+    <!-- 工作台占位：说明入口关系 -->
+    <section class="page" id="page-workbench" data-page="workbench">
+      <div class="page-toolbar">
+        <h1>工作台</h1>
+        <span class="muted">原型占位 · 对话采集入口保持不变</span>
+      </div>
+      <div style="padding: 12px 20px 20px; flex:1; min-height:0; overflow:auto;">
+        <div class="plan-detail" style="max-width: 720px;">
+          <h2 style="margin:0 0 8px; font-size:16px;">智能交付链路在本原型中的位置</h2>
+          <p style="margin:0 0 12px; color:rgb(var(--color-muted)); font-size:13px;">
+            订单提交后，后端管线依次生成方案 PDF → 三机位预览图 → 预览视频 → 汇总交付包。
+            用户在「我的方案」查看与下载；运营在后台「知识库」上传垂类 PDF 入向量库。
+          </p>
+          <div class="skill-strip">
+            <div class="skill-chip"><span class="skill-chip__label">F2 方案 PDF</span><span class="skill-chip__state"><i class="dot is-done"></i>plan_document</span></div>
+            <div class="skill-chip"><span class="skill-chip__label">F3 预览图</span><span class="skill-chip__state"><i class="dot is-done"></i>preview_images</span></div>
+            <div class="skill-chip"><span class="skill-chip__label">F4 预览视频</span><span class="skill-chip__state"><i class="dot is-done"></i>preview_video</span></div>
+            <div class="skill-chip"><span class="skill-chip__label">F5 交付包</span><span class="skill-chip__state"><i class="dot is-done"></i>final_package</span></div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="btn btn--primary" data-route="plans">打开我的方案</button>
+            <button type="button" class="btn btn--ghost" data-route="admin">打开知识库</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 用户端：我的方案 -->
+    <section class="page is-active" id="page-plans" data-page="plans">
+      <div class="page-toolbar">
+        <h1>我的方案</h1>
+        <span class="muted">查看 360 预览图、预览视频与方案清单</span>
+        <div class="spacer"></div>
+        <button type="button" class="btn btn--ghost btn--sm" id="btn-refresh-plans">刷新状态</button>
+      </div>
+      <div class="plans-body">
+        <aside class="plans-list" aria-label="方案列表">
+          <div class="plans-list__head">
+            <span>历史方案</span>
+            <span id="plans-count">3</span>
+          </div>
+          <div class="plans-list__scroll" id="plans-list"></div>
+        </aside>
+        <article class="plan-detail" id="plan-detail" aria-live="polite"></article>
+      </div>
+    </section>
+
+    <!-- 管理端：知识库 -->
+    <section class="page" id="page-admin" data-page="admin">
+      <div class="page-toolbar">
+        <h1>后台管理</h1>
+        <span class="muted">与交付物 / 用户并列的第三 Tab</span>
+        <div class="spacer"></div>
+        <span class="muted">Admin</span>
+      </div>
+      <div class="admin-tabs" role="tablist" aria-label="后台模块">
+        <button type="button" class="admin-tab" role="tab" aria-selected="false">交付物</button>
+        <button type="button" class="admin-tab" role="tab" aria-selected="false">用户</button>
+        <button type="button" class="admin-tab is-active" role="tab" aria-selected="true">知识库</button>
+      </div>
+      <div class="admin-content">
+        <div class="stat-row" id="knowledge-stats"></div>
+
+        <div class="upload-zone" id="upload-zone">
+          <div class="upload-zone__inner">
+            <div style="flex:1">
+              <h3>上传知识库 PDF</h3>
+              <p>拖拽文件到此处，或点击选择。支持设备参数、搭建方案、垂类知识文档。</p>
+              <div class="upload-controls">
+                <select class="field" id="upload-category" aria-label="知识分类">
+                  <option value="equipment">设备参数</option>
+                  <option value="scheme">搭建方案</option>
+                  <option value="vertical" selected>垂类知识</option>
+                </select>
+                <button type="button" class="btn btn--primary btn--sm" id="btn-pick-pdf">选择 PDF</button>
+                <input type="file" id="pdf-input" accept="application/pdf,.pdf" hidden />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="filter-bar">
+          <input class="field" type="search" id="kb-search" placeholder="搜索文件名…" aria-label="搜索文档" />
+          <select class="field" id="kb-status" aria-label="状态筛选">
+            <option value="">全部状态</option>
+            <option value="ready">就绪</option>
+            <option value="embedding">向量化中</option>
+            <option value="pending">待处理</option>
+            <option value="failed">失败</option>
+          </select>
+          <select class="field" id="kb-category" aria-label="分类筛选">
+            <option value="">全部分类</option>
+            <option value="equipment">设备参数</option>
+            <option value="scheme">搭建方案</option>
+            <option value="vertical">垂类知识</option>
+          </select>
+        </div>
+
+        <div class="data-table-wrap">
+          <table class="data">
+            <thead>
+              <tr>
+                <th>文件名</th>
+                <th>分类</th>
+                <th>状态</th>
+                <th>Chunks</th>
+                <th>更新时间</th>
+                <th style="text-align:right">操作</th>
+              </tr>
+            </thead>
+            <tbody id="kb-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="drawer-backdrop" id="drawer-backdrop"></div>
+  <aside class="drawer" id="drawer" hidden aria-label="文档详情"></aside>
+
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="预览图放大">
+    <div class="lightbox__panel">
+      <div class="lightbox__stage" id="lightbox-stage"></div>
+      <div class="lightbox__bar">
+        <div>
+          <strong id="lightbox-title">正面 0°</strong>
+          <span class="muted" style="margin-left:8px; font-size:12px;" id="lightbox-sub">主播主视角</span>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button type="button" class="btn btn--ghost btn--sm" id="lightbox-prev">上一张</button>
+          <button type="button" class="btn btn--ghost btn--sm" id="lightbox-next">下一张</button>
+          <button type="button" class="btn btn--ghost btn--sm" id="lightbox-close">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

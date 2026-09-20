@@ -196,6 +196,25 @@ def test_normalize_form_state_maps_core_fields():
     assert brief.completeness == 1.0
 
 
+def test_template_plan_has_realistic_models_and_channels():
+    """模板方案应含具体型号、必买项、参数、租赁渠道与垂类要点。"""
+    from pipeline.templates_plan import build_template_plan
+
+    brief = normalize_form_state(_form_state())
+    plan = build_template_plan(brief)
+
+    models = [item.model for item in plan.equipment_list if item.model]
+    assert any('Aputure' in m or '爱图仕' in m or '200d' in m for m in models)
+    assert any(item.must_buy for item in plan.equipment_list)
+    assert all(item.specs for item in plan.equipment_list if item.must_buy)
+    assert plan.must_buy_list
+    assert plan.rental_channels
+    assert plan.vertical_notes
+    assert plan.meta.get('layout_scale')
+    assert len(plan.package_tiers) == 3
+    assert plan.package_tiers[0].items[0].model or plan.package_tiers[0].items[0].name
+
+
 def test_normalize_incomplete_reports_missing(artifact_root):
     state = create_initial_state()
     brief = normalize_form_state(to_dict(state))

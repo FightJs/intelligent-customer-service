@@ -1,0 +1,44 @@
+/* 我的方案 — 多机位预览占位视觉（接真实图片 url 后可删除） */
+
+.plan-visual-front {
+  background:
+    radial-gradient(ellipse 40% 30% at 50% 42%, rgb(221 244 237) 0%, transparent 70%),
+    linear-gradient(165deg, #d8ebe4 0%, #b7d4cb 48%, #8fb5aa 100%);
+}
+
+.plan-visual-left {
+  background:
+    radial-gradient(ellipse 50% 40% at 30% 50%, rgb(153 96 0 / 0.18) 0%, transparent 65%),
+    linear-gradient(200deg, #d2e8e1 0%, #a8c9c0 55%, #7da89d 100%);
+}
+
+.plan-visual-rear {
+  background: linear-gradient(180deg, #c5ddd6 0%, #9bbfb5 45%, #6f9a90 100%);
+}
+
+/* DESIGN.md：视口 <900px 改单栏；Tailwind lg=1024 不等价 */
+.plans-layout {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  gap: 12px;
+  padding: 12px 16px 16px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 900px) {
+  .plans-layout {
+    grid-template-columns: 260px 1fr;
+  }
+}
+
+.video-stage-shell {
+  background:
+    radial-gradient(ellipse 55% 45% at 50% 55%, rgb(0 106 96 / 0.35) 0%, transparent 70%),
+    linear-gradient(180deg, rgb(25 59 53 / 0.92) 0%, rgb(13 28 26 / 0.98) 100%);
+}
+
+.video-meta-bar {
+  color: rgb(var(--color-secondary));
+  background: rgb(var(--color-recess));
+}

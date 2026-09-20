@@ -1,6 +1,7 @@
 """Embedding 提供方。
 
 - dashscope：生产 text-embedding-v3（httpx，1024 维）
+- openrouter：OpenAI 兼容 /embeddings（如 openai/text-embedding-3-small + dimensions）
 - local_bge：本地 BGE-M3（可选依赖）
 - mock：测试/契约联调，确定性向量，不访问网络
 """
@@ -148,6 +149,73 @@ class LocalBgeEmbedder:
             raise EmbeddingError(f'local bge embedding failed: {exc}') from exc
 
 
+class OpenRouterEmbedder:
+    """OpenRouter / OpenAI 兼容 embeddings。
+
+    默认用 openai/text-embedding-3-small，并请求 dimensions 对齐库内 1024 维。
+    """
+
+    def __init__(
+        self,
+        api_key: str,
+        model: str = 'openai/text-embedding-3-small',
+        dim: int = 1024,
+        base_url: str = 'https://openrouter.ai/api/v1',
+        timeout: float = 30.0,
+    ) -> None:
+        if not api_key:
+            raise EmbeddingError('OPENROUTER_API_KEY is empty')
+        self.api_key = api_key
+        self.model = model
+        self.dim = dim
+        self.base_url = base_url.rstrip('/')
+        self.timeout = timeout
+
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        payload: dict = {
+            'model': self.model,
+            'input': list(texts),
+        }
+        # OpenAI text-embedding-3-* 支持 dimensions；其它模型忽略该字段可能 400
+        if 'text-embedding-3' in self.model:
+            payload['dimensions'] = self.dim
+        try:
+            resp = httpx.post(
+                f'{self.base_url}/embeddings',
+                json=payload,
+                headers={
+                    'Authorization': f'Bearer {self.api_key}',
+                    'Content-Type': 'application/json',
+                    # OpenRouter 建议带 HTTP-Referer / X-Title（可选）
+                    'X-Title': 'intelligent-customer-service',
+                },
+                timeout=self.timeout,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            items = data.get('data') or []
+            if not items:
+                raise EmbeddingError(f'empty embeddings in response: {data!r:.200}')
+            # OpenAI 返回按 index 排序；保险起见按 index 重排
+            items = sorted(items, key=lambda x: x.get('index', 0))
+            vectors = [item['embedding'] for item in items]
+            if len(vectors) != len(texts):
+                raise EmbeddingError(
+                    f'embedding count mismatch: got {len(vectors)}, want {len(texts)}'
+                )
+            if vectors and len(vectors[0]) != self.dim:
+                raise EmbeddingError(
+                    f'embedding dim mismatch: got {len(vectors[0])}, want {self.dim}'
+                )
+            return vectors
+        except EmbeddingError:
+            raise
+        except Exception as exc:
+            raise EmbeddingError(f'openrouter embedding failed: {exc}') from exc
+
+
 def get_embedder(config: KnowledgeConfig | None = None) -> Embedder:
     cfg = config or get_config()
     provider = cfg.embedding_provider
@@ -160,5 +228,12 @@ def get_embedder(config: KnowledgeConfig | None = None) -> Embedder:
             api_key=cfg.dashscope_api_key,
             model=cfg.embedding_model,
             dim=cfg.embedding_dim,
+        )
+    if provider == 'openrouter':
+        return OpenRouterEmbedder(
+            api_key=cfg.openrouter_api_key,
+            model=cfg.embedding_model,
+            dim=cfg.embedding_dim,
+            base_url=cfg.openrouter_base_url,
         )
     raise EmbeddingError(f'unknown EMBEDDING_PROVIDER: {provider!r}')

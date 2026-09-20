@@ -80,14 +80,27 @@ class PreviewVideoInput(BaseModel):
 
 ## 5. Motion Prompt
 
+以首帧图为锚的 i2v motion prompt，禁止按文生视频方式重述整个场景。
+
 ```text
-slow cinematic orbit around a professional livestream studio interior,
-same room as the still image, soft key lighting, {style_keywords} aesthetic,
-smooth camera movement, no people close-up, no text, no watermark,
-duration {duration_sec}s, {resolution}
+以给定首帧图为唯一起点，严格保持画面中的房间结构、家具布置、灯具位置与色彩不变。
+{camera_move_by_source_angle}。
+专业直播间室内，{style_keywords}风格，色调 {color_palette}，可见 {furniture} 与 {lighting_fixtures}。
+色温 {color_temp}，商品品类 {product_category}，{room_size_band} 房间尺度。
+灯光稳定无闪烁，画面干净专业，无人物特写，无文字，无水印，无 logo。
+{不要出现 forbidden...}
+镜头运动平滑电影感，时长约 {duration_sec} 秒，画质 {resolution}。
 ```
 
-从 `scene_card` 注入：style_keywords、color_temp、forbidden。
+镜头运动按首帧机位：
+
+| source_angle | 镜头运动 |
+|--------------|----------|
+| front | 正机位缓慢右移轻环绕，露出左侧灯位与背景层次 |
+| left | 左侧机位前推轻环绕，展示主灯/柔光箱/背景 |
+| rear | 后侧机位纵深推进，展示动线与空间尺度 |
+
+从 `scene_card` 注入：style_keywords、color_palette、color_temp、furniture、lighting_fixtures、product_category、room_size_band、forbidden。
 
 **禁止**在 prompt 中要求出现具体品牌 logo 或屏幕文字。
 

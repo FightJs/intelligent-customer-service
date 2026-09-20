@@ -28,7 +28,7 @@ from knowledge.store import get_store
 
 SOURCE = source_tag('seed_knowledge.json', 'ics-seed-v1')
 
-INDUSTRIES = ['women', 'men', 'beauty', 'food', 'jewelry', 'home']
+INDUSTRIES = ['women', 'men', 'shoes', 'beauty', 'food', 'jewelry', 'home']
 ROOM_SIZES = ['small', 'medium', 'large', 'xlarge']
 BUDGETS = ['low', 'mid', 'high', 'ultra']
 LIVE_TYPES = ['influencer', 'brand', 'factory', 'ip']
@@ -47,6 +47,7 @@ BRANDS = {
 INDUSTRY_LABEL = {
     'women': '女装',
     'men': '男装',
+    'shoes': '鞋靴',
     'beauty': '美妆',
     'food': '食品',
     'jewelry': '珠宝',
@@ -171,6 +172,13 @@ def _vertical_rows() -> list[dict]:
             ('机位', '主机位略低，增强气场。裤装展示增加下移机位，鞋履特写单独机位。'),
             ('商品展示', '正装讲版型与场合，休闲讲面料克重。折叠演示比悬挂更易传达厚度。'),
             ('话术区', '信息密度可略低于女装，强调参数与场景。尺码对照表常驻画面一角。'),
+        ],
+        'shoes': [
+            ('布光', '鞋靴直播间强调鞋面色准与中底层次。主灯 45° 侧上，侧逆光勾勒轮廓与鞋面材质；镜面地台控反射。色温统一 4500K，避免跑鞋荧光色偏色导致退货。'),
+            ('背景', '双层鞋墙 + 鞋盒堆叠建立真实仓播层次，深灰工业风模块墙配橙色点缀灯带。避免高饱和背景抢鞋款配色。小空间可用 1.6m 可移动鞋墙架。'),
+            ('机位', '主机位半身讲款，细节机位对准鞋面编织/皮革与外底纹路；下移机位拍上脚效果；后侧机位交代鞋墙纵深。主播到镜头保持 1.2m。'),
+            ('商品展示', '鞋靴讲解顺序：整体廓形 → 鞋面材质特写 → 中底/外底 → 上脚试穿。亚克力旋转鞋台慢速转动 360° 展示；换鞋凳固定在主机位右侧 45°。'),
+            ('话术区', '尺码对照表与脚型建议常驻右下角。缓震/抓地/透气等参数卡固定一角，高客单鞋款客服入口不可遮挡。'),
         ],
         'beauty': [
             ('布光', '美妆要求极高显色指数 CRI≥95。主灯大柔光箱，面部测光准确，避免过曝高光。'),

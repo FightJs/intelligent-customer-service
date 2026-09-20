@@ -10,6 +10,8 @@
 | F4 | `preview_video` | [spec-f4-preview-video-skill.md](./spec-f4-preview-video-skill.md) | 首帧图生视频预览 |
 | F5 | `final_package` | [spec-f5-final-package-skill.md](./spec-f5-final-package-skill.md) | 交叉校验 + 说明 + 最终交付包 |
 | 联调 | （测试） | [spec-integration-testing.md](./spec-integration-testing.md) | 分功能测试 + E2E 剧本 + 发布门禁 |
+| **Agent 化** | `plan_agent` + skills | [spec-plan-agent.md](./spec-plan-agent.md) | Plan Agent + Skill 工具集 + Delivery Evaluator 门禁 |
+| **Agent MVP 测** | （测试） | [spec-plan-agent-mvp-testing.md](./spec-plan-agent-mvp-testing.md) | M1/M2 用例、Mock 约定、发布阻断项 |
 
 ## 数据流
 
@@ -29,6 +31,26 @@ F2 plan.json + plan.pdf ◄──┘
                           ▼
                      F5 package/ + manifest + zip
 ```
+
+### Agent 化目标态（MVP：M1+M2）
+
+```text
+form_state
+    │
+    ▼
+Plan Agent（tool-use 循环）
+    decompose → retrieve → compose → validate ⇄ refine → render
+    │
+    ▼
+evaluate_delivery（硬门禁 H1–H8 + 分垂类软分阈值）
+    │ decision=pass 且连续 2 次 → package
+    │ decision=degraded_candidate → HITL 用户确认 → package | failed
+    │ decision=fail → refine 或 failed
+    ▼
+preview_* → evaluate(include_media) → package（需 gate_pass_token）
+```
+
+详见 [spec-plan-agent.md](./spec-plan-agent.md)（v0.3：HITL 15 分钟确认、阈值 KB→config、llm_review 全开、连续 2 次 pass、resume_from）。未过门禁禁止打包（壳层强制）。
 
 ## 统一约定
 

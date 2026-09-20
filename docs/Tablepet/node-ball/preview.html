@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>节点球 · 动画预览</title>
+    <style>
+      :root { color-scheme: dark; background: #0a0a0a; }
+      html, body { margin: 0; min-height: 100%; background: #0a0a0a; }
+      body { max-width: 1200px; margin: 0 auto; padding: 28px; color: #f5f5f5; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif; }
+      h1 { margin: 0 0 6px; font-size: 24px; }
+      p { margin: 0 0 18px; color: #a3a3a3; }
+      img { display: block; width: 100%; height: auto; border: 1px solid #404040; border-radius: 12px; background: #171717; }
+      .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+      .row img { width: 100%; }
+      @media (max-width: 720px) { body { padding: 16px; } .row { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <h1>节点球 · 动画预览</h1>
+    <p>蓝色执行、绿色完成、红色异常；图集为 Codex v2 的 8×11 结构。</p>
+    <img src="../runs/node-ball/qa/contact-sheet-extended.png" alt="节点球完整图集 contact sheet" />
+    <div class="row">
+      <img src="../runs/node-ball/qa/previews/idle.gif" alt="idle" />
+      <img src="../runs/node-ball/qa/previews/running.gif" alt="running" />
+      <img src="../runs/node-ball/qa/previews/review.gif" alt="review" />
+    </div>
+  </body>
+</html>

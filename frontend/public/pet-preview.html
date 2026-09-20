@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>桌宠方案预览 · 青瓷运营台</title>
+<style>
+  :root {
+    --base: #f2f8f6;
+    --surface: #ffffff;
+    --active: #ecf4f1;
+    --primary: #193b35;
+    --secondary: #47635c;
+    --muted: #5f766f;
+    --idle: #bacdc6;
+    --outline: #dde9e4;
+    --accent: #006a60;
+    --accent-strong: #00584f;
+    --done: #1f7a5a;
+    --warning: #996000;
+    --brand-soft: #ddf4ed;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--base);
+    color: var(--primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    padding: 40px 32px 64px;
+  }
+  header { max-width: 1120px; margin: 0 auto 36px; }
+  .eyebrow {
+    color: var(--accent);
+    font-size: 11px; font-weight: 700; letter-spacing: .18em;
+    margin-bottom: 10px;
+  }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+  header p { margin-top: 10px; color: var(--secondary); font-size: 14px; line-height: 1.7; max-width: 640px; }
+  .grid {
+    max-width: 1120px; margin: 0 auto;
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--outline);
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    transition: transform .2s ease, box-shadow .2s ease;
+  }
+  .card:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgb(25 59 53 / .10); }
+  .stage {
+    height: 240px;
+    display: grid; place-items: center;
+    background:
+      radial-gradient(circle at 50% 62%, rgb(0 106 96 / .06), transparent 62%),
+      var(--active);
+    border-bottom: 1px solid var(--outline);
+  }
+  .stage svg { overflow: visible; }
+  .info { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .name-row { display: flex; align-items: baseline; gap: 10px; }
+  .name { font-size: 17px; font-weight: 700; }
+  .cn { font-size: 12px; color: var(--muted); }
+  .tagline { font-size: 13px; color: var(--secondary); line-height: 1.65; }
+  .mechanics { font-size: 12px; color: var(--muted); line-height: 1.8; }
+  .mechanics b { color: var(--secondary); font-weight: 600; }
+  .palette { display: flex; gap: 6px; margin-top: auto; padding-top: 8px; }
+  .palette i {
+    width: 18px; height: 18px; border-radius: 6px;
+    border: 1px solid rgb(25 59 53 / .10);
+  }
+  .badge {
+    align-self: flex-start;
+    font-size: 10px; font-weight: 700; letter-spacing: .08em;
+    color: var(--accent); background: var(--brand-soft);
+    padding: 3px 9px; border-radius: 999px;
+  }
+  footer {
+    max-width: 1120px; margin: 34px auto 0;
+    color: var(--muted); font-size: 12px; line-height: 1.8;
+    border-top: 1px solid var(--outline); padding-top: 18px;
+  }
+  /* —— 微动效：呼吸 / 眨眼 / 摇摆 —— */
+  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+  @keyframes wobble { 0%,100% { transform: rotate(-2.5deg); } 50% { transform: rotate(2.5deg); } }
+  @keyframes blink { 0%,92%,100% { transform: scaleY(1); } 95% { transform: scaleY(.12); } }
+  @keyframes sway { 0%,100% { transform: rotate(-8deg); } 50% { transform: rotate(10deg); } }
+  @keyframes wave { 0%,100% { transform: rotate(0); } 50% { transform: rotate(-16deg); } }
+  @keyframes twinkle { 0%,100% { opacity: .25; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.1); } }
+  .anim-bob { animation: bob 3.2s ease-in-out infinite; transform-origin: 50% 100%; }
+  .anim-wobble { animation: wobble 3.6s ease-in-out infinite; transform-origin: 50% 88%; }
+  .eyes { animation: blink 4.4s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+  .tail { animation: sway 2.8s ease-in-out infinite; transform-origin: left bottom; transform-box: fill-box; }
+  .paw { animation: wave 2.2s ease-in-out infinite; transform-origin: 30% 80%; transform-box: fill-box; }
+  .spark { animation: twinkle 2.6s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+  .spark.s2 { animation-delay: 1.3s; }
+  @media (prefers-reduced-motion: reduce) { svg * { animation: none !important; } }
+  @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <p class="eyebrow">DESKTOP PET CONCEPTS</p>
+  <h1>桌宠方案预览</h1>
+  <p>四个候选形象都基于当前「青瓷运营台」主题，但轮廓、性格和动作机制完全不同：从影像采集、设备履约、空间顾问到直播间本体四个方向做对比。</p>
+</header>
+
+<div class="grid">
+
+  <!-- 方案一：镜头小摄 -->
+  <section class="card">
+    <div class="stage">
+      <svg width="220" height="220" viewBox="0 0 240 240">
+        <defs>
+          <linearGradient id="cameraGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#3d9b88"/>
+            <stop offset="1" stop-color="#1f7a5a"/>
+          </linearGradient>
+        </defs>
+        <g class="anim-wobble">
+          <path d="M88 91 V70 Q88 58 100 58 H132 Q144 58 144 70 V91" fill="none" stroke="#00584f" stroke-width="8" stroke-linecap="round"/>
+          <rect x="56" y="88" width="122" height="82" rx="22" fill="url(#cameraGrad)" stroke="#00584f" stroke-width="4"/>
+          <rect x="75" y="106" width="58" height="43" rx="13" fill="#f2f8f6" opacity=".96"/>
+          <g class="eyes">
+            <circle cx="94" cy="123" r="5.5" fill="#193b35"/>
+            <circle cx="116" cy="123" r="5.5" fill="#193b35"/>
+          </g>
+          <path d="M96 137 Q105 143 114 137" stroke="#193b35" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+          <circle cx="169" cy="129" r="36" fill="#00584f"/>
+          <circle cx="169" cy="129" r="27" fill="#a9dcd0"/>
+          <circle cx="169" cy="129" r="18" fill="#006a60"/>
+          <circle cx="163" cy="121" r="6" fill="#f2f8f6" opacity=".9"/>
+          <circle class="spark" cx="148" cy="83" r="6" fill="#d9ad62" stroke="#996000" stroke-width="2"/>
+          <path class="paw" d="M58 129 Q39 139 43 160" stroke="#00584f" stroke-width="8" stroke-linecap="round" fill="none"/>
+          <path d="M190 147 Q207 154 202 172" stroke="#00584f" stroke-width="8" stroke-linecap="round" fill="none"/>
+          <path d="M86 170 L80 201 M132 170 L137 201" stroke="#00584f" stroke-width="7" stroke-linecap="round" fill="none"/>
+          <path d="M73 201 H89 M129 201 H145" stroke="#193b35" stroke-width="6" stroke-linecap="round"/>
+        </g>
+      </svg>
+    </div>
+    <div class="info">
+      <span class="badge">方案一 · 最有专业感</span>
+      <div class="name-row"><span class="name">镜头小摄</span><span class="cn">Xiǎo Shè</span></div>
+      <p class="tagline">一台有表情的小型摄影机：镜头、提手和录制灯都来自直播间采集场景，专业感最直接。</p>
+      <p class="mechanics"><b>动作机制：</b>镜头先转向目标，机身随后点头；录制灯表示等待或进行中，两只短腿做小步移动，挥手由侧臂完成。</p>
+      <div class="palette">
+        <i style="background:#3d9b88"></i><i style="background:#1f7a5a"></i><i style="background:#00584f"></i><i style="background:#a9dcd0"></i><i style="background:#d9ad62"></i>
+      </div>
+    </div>
+  </section>
+
+  <!-- 方案二：箱仔 -->
+  <section class="card">
+    <div class="stage">
+      <svg width="220" height="220" viewBox="0 0 240 240">
+        <defs>
+          <linearGradient id="caseGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#3d9b88"/>
+            <stop offset="1" stop-color="#1f7a5a"/>
+          </linearGradient>
+        </defs>
+        <g class="anim-wobble">
+          <path d="M96 80 V61 Q96 50 107 50 H133 Q144 50 144 61 V80" fill="none" stroke="#00584f" stroke-width="9" stroke-linecap="round"/>
+          <path d="M120 50 V32" stroke="#00584f" stroke-width="5" stroke-linecap="round"/>
+          <circle class="spark" cx="120" cy="27" r="6" fill="#d9ad62"/>
+          <rect x="60" y="78" width="120" height="108" rx="24" fill="url(#caseGrad)" stroke="#00584f" stroke-width="4"/>
+          <path d="M71 99 H88 M152 99 H169" stroke="#a9dcd0" stroke-width="5" stroke-linecap="round" opacity=".85"/>
+          <rect x="82" y="101" width="76" height="54" rx="15" fill="#f2f8f6" opacity=".95"/>
+          <g class="eyes">
+            <circle cx="120" cy="127" r="17" fill="#006a60"/>
+            <circle cx="120" cy="127" r="8" fill="#f2f8f6"/>
+          </g>
+          <path d="M104 165 Q120 174 136 165" stroke="#f2f8f6" stroke-width="4" stroke-linecap="round" fill="none"/>
+          <path class="paw" d="M61 124 Q40 132 43 154" stroke="#00584f" stroke-width="8" stroke-linecap="round" fill="none"/>
+          <path d="M179 124 Q200 132 197 154" stroke="#00584f" stroke-width="8" stroke-linecap="round" fill="none"/>
+          <path d="M88 186 V201 M152 186 V201" stroke="#00584f" stroke-width="7" stroke-linecap="round"/>
+          <circle cx="88" cy="205" r="9" fill="#193b35"/>
+          <circle cx="152" cy="205" r="9" fill="#193b35"/>
+        </g>
+      </svg>
+    </div>
+    <div class="info">
+      <span class="badge">方案二 · 最贴业务</span>
+      <div class="name-row"><span class="name">箱仔</span><span class="cn">Xiāngzǎi</span></div>
+      <p class="tagline">一台有表情的设备运输箱：提手、锁扣、滚轮都来自租赁履约场景，专业但不冷。</p>
+      <p class="mechanics"><b>动作机制：</b>箱体左右轻晃，机械臂做确认和指引，滚轮负责移动；等待时顶部信号灯呼吸，完成时镜头眼眨一下。</p>
+      <div class="palette">
+        <i style="background:#3d9b88"></i><i style="background:#1f7a5a"></i><i style="background:#00584f"></i><i style="background:#f2f8f6"></i><i style="background:#d9ad62"></i>
+      </div>
+    </div>
+  </section>
+
+  <!-- 方案三：守灯小鹿 -->
+  <section class="card">
+    <div class="stage">
+      <svg width="220" height="220" viewBox="0 0 240 240">
+        <defs>
+          <linearGradient id="deerGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#a9dcd0"/>
+            <stop offset="1" stop-color="#2f8a7c"/>
+          </linearGradient>
+        </defs>
+        <g class="anim-bob">
+          <path d="M77 160 C82 134 107 122 138 130 C160 136 168 153 159 171 C133 184 96 181 77 160 Z" fill="url(#deerGrad)" stroke="#00584f" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M139 137 C151 116 156 94 151 72 L171 77 C174 103 166 127 151 145 Z" fill="url(#deerGrad)" stroke="#00584f" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M150 69 C150 52 166 43 183 51 C198 59 198 77 185 87 C170 98 153 89 150 69 Z" fill="url(#deerGrad)" stroke="#00584f" stroke-width="4"/>
+          <path d="M181 75 Q196 77 203 84 Q194 92 181 88 Z" fill="#f2f8f6" opacity=".95"/>
+          <circle cx="194" cy="82" r="4" fill="#193b35"/>
+          <path d="M155 55 L143 36 M143 36 L133 30 M143 36 L145 24" stroke="#00584f" stroke-width="5" stroke-linecap="round" fill="none"/>
+          <path d="M176 51 L177 29 M177 29 L166 21 M177 29 L190 20" stroke="#00584f" stroke-width="5" stroke-linecap="round" fill="none"/>
+          <path class="paw" d="M154 61 L132 45 L151 79 Z" fill="#2f8a7c" stroke="#00584f" stroke-width="3" stroke-linejoin="round"/>
+          <g class="eyes">
+            <circle cx="174" cy="67" r="5" fill="#193b35"/>
+          </g>
+          <path d="M92 174 L86 207 M119 178 L116 207 M145 174 L153 207" stroke="#00584f" stroke-width="6" stroke-linecap="round" fill="none"/>
+          <path d="M81 207 H94 M111 207 H123 M148 207 H161" stroke="#193b35" stroke-width="5" stroke-linecap="round"/>
+          <path class="tail" d="M78 154 Q61 147 58 132 Q75 136 84 148 Z" fill="#a9dcd0" stroke="#00584f" stroke-width="3" stroke-linejoin="round"/>
+        </g>
+      </svg>
+    </div>
+    <div class="info">
+      <span class="badge">方案三 · 最有气质</span>
+      <div class="name-row"><span class="name">守灯小鹿</span><span class="cn">Lù Lù</span></div>
+      <p class="tagline">一只在直播间里巡场的小鹿，鹿角带一点灯架感，传达空间、灯光和方案顾问的气质。</p>
+      <p class="mechanics"><b>动作机制：</b>耳朵和头部先跟随目标，细腿做慢速步态；确认时轻点头，等待时耳朵转向用户，整体保持安静优雅。</p>
+      <div class="palette">
+        <i style="background:#a9dcd0"></i><i style="background:#2f8a7c"></i><i style="background:#00584f"></i><i style="background:#f2f8f6"></i><i style="background:#193b35"></i>
+      </div>
+    </div>
+  </section>
+
+  <!-- 方案四：环形灯小灵 -->
+  <section class="card">
+    <div class="stage">
+      <svg width="220" height="220" viewBox="0 0 240 240">
+        <defs>
+          <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#3d9b88"/>
+            <stop offset="1" stop-color="#006a60"/>
+          </linearGradient>
+        </defs>
+        <g class="anim-wobble">
+          <path d="M120 136 V169" stroke="#00584f" stroke-width="11" stroke-linecap="round"/>
+          <path d="M120 168 L82 205 M120 168 L158 205 M120 168 V210" stroke="#00584f" stroke-width="8" stroke-linecap="round" fill="none"/>
+          <path d="M76 205 H91 M151 205 H166 M112 210 H128" stroke="#193b35" stroke-width="6" stroke-linecap="round"/>
+          <circle cx="120" cy="88" r="58" fill="url(#ringGrad)" stroke="#00584f" stroke-width="4"/>
+          <circle cx="120" cy="88" r="35" fill="#f2f8f6" stroke="#a9dcd0" stroke-width="5"/>
+          <path d="M89 61 Q120 42 151 61" stroke="#a9dcd0" stroke-width="7" stroke-linecap="round" opacity=".9" fill="none"/>
+          <g class="eyes">
+            <circle cx="108" cy="86" r="5.5" fill="#193b35"/>
+            <circle cx="132" cy="86" r="5.5" fill="#193b35"/>
+          </g>
+          <path d="M111 101 Q120 108 129 101" stroke="#193b35" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+          <path class="paw" d="M67 112 Q44 122 46 145" stroke="#00584f" stroke-width="8" stroke-linecap="round" fill="none"/>
+          <path d="M173 112 Q196 122 194 145" stroke="#00584f" stroke-width="8" stroke-linecap="round" fill="none"/>
+          <circle cx="156" cy="132" r="7" fill="#d9ad62" stroke="#996000" stroke-width="3"/>
+        </g>
+      </svg>
+    </div>
+    <div class="info">
+      <span class="badge">方案四 · 最有直播感</span>
+      <div class="name-row"><span class="name">环形灯小灵</span><span class="cn">Ring</span></div>
+      <p class="tagline">把直播间最核心的环形灯做成角色：圆环是脸、三脚架是身体，业务识别度最高。</p>
+      <p class="mechanics"><b>动作机制：</b>圆环头部做点头和转向，三脚支架小步移动；等待时琥珀状态灯呼吸，完成时头部轻点两下。</p>
+      <div class="palette">
+        <i style="background:#3d9b88"></i><i style="background:#006a60"></i><i style="background:#00584f"></i><i style="background:#a9dcd0"></i><i style="background:#d9ad62"></i>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  预览为 SVG 概念稿，用于确定方向（造型、性格、动作机制）。选定方案后，将按 hatch-pet 流程孵化为完整动态桌宠：生成统一风格的 9 组标准动作 + 16 个注视方向，打包为 spriteVersionNumber 2 图集。<br>
+  注意：孵化阶段需要图像生成能力，当前会话的内置生成工具不可用、CLI 备选需要 OPENAI_API_KEY，届时会再确认。
+</footer>
+</body>
+</html>

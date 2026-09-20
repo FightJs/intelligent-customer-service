@@ -246,6 +246,50 @@ def test_get_session_recovers_state(client, auth_headers):
     assert r.json()['session_id'] == sid
 
 
+def test_get_latest_session_returns_filled_conversation(client, auth_headers):
+    """sessionStorage 丢失后可通过 /session/latest 找回有内容的调研会话。"""
+    from agent.loop import AgentResult
+    from survey.state import create_initial_state, to_dict
+
+    # 先建空会话（应被跳过）
+    client.post('/api/session', headers=auth_headers)
+
+    filled = client.post('/api/session', headers=auth_headers).json()
+    sid = filled['session_id']
+    state = create_initial_state()
+    state.sections['customer'].fields['brand'].value = '云裳'
+    mock_result = AgentResult(
+        reply='收到云裳',
+        tool_events=[],
+        state=state,
+        form_complete=False,
+    )
+    with patch('api.app.run_agent', return_value=mock_result):
+        client.post(
+            '/api/chat',
+            json={'session_id': sid, 'message': '云裳'},
+            headers=auth_headers,
+        )
+
+    # 再建更新的空会话，不应抢走 latest
+    client.post('/api/session', headers=auth_headers)
+
+    r = client.get('/api/session/latest', headers=auth_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data['session_id'] == sid
+    assert (
+        data['form_state']['sections']['customer']['fields']['brand']['value']
+        == '云裳'
+    )
+
+
+def test_get_latest_session_404_when_only_empty(client, auth_headers):
+    client.post('/api/session', headers=auth_headers)
+    r = client.get('/api/session/latest', headers=auth_headers)
+    assert r.status_code == 404
+
+
 def test_get_empty_session_restores_greeting(client, auth_headers):
     created = client.post('/api/session', headers=auth_headers).json()
 
@@ -611,7 +655,7 @@ def test_skip_endpoint_enforces_schema_permissions(client, auth_headers):
     assert allowed.status_code == 200
     assert 'industry.category' in allowed.json()['form_state']['skippedFieldIds']
     assert allowed.json()['form_state']['currentFieldId'] == 'subcategory'
-    assert '填写示例：高端香云纱女装' in allowed.json()['reply']
+    assert '填写示例：国产实战篮球鞋' in allowed.json()['reply']
 
 
 def test_equipment_photo_can_replace_unknown_text_inventory(tmp_path, monkeypatch):

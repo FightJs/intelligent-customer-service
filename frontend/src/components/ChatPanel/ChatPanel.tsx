@@ -16,8 +16,8 @@ import {
 import { useCoarsePointer } from '../../hooks/useCoarsePointer'
 import { MOBILE_LAYOUT_QUERY, useMediaQuery } from '../../hooks/useMediaQuery'
 import { useFormState } from '../../state/FormContext'
-import { createSession, getSession, chat, skipCurrentQuestion } from '../../api/client'
-import type { FieldUpdate, SessionMessage, Suggestion, SuggestionOption } from '../../api/client'
+import { createSession, getLatestSession, getSession, chat, skipCurrentQuestion } from '../../api/client'
+import type { FieldUpdate, SessionData, SessionMessage, Suggestion, SuggestionOption } from '../../api/client'
 import type { StudioFormState } from '../../types/schema'
 import type { CameraPetActivity } from '../CameraPet/types'
 import {
@@ -83,6 +83,34 @@ function newRequestId(): string {
 }
 
 const STREAMING_ENABLED = import.meta.env.VITE_CHAT_STREAMING_ENABLED !== 'false'
+
+// StrictMode 会双跑 effect：共享 in-flight Promise，避免并行 createSession 开出两个空会话
+let createSessionInFlight: Promise<SessionData> | null = null
+
+export function createSessionOnce(): Promise<SessionData> {
+  if (!createSessionInFlight) {
+    createSessionInFlight = createSession().finally(() => {
+      createSessionInFlight = null
+    })
+  }
+  return createSessionInFlight
+}
+
+/** 优先本地会话 → 服务端最近有内容会话 → 新建空会话。 */
+export async function restoreOrCreateSession(savedId: string | null): Promise<SessionData> {
+  if (savedId) {
+    try {
+      return await getSession(savedId)
+    } catch {
+      // 会话失效时继续回捞最近有内容的调研
+    }
+  }
+  try {
+    return await getLatestSession()
+  } catch {
+    return createSessionOnce()
+  }
+}
 
 export // 字段 label 的常见中文前缀。匹配回复时去掉这些前缀，用剩余"实义"部分作为关键词，
   // 避免"客户"、"场地"这类泛词误匹配。改 data/sections.ts 字段 label 时需同步复核此处。
@@ -183,10 +211,7 @@ export default function ChatPanel({
     let cancelled = false
     setLoading(true)
     const savedId = getConversationSessionId(userId)
-    const restore = savedId
-      ? getSession(savedId).catch(() => createSession())
-      : createSession()
-    restore
+    restoreOrCreateSession(savedId)
       .then((data) => {
         if (cancelled) return
         setSessionId(data.session_id)

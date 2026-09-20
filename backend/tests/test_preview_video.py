@@ -191,8 +191,11 @@ async def test_success_front_writes_mp4_and_meta(artifacts_root: Path, tmp_path:
     prompt = client.submits[0]['prompt']
     assert '国风' in prompt
     assert '4000K' in prompt
-    assert 'no 文字水印' in prompt
-    assert 'slow cinematic orbit' in prompt
+    assert '不要出现文字水印' in prompt
+    assert '主播桌' in prompt
+    assert 'COB主灯' in prompt
+    assert '以给定首帧图为唯一起点' in prompt
+    assert '正机位' in prompt
 
     art = store.find_latest_video_artifact('run-ok')
     assert art and art['path'] == out.video_path
@@ -387,16 +390,34 @@ def test_select_source_image_priority():
 def test_build_motion_prompt_from_scene_card():
     card = SceneCard(
         style_keywords=['极简'],
+        color_palette=['#f5f0e8'],
         color_temp='5000K',
+        furniture=['主播桌', '展示架'],
+        lighting_fixtures=['COB主灯', '柔光箱'],
         product_category='美妆',
+        room_size_band='small',
         forbidden=['品牌logo'],
     )
-    prompt = build_motion_prompt(card, duration_sec=8, resolution='720P')
+    prompt = build_motion_prompt(card, duration_sec=8, resolution='720P', source_angle='left')
     assert '极简' in prompt
+    assert '#f5f0e8' in prompt
     assert '5000K' in prompt
     assert '美妆' in prompt
-    assert 'no 品牌logo' in prompt
-    assert 'duration 8s' in prompt
+    assert '主播桌' in prompt
+    assert 'COB主灯' in prompt
+    assert 'small' in prompt
+    assert '不要出现品牌logo' in prompt
+    assert '时长约 8 秒' in prompt
+    assert '以给定首帧图为唯一起点' in prompt
+    assert '左侧机位' in prompt
+
+
+def test_build_motion_prompt_front_and_rear_camera_moves():
+    card = SceneCard(product_category='数码')
+    front = build_motion_prompt(card, duration_sec=5, resolution='720P', source_angle='front')
+    rear = build_motion_prompt(card, duration_sec=5, resolution='720P', source_angle='rear')
+    assert '正机位' in front
+    assert '纵深推进' in rear
 
 
 def test_estimate_cost_tiers():

@@ -32,7 +32,7 @@ export interface AuthUser {
 }
 
 /** 统一请求封装：注入 token、401 自动清 auth。 */
-async function request(path: string, init: RequestInit = {}): Promise<Response> {
+export async function request(path: string, init: RequestInit = {}): Promise<Response> {
   const token = getToken()
   const headers: Record<string, string> = {
     ...(init.headers as Record<string, string> | undefined),
@@ -174,6 +174,13 @@ export async function getSession(sessionId: string): Promise<SessionData> {
   return r.json()
 }
 
+/** 取当前用户最近一次有内容的调研会话；无内容时 404。 */
+export async function getLatestSession(): Promise<SessionData> {
+  const r = await request('/session/latest')
+  if (!r.ok) throw await responseError(r, `getLatestSession: ${r.status}`)
+  return r.json()
+}
+
 export interface FieldUpdate {
   section_id: SectionId
   field_id: string
@@ -241,6 +248,25 @@ export async function sendOrder(
     )
   }
 
+  return response.json()
+}
+
+/** 启动 F2–F5 交付管线。 */
+export async function startPipeline(
+  sessionId: string,
+  allowIncomplete = false,
+): Promise<{ id: string; status: string; message: string }> {
+  const response = await request('/pipeline', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      session_id: sessionId,
+      allow_incomplete: allowIncomplete,
+    }),
+  })
+  if (!response.ok) {
+    throw await responseError(response, `startPipeline: ${response.status}`)
+  }
   return response.json()
 }
 

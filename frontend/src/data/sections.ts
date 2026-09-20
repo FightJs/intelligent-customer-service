@@ -20,7 +20,7 @@ export const SECTIONS: SectionDef[] = [
         "question": "请问您的品牌或公司名称是什么？",
         "skippable": false,
         "askInFull": true,
-        "placeholder": "如：云裳",
+        "placeholder": "如：跃步",
         "helpText": "填写说明：用于方案标题与正式归档，是生成专属方案的核心标识。"
       },
       {
@@ -150,6 +150,10 @@ export const SECTIONS: SectionDef[] = [
             "label": "男装"
           },
           {
+            "value": "shoes",
+            "label": "鞋靴"
+          },
+          {
             "value": "beauty",
             "label": "美妆"
           },
@@ -188,8 +192,8 @@ export const SECTIONS: SectionDef[] = [
         "question": "更具体的细分品类是什么？",
         "skippable": true,
         "askInFull": true,
-        "placeholder": "例：高端香云纱女装、黄金珠宝、进口零食",
-        "helpText": "填写示例：高端香云纱女装、黄金珠宝、进口零食，越具体，生成的方案越精准。"
+        "placeholder": "例：国产实战篮球鞋、高端香云纱女装、黄金珠宝、进口零食",
+        "helpText": "填写示例：国产实战篮球鞋、高端香云纱女装、黄金珠宝、进口零食，越具体，生成的方案越精准。"
       },
       {
         "id": "price_band",
@@ -892,8 +896,8 @@ export const SECTIONS: SectionDef[] = [
         "question": "直播间的主营商品类型是什么？",
         "skippable": false,
         "askInFull": true,
-        "placeholder": "例：连衣裙、口红、翡翠手镯",
-        "helpText": "填写示例：连衣裙、口红、翡翠手镯，越具体越好。"
+        "placeholder": "例：实战篮球鞋、口红、翡翠手镯",
+        "helpText": "填写示例：实战篮球鞋、口红、翡翠手镯，越具体越好。"
       },
       {
         "id": "size_cat",

@@ -559,6 +559,30 @@ def test_agent_advice_is_replaced_by_short_collection_reply():
     assert '更适合' not in subtle_advice
 
 
+def test_user_off_topic_uses_topic_correction_lead():
+    state = create_initial_state()
+    reply = _enforce_collector_reply(
+        state,
+        '好的。',
+        user_message='你们一般用什么灯比较合适？',
+    )
+
+    assert reply.startswith('这个我们信息收齐后会一起出方案。')
+    assert reply.endswith('请问您的品牌或公司名称是什么？')
+
+
+def test_user_on_topic_keeps_generic_lead_when_rewrite_needed():
+    state = create_initial_state()
+    reply = _enforce_collector_reply(
+        state,
+        '嗯嗯。',
+        user_message='我们品牌叫云裳',
+    )
+
+    assert reply.startswith('收到，我理解您的情况。')
+    assert '信息收齐后会一起出方案' not in reply
+
+
 @patch('agent.loop.get_client')
 def test_run_agent_fast_path_text_with_fill(mock_get_client):
     """文本+fill_fields 同响应且全部成功时，一轮结束（省一次 LLM 往返）。"""
@@ -881,7 +905,7 @@ def test_suggestions_populated_for_choice_field(mock_get_client):
     s = result.suggestions[0]
     assert s['section_id'] == 'industry'
     assert s['field_id'] == 'category'
-    assert len(s['options']) == 9
+    assert len(s['options']) == 10
     assert {'value': 'women', 'label': '女装'} in s['options']
 
 

@@ -1,0 +1,973 @@
+{
+  "ok": true,
+  "frames_root": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames",
+  "states": [
+    "idle",
+    "running-right",
+    "running-left",
+    "waving",
+    "jumping",
+    "failed",
+    "waiting",
+    "running",
+    "review"
+  ],
+  "errors": [],
+  "warnings": [],
+  "rows": [
+    {
+      "state": "idle",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": null,
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/idle/000.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14882,
+          "bbox": [
+            25,
+            33,
+            168,
+            167
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/idle/001.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14884,
+          "bbox": [
+            29,
+            35,
+            172,
+            169
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/idle/002.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14883,
+          "bbox": [
+            27,
+            34,
+            170,
+            168
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/idle/003.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14881,
+          "bbox": [
+            23,
+            32,
+            166,
+            166
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 4,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/idle/004.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14880,
+          "bbox": [
+            21,
+            31,
+            164,
+            165
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 5,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/idle/005.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14882,
+          "bbox": [
+            25,
+            33,
+            168,
+            167
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    },
+    {
+      "state": "running-right",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": null,
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running-right/000.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15141,
+          "bbox": [
+            28,
+            33,
+            171,
+            180
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running-right/001.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15226,
+          "bbox": [
+            29,
+            35,
+            172,
+            185
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running-right/002.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15142,
+          "bbox": [
+            30,
+            35,
+            173,
+            182
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running-right/003.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15226,
+          "bbox": [
+            29,
+            34,
+            172,
+            184
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 4,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running-right/004.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15141,
+          "bbox": [
+            27,
+            32,
+            170,
+            179
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 5,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running-right/005.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15225,
+          "bbox": [
+            27,
+            31,
+            170,
+            181
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 6,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running-right/006.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15141,
+          "bbox": [
+            27,
+            31,
+            170,
+            178
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 7,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running-right/007.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15225,
+          "bbox": [
+            28,
+            33,
+            171,
+            183
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    },
+    {
+      "state": "running-left",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": null,
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running-left/000.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15221,
+          "bbox": [
+            22,
+            33,
+            165,
+            183
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running-left/001.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15139,
+          "bbox": [
+            23,
+            35,
+            166,
+            182
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running-left/002.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15223,
+          "bbox": [
+            23,
+            35,
+            166,
+            185
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running-left/003.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15139,
+          "bbox": [
+            23,
+            34,
+            166,
+            181
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 4,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running-left/004.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15223,
+          "bbox": [
+            21,
+            32,
+            164,
+            182
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 5,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running-left/005.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15138,
+          "bbox": [
+            20,
+            31,
+            163,
+            178
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 6,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running-left/006.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15222,
+          "bbox": [
+            21,
+            31,
+            164,
+            181
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 7,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running-left/007.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15137,
+          "bbox": [
+            22,
+            33,
+            165,
+            180
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    },
+    {
+      "state": "waving",
+      "expected_frames": 4,
+      "actual_frames": 4,
+      "extraction_method": null,
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/waving/000.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15034,
+          "bbox": [
+            25,
+            33,
+            173,
+            167
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/waving/001.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15128,
+          "bbox": [
+            25,
+            35,
+            173,
+            169
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/waving/002.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15128,
+          "bbox": [
+            25,
+            31,
+            173,
+            165
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/waving/003.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15034,
+          "bbox": [
+            25,
+            33,
+            173,
+            167
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    },
+    {
+      "state": "jumping",
+      "expected_frames": 5,
+      "actual_frames": 5,
+      "extraction_method": null,
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/jumping/000.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15194,
+          "bbox": [
+            25,
+            33,
+            168,
+            177
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/jumping/001.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15196,
+          "bbox": [
+            30,
+            24,
+            173,
+            168
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/jumping/002.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15194,
+          "bbox": [
+            25,
+            15,
+            168,
+            159
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/jumping/003.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15192,
+          "bbox": [
+            20,
+            18,
+            163,
+            162
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 4,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/jumping/004.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15194,
+          "bbox": [
+            25,
+            33,
+            168,
+            177
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    },
+    {
+      "state": "failed",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": null,
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/failed/000.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14882,
+          "bbox": [
+            25,
+            41,
+            168,
+            175
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/failed/001.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14882,
+          "bbox": [
+            25,
+            43,
+            168,
+            177
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/failed/002.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14883,
+          "bbox": [
+            26,
+            43,
+            169,
+            177
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/failed/003.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14883,
+          "bbox": [
+            26,
+            42,
+            169,
+            176
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 4,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/failed/004.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14883,
+          "bbox": [
+            26,
+            40,
+            169,
+            174
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 5,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/failed/005.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14883,
+          "bbox": [
+            26,
+            39,
+            169,
+            173
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 6,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/failed/006.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14882,
+          "bbox": [
+            25,
+            39,
+            168,
+            173
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 7,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/failed/007.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14882,
+          "bbox": [
+            25,
+            41,
+            168,
+            175
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    },
+    {
+      "state": "waiting",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": null,
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/waiting/000.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14882,
+          "bbox": [
+            25,
+            36,
+            168,
+            170
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/waiting/001.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14884,
+          "bbox": [
+            29,
+            38,
+            172,
+            172
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/waiting/002.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14883,
+          "bbox": [
+            27,
+            37,
+            170,
+            171
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/waiting/003.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14881,
+          "bbox": [
+            23,
+            35,
+            166,
+            169
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 4,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/waiting/004.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14880,
+          "bbox": [
+            21,
+            34,
+            164,
+            168
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 5,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/waiting/005.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14882,
+          "bbox": [
+            25,
+            36,
+            168,
+            170
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    },
+    {
+      "state": "running",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": null,
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running/000.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15034,
+          "bbox": [
+            25,
+            33,
+            168,
+            167
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running/001.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15032,
+          "bbox": [
+            29,
+            35,
+            172,
+            169
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running/002.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15032,
+          "bbox": [
+            27,
+            34,
+            170,
+            168
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running/003.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15020,
+          "bbox": [
+            23,
+            32,
+            166,
+            166
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 4,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running/004.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15044,
+          "bbox": [
+            21,
+            31,
+            164,
+            165
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 5,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/running/005.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15043,
+          "bbox": [
+            25,
+            33,
+            168,
+            167
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    },
+    {
+      "state": "review",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": null,
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/review/000.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14882,
+          "bbox": [
+            25,
+            33,
+            168,
+            167
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/review/001.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14884,
+          "bbox": [
+            29,
+            35,
+            172,
+            169
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/review/002.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14883,
+          "bbox": [
+            27,
+            34,
+            170,
+            168
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/review/003.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14881,
+          "bbox": [
+            23,
+            32,
+            166,
+            166
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 4,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/review/004.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14880,
+          "bbox": [
+            21,
+            31,
+            164,
+            165
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 5,
+          "file": "/Users/xiaochao/Desktop/intelligent-customer-service/docs/Tablepet/runs/node-ball/qa/frames/review/005.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14882,
+          "bbox": [
+            25,
+            33,
+            168,
+            167
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    }
+  ]
+}

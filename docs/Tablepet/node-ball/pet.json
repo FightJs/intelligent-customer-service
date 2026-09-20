@@ -1,0 +1,32 @@
+{
+  "id": "node-ball",
+  "displayName": "节点球",
+  "description": "面向智能客服工作台的圆润节点助手，以核心环表达执行、完成和异常状态。",
+  "spriteVersionNumber": 2,
+  "spritesheetPath": "spritesheet.webp",
+  "cell": {
+    "width": 192,
+    "height": 208,
+    "columns": 8,
+    "rows": 11
+  },
+  "palette": {
+    "base": "#0A0A0A",
+    "surface": "#171717",
+    "accent": "#3B82F6",
+    "done": "#34D399",
+    "danger": "#F87171"
+  },
+  "states": {
+    "idle": "安静呼吸与眨眼",
+    "running-right": "向右移动",
+    "running-left": "向左移动",
+    "waving": "抬手回应",
+    "jumping": "确认反馈",
+    "failed": "异常反馈",
+    "waiting": "等待用户输入",
+    "running": "处理与扫描",
+    "review": "完成审核",
+    "look-directions": "16 个屏幕坐标方向"
+  }
+}

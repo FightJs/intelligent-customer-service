@@ -1,5 +1,6 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
 import { fireEvent, render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import TopBar from '../src/components/TopBar'
 import type { Theme } from '../src/state/theme'
@@ -16,7 +17,11 @@ function renderBar(overrides: Partial<React.ComponentProps<typeof TopBar>> = {})
     onRestoreCenterCard: vi.fn(),
     ...overrides,
   }
-  return { props, ...render(<TopBar {...props} />) }
+  return { props, ...render(
+    <MemoryRouter>
+      <TopBar {...props} />
+    </MemoryRouter>,
+  ) }
 }
 
 describe('TopBar', () => {

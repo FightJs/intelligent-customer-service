@@ -3,8 +3,9 @@ import AdminHeader from '../components/admin/AdminHeader'
 import AdminErrorNotification from '../components/admin/AdminErrorNotification'
 import DeliveriesTab from './admin/DeliveriesTab'
 import UsersTab from './admin/UsersTab'
+import KnowledgeTab from './admin/KnowledgeTab'
 
-type Tab = 'deliveries' | 'users'
+type Tab = 'deliveries' | 'users' | 'knowledge'
 
 /** 管理后台编排层：顶栏 tab 切换 + 内容区。各 tab 自管理数据与状态。 */
 export default function AdminScreen() {
@@ -55,6 +56,15 @@ export default function AdminScreen() {
             inert={tab !== 'users'}
           >
             <UsersTab onViewDeliveries={(userId) => { setDeliveryUserId(userId); setTab('deliveries') }} />
+          </section>
+          <section
+            data-testid="admin-tab-knowledge"
+            data-active={tab === 'knowledge'}
+            className="admin-tab-panel"
+            aria-hidden={tab !== 'knowledge'}
+            inert={tab !== 'knowledge'}
+          >
+            <KnowledgeTab />
           </section>
         </div>
       </main>

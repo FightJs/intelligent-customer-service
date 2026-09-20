@@ -202,12 +202,16 @@ def run_final_package(
     (package_dir / 'images').mkdir(parents=True, exist_ok=True)
     (package_dir / 'video').mkdir(parents=True, exist_ok=True)
 
-    # 1) docs: plan.json + plan.pdf
+    # 1) docs: plan.json + plan.pdf（或降级 docx）
     copy_into_package(Path(plan_output.plan_json_path), package_dir, 'docs/plan.json')
     has_plan_pdf = False
     if plan_output.pdf_path and Path(plan_output.pdf_path).is_file():
         copy_into_package(Path(plan_output.pdf_path), package_dir, 'docs/plan.pdf')
         has_plan_pdf = True
+    else:
+        docx_src = Path(plan_output.plan_json_path).parent / 'plan.docx'
+        if docx_src.is_file():
+            copy_into_package(docx_src, package_dir, 'docs/plan.docx')
 
     # 2) images
     present_images: list[dict[str, str]] = []

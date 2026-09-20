@@ -17,6 +17,8 @@ export default {
         danger: 'rgb(var(--color-danger) / <alpha-value>)',
         'brand-soft': 'rgb(var(--color-brand-soft) / <alpha-value>)',
         idle: 'rgb(var(--color-idle) / <alpha-value>)',
+        outline: 'rgb(var(--color-outline) / <alpha-value>)',
+        recess: 'rgb(var(--color-recess) / <alpha-value>)',
       },
       borderRadius: {
         card: '8px',

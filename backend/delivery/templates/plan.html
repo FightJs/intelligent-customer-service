@@ -130,6 +130,9 @@
   <div class="summary-box">{{ summary }}</div>
 
   <h2>二、空间与布局</h2>
+  {% if layout_scale %}
+  <div class="summary-box">{{ layout_scale }}</div>
+  {% endif %}
   <ul>
     {% for zone in layout.zones %}
     <li><strong>{{ zone.name }}</strong>：{{ zone.notes }}</li>
@@ -141,65 +144,105 @@
     <tr><th>背景</th><td>{{ layout.background_plan }}</td></tr>
   </table>
 
-  <h2>三、设备清单</h2>
+  <h2>三、设备清单（含型号与参数）</h2>
+  {% if must_buy_list %}
+  <p><strong>必买 / 必租：</strong>{{ must_buy_list|join('、') }}</p>
+  {% endif %}
   <table>
     <thead>
       <tr>
-        <th>类别</th><th>名称/型号</th><th>品牌</th><th>数量</th><th>理由</th><th>状态</th>
+        <th>类别</th><th>名称/型号</th><th>品牌</th><th>数量</th><th>关键参数</th><th>参考价</th><th>状态</th>
       </tr>
     </thead>
     <tbody>
       {% for item in equipment_list %}
       <tr>
         <td>{{ item.category }}</td>
-        <td>{{ item.name }}{% if item.model %}<br/><span class="muted">{{ item.model }}</span>{% endif %}</td>
+        <td>
+          {% if item.brand %}{{ item.brand }} {% endif %}{{ item.model or item.name }}
+          {% if item.model and item.name and item.model != item.name %}
+          <br/><span class="muted">{{ item.name }}</span>
+          {% endif %}
+        </td>
         <td>{{ item.brand or '—' }}</td>
         <td>{{ item.qty }}</td>
-        <td>{{ item.reason }}</td>
         <td>
+          {% if item.specs %}
+            {% for k, v in item.specs.items() %}
+              {{ k }}：{{ v }}{% if not loop.last %}；{% endif %}
+            {% endfor %}
+          {% else %}—{% endif %}
+          {% if item.reason %}<br/><span class="muted">{{ item.reason }}</span>{% endif %}
+        </td>
+        <td>
+          {% if item.purchase_price %}购 {{ item.purchase_price }}<br/>{% endif %}
+          {% if item.rent_monthly and item.rent_monthly != '—' %}租 {{ item.rent_monthly }}/月{% endif %}
+        </td>
+        <td>
+          {% if item.must_buy and not item.already_owned %}<span class="tag">必买</span>{% endif %}
           {% if item.already_owned %}<span class="tag">已有</span>{% endif %}
           {% if item.is_custom %}<span class="tag">定制</span>{% endif %}
           {% if item.knowledge_id %}<span class="tag">#{{ item.knowledge_id }}</span>{% endif %}
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="muted">暂无设备清单</td></tr>
+      <tr><td colspan="7" class="muted">暂无设备清单</td></tr>
       {% endfor %}
     </tbody>
   </table>
 
-  <h2>四、三档套餐</h2>
+  <h2>四、三档套餐（购买 / 租赁）</h2>
   <table>
     <thead>
-      <tr><th>档位</th><th>金额区间</th><th>包含内容</th></tr>
+      <tr><th>档位</th><th>金额区间</th><th>月租参考</th><th>模式</th><th>包含内容</th></tr>
     </thead>
     <tbody>
       {% for tier in package_tiers %}
       <tr>
-        <td>{{ tier.tier }}</td>
+        <td>{{ tier.tier }}{% if tier.suitable %}<br/><span class="muted">{{ tier.suitable }}</span>{% endif %}</td>
         <td>{{ tier.total_range }}</td>
+        <td>{{ tier.monthly_rent_range or '—' }}</td>
+        <td>{{ {'rent': '租赁', 'buy': '购买', 'mixed': '租买混合'}.get(tier.mode, tier.mode or '混合') }}</td>
         <td>
           {% if tier.items %}
             {% for item in tier.items %}
-              {{ item.name }} ×{{ item.qty }}{% if not loop.last %}；{% endif %}
+              {% if item.brand %}{{ item.brand }} {% endif %}{{ item.model or item.name }} ×{{ item.qty }}{% if not loop.last %}；{% endif %}
             {% endfor %}
           {% else %}—{% endif %}
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="3" class="muted">暂无套餐</td></tr>
+      <tr><td colspan="5" class="muted">暂无套餐</td></tr>
       {% endfor %}
     </tbody>
   </table>
 
-  <h2>五、搭建步骤</h2>
+  {% if rental_channels %}
+  <h2>五、设备租赁 / 采购渠道</h2>
+  <ul>
+    {% for ch in rental_channels %}
+    <li><strong>{{ ch.name }}</strong>{% if ch.categories %}（{{ ch.categories|join('、') }}）{% endif %}：{{ ch.note }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if vertical_notes %}
+  <h2>六、垂类搭建要点</h2>
+  <ul>
+    {% for note in vertical_notes %}
+    <li>{{ note }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <h2>七、搭建步骤</h2>
   <ol>
     {% for step in setup_steps %}
     <li>{{ step }}</li>
     {% endfor %}
   </ol>
 
-  <h2>六、风险与提示</h2>
+  <h2>八、风险与提示</h2>
   {% if risks %}
   <ul class="risk-list">
     {% for risk in risks %}
@@ -210,7 +253,7 @@
   <p class="muted">暂无额外风险提示。</p>
   {% endif %}
 
-  <h2>七、场景卡（供预览图使用）</h2>
+  <h2>九、场景卡（供预览图使用）</h2>
   <table class="kv">
     <tr><td>风格关键词</td><td>{% for k in scene_card.style_keywords %}<span class="tag">{{ k }}</span>{% endfor %}</td></tr>
     <tr><td>色板</td><td>{{ scene_card.color_palette|join(' / ') }}</td></tr>

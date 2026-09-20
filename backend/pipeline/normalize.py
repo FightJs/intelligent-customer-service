@@ -152,6 +152,7 @@ def industry_label(industry: str) -> str:
     labels = {
         'women': '女装',
         'men': '男装',
+        'shoes': '鞋靴',
         'beauty': '美妆',
         'food': '食品',
         'jewelry': '珠宝',

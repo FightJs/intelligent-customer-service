@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Package, Users } from 'lucide-react'
+import { ArrowLeft, Database, Package, Users } from 'lucide-react'
 
-type Tab = 'deliveries' | 'users'
+type Tab = 'deliveries' | 'users' | 'knowledge'
 
 interface AdminHeaderProps {
   tab: Tab
@@ -11,6 +11,7 @@ interface AdminHeaderProps {
 const TABS: { id: Tab; label: string; icon: typeof Package }[] = [
   { id: 'deliveries', label: '交付物', icon: Package },
   { id: 'users', label: '用户', icon: Users },
+  { id: 'knowledge', label: '知识库', icon: Database },
 ]
 
 /** 后台顶栏：标题 + tab 切换 + 返回工作台。对齐 TopBar 高度(h-12)。 */
