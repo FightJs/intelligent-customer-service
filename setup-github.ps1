@@ -1,9 +1,9 @@
-﻿# setup-github.ps1 — 一次性 GitHub 环境初始化（monorepo 版）
+# setup-github.ps1 — 一次性 GitHub 环境初始化（monorepo 版）
 # 前置：代理客户端（Clash 等）运行中，GitHub 规则生效
 # 用法：在 A:\Intelligent Customer Service 下执行  .\setup-github.ps1
 #
 # 适用场景：在新机器上 clone 本仓库后，配置 GitHub CLI + git 凭据 + 上传缓冲。
-# 仓库已存在于 GitHub（HXS482/intelligent-customer-service），本脚本不再创建仓库。
+# 仓库已存在于 GitHub（FightJs/intelligent-customer-service），本脚本不再创建仓库。
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = "A:\Intelligent Customer Service"
@@ -58,11 +58,11 @@ if ($remote) {
     & git ls-remote origin *>$null
     if ($LASTEXITCODE -eq 0) {
         Write-Host "`n✅ 环境就绪！可用 git pull / push 与 GitHub 同步。" -ForegroundColor Green
-        Write-Host "仓库地址：https://github.com/HXS482/intelligent-customer-service" -ForegroundColor Cyan
+        Write-Host "仓库地址：https://github.com/FightJs/intelligent-customer-service" -ForegroundColor Cyan
     } else {
         Write-Host "git ls-remote 失败，请检查凭据与代理" -ForegroundColor Red
     }
 } else {
     Write-Host "未检测到 origin 远程。若是新 clone，请确认仓库地址正确。" -ForegroundColor Yellow
-    Write-Host "手动添加：git remote add origin https://github.com/HXS482/intelligent-customer-service.git" -ForegroundColor Yellow
+    Write-Host "手动添加：git remote add origin https://github.com/FightJs/intelligent-customer-service.git" -ForegroundColor Yellow
 }

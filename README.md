@@ -12,7 +12,7 @@ AI 对话式客服系统，通过多轮对话采集直播间搭建需求，自�
 ### 1. 克隆并进入项目
 
 ```bash
-git clone https://github.com/HXS482/intelligent-customer-service.git
+git clone https://github.com/FightJs/intelligent-customer-service.git
 cd intelligent-customer-service
 ```
 

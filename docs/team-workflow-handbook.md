@@ -12,7 +12,7 @@
 
 ### 2. 克隆仓库
 ```bash
-git clone https://github.com/HXS482/intelligent-customer-service.git
+git clone https://github.com/FightJs/intelligent-customer-service.git
 cd intelligent-customer-service
 ```
 
