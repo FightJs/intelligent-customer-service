@@ -40,7 +40,7 @@ const PALETTES: Array<{ id: PaletteId; label: string; description: string }> = [
   { id: 'govuk', label: '信任服务台', description: '白底 + 可信蓝，状态和焦点边界最明确' },
 ]
 
-export default function WorkbenchPreview() {
+export default function WorkbenchPreview({ demo = false }: { demo?: boolean }) {
   const [palette, setPalette] = useState<PaletteId>('jade')
   const [selectedEquipment, setSelectedEquipment] = useState('fx3')
   const [addedToOrder, setAddedToOrder] = useState(false)
@@ -159,8 +159,8 @@ export default function WorkbenchPreview() {
 
           <form className="rental-preview-composer" onSubmit={(event) => event.preventDefault()}>
             <label className="sr-only" htmlFor="rental-preview-input">输入租赁需求</label>
-            <input id="rental-preview-input" placeholder="补充设备、收音或取还需求" />
-            <button type="submit" aria-label="发送消息"><Send size={16} /></button>
+            <input disabled={demo} id="rental-preview-input" placeholder="补充设备、收音或取还需求" />
+            <button disabled={demo} type="submit" aria-label="发送消息"><Send size={16} /></button>
           </form>
         </section>
 
@@ -213,7 +213,7 @@ export default function WorkbenchPreview() {
           >
             {addedToOrder ? <><Check size={16} />已加入租赁单</> : '加入租赁单'}
           </button>
-          <button className="rental-preview-secondary-action" type="button"><FileText size={15} />查看配置说明</button>
+          <button disabled={demo} className="rental-preview-secondary-action" type="button"><FileText size={15} />查看配置说明</button>
         </aside>
       </div>
     </main>
