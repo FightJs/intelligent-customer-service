@@ -1,3 +1,4 @@
+import { apiFetch, isPagesDemo } from './transport'
 /**
  * 后端 API client。
  *
@@ -6,23 +7,24 @@
  */
 import type { StudioFormState, SectionId } from '../types/schema'
 
-export const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/api'
+export const API_BASE = isPagesDemo ? '/api' : import.meta.env.VITE_API_BASE ?? 'http://localhost:8000/api'
 
-const TOKEN_KEY = 'ics_token'
-const USER_KEY = 'ics_user'
+const TOKEN_KEY = isPagesDemo ? 'ics_demo_token' : 'ics_token'
+export const USER_KEY = isPagesDemo ? 'ics_demo_user' : 'ics_user'
+export const authStorage = () => isPagesDemo ? sessionStorage : localStorage
 
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
+  return authStorage().getItem(TOKEN_KEY)
 }
 
 export function setAuth(token: string, user: AuthUser): void {
-  localStorage.setItem(TOKEN_KEY, token)
-  localStorage.setItem(USER_KEY, JSON.stringify(user))
+  authStorage().setItem(TOKEN_KEY, token)
+  authStorage().setItem(USER_KEY, JSON.stringify(user))
 }
 
 export function clearAuth(): void {
-  localStorage.removeItem(TOKEN_KEY)
-  localStorage.removeItem(USER_KEY)
+  authStorage().removeItem(TOKEN_KEY)
+  authStorage().removeItem(USER_KEY)
 }
 
 export interface AuthUser {
@@ -39,7 +41,7 @@ export async function request(path: string, init: RequestInit = {}): Promise<Res
   }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const r = await fetch(`${API_BASE}${path}`, { ...init, headers })
+  const r = await apiFetch(`${API_BASE}${path}`, { ...init, headers })
   if (r.status === 401) {
     clearAuth()
     // 跳登录（避免在循环里用 router，简单 reload）
@@ -59,7 +61,7 @@ async function responseError(r: Response, fallback: string): Promise<Error> {
 // ── Auth ─────────────────────────────────────────────────────
 
 export async function register(username: string, password: string): Promise<{ token: string; user: AuthUser }> {
-  const r = await fetch(`${API_BASE}/auth/register`, {
+  const r = await apiFetch(`${API_BASE}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
@@ -72,7 +74,7 @@ export async function register(username: string, password: string): Promise<{ to
 }
 
 export async function login(username: string, password: string): Promise<{ token: string; user: AuthUser }> {
-  const r = await fetch(`${API_BASE}/auth/login`, {
+  const r = await apiFetch(`${API_BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),

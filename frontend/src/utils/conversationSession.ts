@@ -1,4 +1,6 @@
-const SESSION_KEY_PREFIX = 'ics_session_id'
+import { isPagesDemo } from '../api/transport'
+
+const SESSION_KEY_PREFIX = isPagesDemo ? 'ics_demo_session_id' : 'ics_session_id'
 
 export function conversationSessionKey(userId: number): string {
   return `${SESSION_KEY_PREFIX}:${userId}`

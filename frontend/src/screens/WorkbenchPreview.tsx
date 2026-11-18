@@ -40,10 +40,13 @@ const PALETTES: Array<{ id: PaletteId; label: string; description: string }> = [
   { id: 'govuk', label: '信任服务台', description: '白底 + 可信蓝，状态和焦点边界最明确' },
 ]
 
-export default function WorkbenchPreview() {
+export default function WorkbenchPreview({ demo = false }: { demo?: boolean }) {
   const [palette, setPalette] = useState<PaletteId>('jade')
   const [selectedEquipment, setSelectedEquipment] = useState('fx3')
   const [addedToOrder, setAddedToOrder] = useState(false)
+  const [message, setMessage] = useState('')
+  const [sentMessage, setSentMessage] = useState('')
+  const [showDetails, setShowDetails] = useState(false)
   const selected = EQUIPMENT.find(({ id }) => id === selectedEquipment) ?? EQUIPMENT[0]
 
   return (
@@ -155,12 +158,25 @@ export default function WorkbenchPreview() {
               </div>
               <ChevronRight size={16} aria-hidden="true" />
             </article>
+            {demo && sentMessage && <>
+              <article className="rental-preview-message is-customer"><div><p>{sentMessage}</p></div></article>
+              <article className="rental-preview-message is-advisor">
+                <span className="rental-preview-message-avatar">L</span>
+                <div><p>模拟回复：已收到补充需求。可在右侧试选设备，核对示例租金。</p></div>
+              </article>
+            </>}
           </div>
 
-          <form className="rental-preview-composer" onSubmit={(event) => event.preventDefault()}>
+          <form className="rental-preview-composer" onSubmit={(event) => {
+            event.preventDefault()
+            if (demo && message.trim()) {
+              setSentMessage(message.trim())
+              setMessage('')
+            }
+          }}>
             <label className="sr-only" htmlFor="rental-preview-input">输入租赁需求</label>
-            <input id="rental-preview-input" placeholder="补充设备、收音或取还需求" />
-            <button type="submit" aria-label="发送消息"><Send size={16} /></button>
+            <input value={demo ? message : undefined} onChange={demo ? event => setMessage(event.target.value) : undefined} maxLength={demo ? 200 : undefined} id="rental-preview-input" placeholder="补充设备、收音或取还需求" />
+            <button disabled={demo && !message.trim()} type="submit" aria-label="发送消息"><Send size={16} /></button>
           </form>
         </section>
 
@@ -213,7 +229,8 @@ export default function WorkbenchPreview() {
           >
             {addedToOrder ? <><Check size={16} />已加入租赁单</> : '加入租赁单'}
           </button>
-          <button className="rental-preview-secondary-action" type="button"><FileText size={15} />查看配置说明</button>
+          <button className="rental-preview-secondary-action" type="button" aria-expanded={demo ? showDetails : undefined} onClick={demo ? () => setShowDetails(value => !value) : undefined}><FileText size={15} />查看配置说明</button>
+          {demo && showDetails && <div className="rental-preview-inventory-note">{selected.name} · {selected.detail}。示例配置及价格仅用于页面体验。</div>}
         </aside>
       </div>
     </main>

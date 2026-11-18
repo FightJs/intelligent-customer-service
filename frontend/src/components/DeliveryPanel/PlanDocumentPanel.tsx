@@ -3,7 +3,7 @@ import type {
   PlanContent,
   PlanEquipmentItem,
   PlanPackageTier,
-} from '../api/pipeline'
+} from '../../api/pipeline'
 
 const ROOM_SIZE_LABEL: Record<string, string> = {
   small: '小型间 10-20㎡',

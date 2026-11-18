@@ -1,3 +1,4 @@
+import { apiFetch } from './transport'
 import { API_BASE, clearAuth, getToken } from './client'
 import type {
   FieldUpdate,
@@ -169,7 +170,7 @@ export async function streamChat(
   signal: AbortSignal,
 ): Promise<void> {
   const token = getToken()
-  const response = await fetch(`${API_BASE}/chat/stream`, {
+  const response = await apiFetch(`${API_BASE}/chat/stream`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

@@ -98,3 +98,6 @@ $RECYCLE.BIN/
 # ---------- 本地脚手架产物（不入库）----------
 _workspace-backup/
 _ics_tmp_hold/
+
+# Pages demo build
+frontend/dist-demo/

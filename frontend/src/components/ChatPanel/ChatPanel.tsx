@@ -1,3 +1,4 @@
+import { isPagesDemo } from '../../api/transport'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -686,7 +687,7 @@ export default function ChatPanel({
         <div ref={scrollRef} className="chat-scrollbar flex-1 overflow-y-auto p-4">
           {loading && <div className="text-muted text-xs text-center">正在连接顾问…</div>}
           {messages.map((m) => (
-            <MessageBubble key={m.id} role={m.role} text={m.text} aiAvatarSrc="/logo.svg">
+            <MessageBubble key={m.id} role={m.role} text={m.text} aiAvatarSrc={import.meta.env.BASE_URL + 'logo.svg'}>
               {m.role === 'ai' ? (
                 <div className="prose-chat" aria-live={m.partial ? 'polite' : undefined}>
                   <ReactMarkdown
@@ -753,6 +754,11 @@ export default function ChatPanel({
             disabled={sending || loading || listening || actionLoading || ended}
           />
 
+          {isPagesDemo && !finished && !ended && !sending && !loading && !actionLoading && (
+            <button type="button" className="pages-demo-example" onClick={() => sendMessage('使用示例回答')}>
+              使用示例回答
+            </button>
+          )}
           {images.length > 0 && (
             <div className="flex gap-2 flex-wrap">
               {images.map((uri, i) => (
@@ -936,7 +942,7 @@ export default function ChatPanel({
               }
               aria-pressed={listening}
               title={
-                !speechSupported
+                isPagesDemo || !speechSupported
                   ? '当前浏览器不支持语音输入'
                   : coarsePointer
                     ? (listening ? '松开停止' : '按住说话')
