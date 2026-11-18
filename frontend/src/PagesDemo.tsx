@@ -1,10 +1,27 @@
-import WorkbenchPreview from './screens/WorkbenchPreview'
+import { HashRouter, NavLink } from 'react-router-dom'
+import App from './App'
+import { AuthProvider, useAuth } from './state/AuthContext'
+import './styles/pagesDemo.css'
+
+function DemoNav() {
+  const { user } = useAuth()
+  return <header className="pages-demo-bar">
+    <p><strong>流程演示</strong> · 使用合成数据与固定媒体样张，输入仅留在当前浏览器标签页。请使用虚构信息。</p>
+    <nav aria-label="演示页面">
+      <NavLink end to="/">产品介绍</NavLink>
+      <NavLink to="/welcome">开场页</NavLink>
+      <NavLink to="/workbench-preview">租赁预览</NavLink>
+      <NavLink to={user ? '/workbench' : '/login'}>开始体验</NavLink>
+      {user && <><NavLink to="/plans">我的方案</NavLink><NavLink to="/admin">管理后台</NavLink></>}
+    </nav>
+  </header>
+}
 
 export default function PagesDemo() {
-  return <>
-    <div role="status" style={{ padding: '12px 20px', background: '#fff2c7', color: '#3e320e', lineHeight: 1.5 }}>
-      前端演示：全部内容均为示例数据。登录、数据保存、AI 调用及订单服务未接入；选择和加入操作仅在当前页面模拟。
+  return <HashRouter><AuthProvider>
+    <div className="pages-demo">
+      <DemoNav />
+      <div className="pages-demo-app"><App /></div>
     </div>
-    <WorkbenchPreview demo />
-  </>
+  </AuthProvider></HashRouter>
 }

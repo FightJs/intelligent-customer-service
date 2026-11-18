@@ -1,3 +1,4 @@
+import { apiFetch } from './transport'
 /** 交付管线 API 与前端展示类型（对齐后端 build_pipeline_detail）。 */
 import { API_BASE, getToken, request } from './client'
 
@@ -256,7 +257,7 @@ export async function fetchAuthedBlobUrl(path: string): Promise<string> {
   const token = getToken()
   const headers: Record<string, string> = {}
   if (token) headers['Authorization'] = `Bearer ${token}`
-  const r = await fetch(`${API_BASE}${path}`, { headers })
+  const r = await apiFetch(`${API_BASE}${path}`, { headers })
   if (!r.ok) throw new Error(`下载失败: ${r.status}`)
   const blob = await r.blob()
   return URL.createObjectURL(blob)
@@ -266,7 +267,7 @@ export async function downloadAuthedFile(path: string, filename: string): Promis
   const token = getToken()
   const headers: Record<string, string> = {}
   if (token) headers['Authorization'] = `Bearer ${token}`
-  const r = await fetch(`${API_BASE}${path}`, { headers })
+  const r = await apiFetch(`${API_BASE}${path}`, { headers })
   if (!r.ok) throw await responseError(r, `download: ${r.status}`)
   const blob = await r.blob()
   const url = URL.createObjectURL(blob)

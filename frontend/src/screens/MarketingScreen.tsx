@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { isPagesDemo } from '../api/transport'
 import { useNavigate } from 'react-router-dom'
 import MarketingHeader from '../components/marketing/MarketingHeader'
 import { CapabilitySection, DeliverablesSection, FaqSection, HeroWaterfall, ScenariosSection, ValueSection, WorkflowSection } from '../components/marketing/MarketingSections'
@@ -51,7 +52,13 @@ export default function MarketingScreen() {
   }
 
   return (
-    <main className="marketing-page" id="top" ref={pageRef}>
+    <main className="marketing-page" id="top" ref={pageRef} onClick={isPagesDemo ? (event) => {
+      const hash = (event.target as Element).closest('a')?.getAttribute('href')
+      if (!hash?.startsWith('#')) return
+      event.preventDefault()
+      if (hash === '#top') pageRef.current?.scrollTo({ top: 0 })
+      else document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' })
+    } : undefined}>
       <MarketingHeader
         menuOpen={menuOpen}
         onMenuToggle={() => setMenuOpen((open) => !open)}

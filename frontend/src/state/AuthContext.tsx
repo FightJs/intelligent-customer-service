@@ -7,6 +7,8 @@ import {
   setAuth,
   clearAuth,
   getToken,
+  USER_KEY,
+  authStorage,
   type AuthUser,
 } from '../api/client'
 import { clearAllConversationSessions } from '../utils/conversationSession'
@@ -28,10 +30,8 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-const USER_KEY = 'ics_user'
-
 function loadUserFromStorage(): AuthUser | null {
-  const raw = localStorage.getItem(USER_KEY)
+  const raw = authStorage().getItem(USER_KEY)
   if (!raw) return null
   try {
     return JSON.parse(raw) as AuthUser

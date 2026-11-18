@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { isPagesDemo } from '../api/transport'
 import { useAuth } from '../state/AuthContext'
 
 type Mode = 'login' | 'register'
@@ -60,17 +61,18 @@ export default function AuthScreen() {
         className="auth-form-container w-full max-w-sm p-6 shadow-xl"
       >
         <div className="mb-6 text-center">
-          <img src="/logo.svg" alt="" className="mx-auto mb-3 h-10 w-10" />
+          <img src={import.meta.env.BASE_URL + 'logo.svg'} alt="" className="mx-auto mb-3 h-10 w-10" />
           <h1 className="text-xl font-semibold">
-            {mode === 'login' ? '登录' : '注册'}
+            {isPagesDemo ? '进入流程演示' : mode === 'login' ? '登录' : '注册'}
           </h1>
           <p className="mt-2 text-sm text-secondary">
-            {mode === 'login'
+            {isPagesDemo ? '使用预设演示身份体验完整流程' : mode === 'login'
               ? '登录智能客服系统'
               : '创建账号开始使用'}
           </p>
         </div>
 
+        {!isPagesDemo && <>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="auth-username" className="mb-1.5 block text-sm text-secondary">
@@ -159,6 +161,7 @@ export default function AuthScreen() {
           <span className="h-px flex-1 bg-idle" />
         </div>
 
+        </>}
         <button
           type="button"
           disabled={busy}
@@ -167,11 +170,11 @@ export default function AuthScreen() {
           }}
           className="w-full rounded-bubble px-4 py-2.5 text-sm font-medium text-primary ring-1 ring-idle transition-colors hover:bg-idle/40 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          快速使用（简约版）
+          {isPagesDemo ? '以演示身份进入工作台' : '快速使用（简约版）'}
         </button>
 
         <p className="mt-2 text-center text-xs text-muted">
-          无需注册，体验精简版需求采集
+          {isPagesDemo ? '包含需求采集、提交订单、方案交付和管理后台。' : '无需注册，体验精简版需求采集'}
         </p>
       </div>
     </div>

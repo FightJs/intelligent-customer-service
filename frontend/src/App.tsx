@@ -8,6 +8,7 @@ import PlansScreen from './screens/PlansScreen'
 import BreathingScreen from './components/BreathingScreen'
 import MarketingScreen from './screens/MarketingScreen'
 import WorkbenchPreview from './screens/WorkbenchPreview'
+import { isPagesDemo } from './api/transport'
 import { useTheme } from './state/theme'
 
 function ThemeRoot({ children }: { children: React.ReactNode }) {
@@ -75,7 +76,7 @@ export default function App() {
           </Protected>
         }
       />
-      <Route path="/workbench-preview" element={<WorkbenchPreview />} />
+      <Route path="/workbench-preview" element={<WorkbenchPreview demo={isPagesDemo} />} />
       <Route
         path="/plans"
         element={

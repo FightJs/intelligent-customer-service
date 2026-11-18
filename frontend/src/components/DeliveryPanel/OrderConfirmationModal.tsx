@@ -1,3 +1,4 @@
+import { isPagesDemo } from '../../api/transport'
 import { useState } from 'react'
 import {
   Check,
@@ -163,8 +164,7 @@ export default function OrderConfirmationModal({
               <h3>{successMessage}</h3>
 
               <p>
-                需求及三类结构化内容已统一提交，
-                管理员现在可以在后台交付物列表中查看。
+                {isPagesDemo ? '可前往「我的方案」查看交付包，也可在演示管理后台查看本次记录。' : '需求及三类结构化内容已统一提交，管理员现在可以在后台交付物列表中查看。'}
               </p>
 
               <button

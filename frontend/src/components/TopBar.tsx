@@ -87,7 +87,7 @@ export default function TopBar({
         </div>
         <div className="flex-1" />
         <div className="flex items-center gap-2.5">
-          <img src="/logo.svg" alt="logo" className="w-7 h-7" />
+          <img src={import.meta.env.BASE_URL + 'logo.svg'} alt="logo" className="w-7 h-7" />
           <span className="top-bar-title text-secondary text-[16px] leading-6 font-medium pointer-events-none">Livestream Studio Setup Assistant</span>
         </div>
         <div className="flex-1 flex items-center justify-end gap-3.5">

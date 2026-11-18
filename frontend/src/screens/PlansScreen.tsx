@@ -1,3 +1,4 @@
+import { isPagesDemo } from '../api/transport'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Download, FileText, Loader2, RefreshCw, RotateCcw, Square } from 'lucide-react'
@@ -440,7 +441,7 @@ function PlanDetailPanel({
               <span>
                 {plan.video.durationSec}s · {plan.video.resolution}
               </span>
-              <span>基于正面机位 i2v</span>
+              <span>{isPagesDemo ? '固定布置示意样片' : '基于正面机位 i2v'}</span>
             </div>
           </div>
         ) : plan.skills.video === 'running' || plan.status === 'running' ? (
